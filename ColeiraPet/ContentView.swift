@@ -8,14 +8,13 @@
 import SwiftUI
 
 struct ContentView: View {
+    // Troque para o endereco final de producao quando necessario.
+    private let appURL = URL(string: "http://localhost:3000")!
+
     var body: some View {
-        ZStack {
-            // Load from localhost for development
-            if let url = URL(string: "http://localhost:3000") {
-                WebView(url: url)
-                    .ignoresSafeArea()
-            }
-        }
+        WebView(url: appURL)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea()
     }
 }
 
