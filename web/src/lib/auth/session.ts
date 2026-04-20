@@ -7,7 +7,7 @@ export function parseAuthSessionCookie(raw: string | undefined): AuthSessionValu
 
 export function isProtectedAppPath(pathname: string) {
   if (pathname === "/") return true;
-  return ["/health", "/location", "/records", "/profile"].some(
+  return ["/health", "/location", "/dados", "/profile"].some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }

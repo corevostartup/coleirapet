@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { IconBell, IconFile, IconHeart, IconHome, IconPin, IconUser } from "@/components/icons";
 
-type Tab = "home" | "health" | "location" | "records" | "profile";
+type Tab = "home" | "health" | "location" | "dados" | "profile";
 
 export function AppShell({ children, tab }: { children: ReactNode; tab: Tab }) {
   return (
@@ -37,7 +37,7 @@ function BottomNav({ tab }: { tab: Tab }) {
     { key: "home", label: "Home", href: "/", Icon: IconHome },
     { key: "health", label: "Saude", href: "/health", Icon: IconHeart },
     { key: "location", label: "Local", href: "/location", Icon: IconPin },
-    { key: "records", label: "Dados", href: "/records", Icon: IconFile },
+    { key: "dados", label: "Dados", href: "/dados", Icon: IconFile },
     { key: "profile", label: "Perfil", href: "/profile", Icon: IconUser },
   ] as const;
 

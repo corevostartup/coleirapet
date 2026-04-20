@@ -2,9 +2,9 @@ import { AppShell, TopBar } from "@/components/shell";
 import { IconCalendar, IconFile, IconPill } from "@/components/icons";
 import { records, vaccines } from "@/lib/mock";
 
-export default function RecordsPage() {
+export default function DadosPage() {
   return (
-    <AppShell tab="records">
+    <AppShell tab="dados">
       <TopBar title="Registros medicos" subtitle="Historico clinico" />
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
