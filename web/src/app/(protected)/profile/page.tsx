@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { SignOutButton } from "@/components/sign-out-button";
 import { AppShell, TopBar } from "@/components/shell";
 import { IconCamera, IconCollar, IconHeart, IconShield } from "@/components/icons";
 import { devices, pet } from "@/lib/mock";
@@ -91,6 +92,11 @@ export default function ProfilePage() {
             <span className="mt-1.5 block text-[11px] font-medium text-zinc-600">Camera</span>
           </button>
         </div>
+      </section>
+
+      <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "320ms" }}>
+        <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Conta</h3>
+        <SignOutButton />
       </section>
     </AppShell>
   );
