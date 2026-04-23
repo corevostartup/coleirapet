@@ -8,18 +8,16 @@ export function middleware(request: NextRequest) {
   const session = parseAuthSessionCookie(request.cookies.get(AUTH_SESSION_COOKIE)?.value);
 
   if (pathname === "/") {
-    if (!session) return NextResponse.redirect(new URL("/login", request.url));
-    if (session === "dev" && !isDevAuthBypassEnabled()) {
-      const res = NextResponse.redirect(new URL("/login", request.url));
-      res.cookies.delete(AUTH_SESSION_COOKIE);
-      return res;
-    }
-    return NextResponse.redirect(new URL("/home", request.url));
+    // Modo recuperação: raiz sempre leva para login para evitar cair direto
+    // em telas protegidas com dependências de backend ainda instáveis.
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   if (pathname === "/login") {
-    if (session) {
-      return NextResponse.redirect(new URL("/home", request.url));
+    if (session === "dev" && !isDevAuthBypassEnabled()) {
+      const res = NextResponse.next();
+      res.cookies.delete(AUTH_SESSION_COOKIE);
+      return res;
     }
     return NextResponse.next();
   }

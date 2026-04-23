@@ -13,7 +13,15 @@ import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 export default async function Home() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
-  const currentUser = uid ? await getOrCreateCurrentUserProfile(uid) : null;
+  let currentUser = null;
+  if (uid) {
+    try {
+      currentUser = await getOrCreateCurrentUserProfile(uid);
+    } catch {
+      // Evita tela branca/500 quando ambiente está sem Firebase Admin em produção.
+      currentUser = null;
+    }
+  }
   const isVet = currentUser?.userType === "vet";
 
   const maxActivity = Math.max(...weeklyActivity.map((item) => item.activeMinutes));
