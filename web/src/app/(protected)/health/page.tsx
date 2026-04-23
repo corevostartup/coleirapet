@@ -83,7 +83,7 @@ export default function HealthPage() {
           <article>
             <div className="relative h-[150px] overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
               <Image
-                src="/img/esteira.webp"
+                src="/img/esteira.png"
                 alt="Esteira"
                 fill
                 className="object-cover"

@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     return [{ source: "/records", destination: "/dados", permanent: true }];
   },
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",

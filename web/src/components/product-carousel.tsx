@@ -14,7 +14,7 @@ const slides = [
   {
     title: "Esteira MalhaCao",
     description: "Treino indoor seguro para gasto de energia e condicionamento fisico.",
-    image: "/img/esteira.webp",
+    image: "/img/esteira.png",
     ctaLabel: "Comprar agora",
     ctaHref: "https://malhacaopet.com.br/products/esteira-para-cachorros-malhacao-m-1-2m?variant=46728550056189",
   },
