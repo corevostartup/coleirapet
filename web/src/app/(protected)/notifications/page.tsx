@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AppShell, TopBar } from "@/components/shell";
-import { IconBell, IconHome } from "@/components/icons";
+import { IconBell, IconNotificationSettings } from "@/components/icons";
 import { notifications as notificationItems } from "@/lib/mock";
 
 function kindDotClass(kind: "info" | "warning" | "success") {
@@ -19,12 +19,11 @@ export default function NotificationsPage() {
         subtitle="Alertas da conta"
         action={
           <Link
-            href="/"
-            className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-zinc-800 shadow-sm transition hover:bg-zinc-50 sm:text-[12px]"
-            aria-label="Voltar para home"
+            href="/notifications/settings"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-emerald-700 shadow-sm transition hover:bg-emerald-50 hover:text-emerald-800"
+            aria-label="Configuracao de notificacoes"
           >
-            <IconHome className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
-            Home
+            <IconNotificationSettings className="h-[22px] w-[22px]" />
           </Link>
         }
       />
