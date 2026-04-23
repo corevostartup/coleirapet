@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { ProfilePetDetailsEditor } from "@/components/profile-pet-details-editor";
 import { ProfilePetSwitcher } from "@/components/profile-pet-switcher";
@@ -12,6 +13,8 @@ import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
 import { devices, pet } from "@/lib/mock";
+
+const NFC_PAIRED_COOKIE = "cp_nfc_paired";
 
 const SIMULATED_PETS = [
   {
@@ -40,14 +43,38 @@ const SIMULATED_PETS = [
 export default async function ProfilePage() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
+  const isNfcPaired = jar.get(NFC_PAIRED_COOKIE)?.value === "1";
   const tutorName = parseAuthUserNameCookie(jar.get(AUTH_USER_NAME_COOKIE)?.value) ?? "Tutor(a)";
   const tutorPhoto =
     parseAuthUserPhotoCookie(jar.get(AUTH_USER_PHOTO_COOKIE)?.value) ??
     "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=700&q=80";
-  const currentPet = uid ? (await getOrCreateCurrentPet(uid)).pet : null;
-  const petList = uid ? await listOwnedPets(uid) : null;
-  const currentUser = uid ? await getOrCreateCurrentUserProfile(uid, { fallbackName: tutorName }) : null;
-  const currentVeterinarian = uid ? await getCurrentVeterinarianProfile(uid) : null;
+  let currentPet = null;
+  let petList = null;
+  let currentUser = null;
+  let currentVeterinarian = null;
+
+  if (uid) {
+    try {
+      currentPet = (await getOrCreateCurrentPet(uid)).pet;
+    } catch {
+      currentPet = null;
+    }
+    try {
+      petList = await listOwnedPets(uid);
+    } catch {
+      petList = null;
+    }
+    try {
+      currentUser = await getOrCreateCurrentUserProfile(uid, { fallbackName: tutorName });
+    } catch {
+      currentUser = null;
+    }
+    try {
+      currentVeterinarian = await getCurrentVeterinarianProfile(uid);
+    } catch {
+      currentVeterinarian = null;
+    }
+  }
   const petData = currentPet
     ? {
         name: currentPet.name,
@@ -91,6 +118,10 @@ export default async function ProfilePage() {
           notes: false,
         },
       };
+  const profileDevices = devices.map((device) => ({
+    ...device,
+    status: device.name === "Tag NFC" && isNfcPaired ? "Conectado" : "Desconectado",
+  }));
 
   return (
     <AppShell tab="profile">
@@ -169,15 +200,33 @@ export default async function ProfilePage() {
           <IconShield className="h-5 w-5 text-emerald-600" />
         </div>
         <div className="space-y-2">
-          {devices.map((device) => (
-            <article key={device.name} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+          {profileDevices.map((device) => {
+            const connected = device.status === "Conectado";
+            return (
+              <article
+                key={device.name}
+                className={`rounded-2xl border px-3 py-2.5 ${
+                  connected ? "border-zinc-200 bg-zinc-50" : "border-zinc-200/90 bg-zinc-50/80 opacity-95"
+                }`}
+              >
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-medium text-zinc-800">{device.name}</p>
                 <p className="text-[11px] text-zinc-500">{device.battery}</p>
               </div>
-              <p className="mt-0.5 text-[11px] text-emerald-600">{device.status}</p>
-            </article>
-          ))}
+              <div className="mt-0.5 flex items-center justify-between gap-2">
+                <p className={`text-[11px] ${connected ? "text-emerald-600" : "text-zinc-500"}`}>{device.status}</p>
+                {device.name === "Tag NFC" ? (
+                  <Link
+                    href="/tag-nfc"
+                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100"
+                  >
+                    Gerenciar
+                  </Link>
+                ) : null}
+              </div>
+              </article>
+            );
+          })}
         </div>
       </section>
 

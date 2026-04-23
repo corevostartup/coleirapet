@@ -106,15 +106,15 @@ export const location = {
 };
 
 export const devices = [
-  { name: "Coleira Smart", status: "Conectado", battery: "87%" },
+  { name: "Tag NFC", status: "Conectado", battery: "87%" },
   { name: "Sensor de atividade", status: "Conectado", battery: "71%" },
   { name: "Esteira MalhaCao", status: "Conectado", battery: "AC" },
   { name: "AirTag (Apple)", status: "Conectado", battery: "94%" },
 ];
 
-/** Apenas Coleira Smart + AirTag na aba Localizacao (AirTag desconectado). */
+/** Apenas Tag NFC + AirTag na aba Localizacao (AirTag desconectado). */
 export const locationPageDevices: Array<{ name: string; status: string; battery?: string }> = [
-  { name: "Coleira Smart", status: "Conectado", battery: "87%" },
+  { name: "Tag NFC", status: "Conectado", battery: "87%" },
   { name: "AirTag", status: "Desconectado" },
 ];
 

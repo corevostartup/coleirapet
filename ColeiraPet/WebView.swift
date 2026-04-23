@@ -149,9 +149,16 @@ struct WebView: UIViewRepresentable {
 
         private func startNativeGoogleSignIn() {
             guard let baseURL = parent.url.originURL else { return }
-            guard let authURL = URL(string: "/auth/ios/google", relativeTo: baseURL)?.absoluteURL else { return }
+            let callbackScheme = "coleirapet"
+            var components = URLComponents()
+            components.path = "/auth/ios/google"
+            components.queryItems = [
+                URLQueryItem(name: "callbackScheme", value: callbackScheme),
+                URLQueryItem(name: "native", value: "1"),
+            ]
+            guard let authURL = components.url(relativeTo: baseURL)?.absoluteURL else { return }
 
-            authSession = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "coleirapet") { [weak self] callbackURL, error in
+            authSession = ASWebAuthenticationSession(url: authURL, callbackURLScheme: callbackScheme) { [weak self] callbackURL, error in
                 guard let self else { return }
 
                 if let error {

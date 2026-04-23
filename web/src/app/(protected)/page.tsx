@@ -10,9 +10,12 @@ import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import { events, metrics, pet, weeklyActivity } from "@/lib/mock";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
+const NFC_PAIRED_COOKIE = "cp_nfc_paired";
+
 export default async function Home() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
+  const isNfcPaired = jar.get(NFC_PAIRED_COOKIE)?.value === "1";
   let currentUser = null;
   if (uid) {
     try {
@@ -49,32 +52,34 @@ export default async function Home() {
         ) : null}
       </TopBar>
 
-        <section
-          className="appear-up mt-3 rounded-[26px] border border-emerald-200/90 bg-gradient-to-b from-emerald-50 via-white to-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
-          style={{ animationDelay: "50ms" }}
-        >
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <IconCollar className="h-5 w-5 text-emerald-800" aria-hidden />
-              <h3 className="text-[14px] font-semibold text-zinc-900">Tag NFC</h3>
-            </div>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200/80">
-              Proximo passo
-            </span>
-          </div>
-          <p className="mb-3 text-[12px] leading-snug text-zinc-700">
-            Pareie agora para liberar dados publicos e contato de emergencia na coleira — leva menos de um minuto.
-          </p>
-          <NFCPairLink
-            href="/profile"
-            className="cta-nfc-attention relative flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 text-[14px] font-semibold shadow-lg transition hover:from-emerald-500 hover:to-emerald-600 hover:shadow-xl active:scale-[0.99]"
+        {!isNfcPaired ? (
+          <section
+            className="appear-up mt-3 rounded-[26px] border border-emerald-200/90 bg-gradient-to-b from-emerald-50 via-white to-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
+            style={{ animationDelay: "50ms" }}
           >
-            <span className="relative z-10 font-semibold text-emerald-50 drop-shadow-sm">Parear Tag NFC</span>
-          </NFCPairLink>
-          <p className="mt-2 text-center text-[10px] font-medium leading-snug text-emerald-800/90">
-            Conecte seu dispositivo NFC ao perfil para sincronizar a coleira e liberar dados em emergência.
-          </p>
-        </section>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <IconCollar className="h-5 w-5 text-emerald-800" aria-hidden />
+                <h3 className="text-[14px] font-semibold text-zinc-900">Tag NFC</h3>
+              </div>
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200/80">
+                Proximo passo
+              </span>
+            </div>
+            <p className="mb-3 text-[12px] leading-snug text-zinc-700">
+              Pareie agora para liberar dados publicos e contato de emergencia na coleira — leva menos de um minuto.
+            </p>
+            <NFCPairLink
+              href="/tag-nfc/parear"
+              className="cta-nfc-attention relative flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 text-[14px] font-semibold shadow-lg transition hover:from-emerald-500 hover:to-emerald-600 hover:shadow-xl active:scale-[0.99]"
+            >
+              <span className="relative z-10 font-semibold text-emerald-50 drop-shadow-sm">Parear Tag NFC</span>
+            </NFCPairLink>
+            <p className="mt-2 text-center text-[10px] font-medium leading-snug text-emerald-800/90">
+              Conecte seu dispositivo NFC ao perfil para sincronizar a coleira e liberar dados em emergência.
+            </p>
+          </section>
+        ) : null}
 
         <section className="appear-up mt-3 overflow-hidden rounded-[30px] border border-zinc-200 bg-white shadow-[0_20px_40px_-28px_rgba(12,18,14,0.5)]" style={{ animationDelay: "60ms" }}>
           <div className="relative h-[260px]">

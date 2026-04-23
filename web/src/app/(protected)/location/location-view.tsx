@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { LocationLeafletMap } from "@/components/location-leaflet-map";
 import { AppShell, TopBar } from "@/components/shell";
 import { IconCollar, IconMessages, IconPin, IconShield } from "@/components/icons";
 import { location, locationPageDevices } from "@/lib/mock";
+
+const NFC_PAIRED_COOKIE = "cp_nfc_paired";
 
 type FinderMessageItem = {
   id: string;
@@ -33,8 +36,19 @@ export function LocationView() {
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [finderMessages, setFinderMessages] = useState<FinderMessageItem[]>([]);
+  const [isNfcPaired, setIsNfcPaired] = useState(false);
+  const disconnectedDevices = locationPageDevices.map((device) => ({
+    ...device,
+    status: device.name === "Tag NFC" && isNfcPaired ? "Conectado" : "Desconectado",
+  }));
 
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const hasPairedCookie = document.cookie
+      .split(";")
+      .some((item) => item.trim().startsWith(`${NFC_PAIRED_COOKIE}=1`));
+    setIsNfcPaired(hasPairedCookie);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,8 +221,9 @@ export function LocationView() {
               <IconShield className="h-5 w-5 text-emerald-600" />
             </div>
             <div className="space-y-2">
-              {locationPageDevices.map((device) => {
+              {disconnectedDevices.map((device) => {
                 const connected = device.status === "Conectado";
+                const isTagNfc = device.name === "Tag NFC";
                 return (
                   <article
                     key={device.name}
@@ -220,7 +235,17 @@ export function LocationView() {
                       <p className="text-[12px] font-medium text-zinc-800">{device.name}</p>
                       <p className="text-[11px] text-zinc-500">{device.battery ?? "—"}</p>
                     </div>
-                    <p className={`mt-0.5 text-[11px] ${connected ? "text-emerald-600" : "text-zinc-500"}`}>{device.status}</p>
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <p className={`text-[11px] ${connected ? "text-emerald-600" : "text-zinc-500"}`}>{device.status}</p>
+                      {isTagNfc ? (
+                        <Link
+                          href="/tag-nfc"
+                          className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100"
+                        >
+                          Gerenciar
+                        </Link>
+                      ) : null}
+                    </div>
                   </article>
                 );
               })}

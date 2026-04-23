@@ -1,6 +1,7 @@
 "use client";
 
 import { consumeGoogleRedirectResult, signInWithGoogleRedirectOnly } from "@/lib/firebase/client";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const CALLBACK_SCHEME = process.env.NEXT_PUBLIC_IOS_AUTH_CALLBACK_SCHEME ?? "coleirapet";
@@ -8,8 +9,8 @@ const IOS_GOOGLE_REDIRECT_MARKER = "cp-ios-google-redirect-started-at";
 const IOS_GOOGLE_REDIRECT_TTL_MS = 10 * 60 * 1000;
 const IOS_GOOGLE_REDIRECT_GUARD_QUERY = "cpGoogleRedirect";
 
-function goNative(path: string) {
-  window.location.replace(`${CALLBACK_SCHEME}://auth${path}`);
+function goNative(path: string, callbackScheme: string) {
+  window.location.replace(`${callbackScheme}://auth${path}`);
 }
 
 /**
@@ -70,6 +71,8 @@ function setRedirectGuardInUrl() {
 }
 
 export default function IosGoogleAuthPage() {
+  const searchParams = useSearchParams();
+  const callbackScheme = searchParams.get("callbackScheme")?.trim() || CALLBACK_SCHEME;
   const [status, setStatus] = useState("Abrindo login Google...");
 
   useEffect(() => {
@@ -84,7 +87,7 @@ export default function IosGoogleAuthPage() {
         if (redirectToken) {
           clearRedirectMarker();
           setStatus("Finalizando autenticacao...");
-          goNative(`?firebaseIdToken=${encodeURIComponent(redirectToken)}`);
+          goNative(`?firebaseIdToken=${encodeURIComponent(redirectToken)}`, callbackScheme);
           return;
         }
 
@@ -92,7 +95,7 @@ export default function IosGoogleAuthPage() {
         if (hadPendingRedirect) {
           clearRedirectMarker();
           iosGoogleAuthStarted = false;
-          goNative(`?error=${encodeURIComponent("Falha ao concluir login Google. Tente novamente.")}`);
+          goNative(`?error=${encodeURIComponent("Falha ao concluir login Google. Tente novamente.")}`, callbackScheme);
           return;
         }
 
@@ -107,7 +110,7 @@ export default function IosGoogleAuthPage() {
         iosGoogleAuthStarted = false;
         clearRedirectMarker();
         const message = error instanceof Error ? error.message : "Erro desconhecido";
-        goNative(`?error=${encodeURIComponent(message)}`);
+        goNative(`?error=${encodeURIComponent(message)}`, callbackScheme);
       }
     }
 
@@ -115,7 +118,7 @@ export default function IosGoogleAuthPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [callbackScheme]);
 
   return (
     <main className="ios-safe-top flex min-h-screen items-center justify-center bg-zinc-50 p-4 text-center">
