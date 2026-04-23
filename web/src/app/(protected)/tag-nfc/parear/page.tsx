@@ -14,24 +14,56 @@ type NativeWindow = Window & {
   __COLEIRAPET_IOS_APP__?: boolean;
   ColeiraPetNativeNFC?: {
     startPairing: () => void;
-    writePairingPassword: (password: string) => void;
+    writePairingPassword: (password: string, publicUrl: string) => void;
   };
 };
 
+function readInitialStep(): "scan" | "password" {
+  if (typeof window === "undefined") return "scan";
+  return window.location.search.includes(PASSWORD_STEP_QUERY) ? "password" : "scan";
+}
+
+function readIsIosNativeApp(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as NativeWindow;
+  return Boolean(w.__COLEIRAPET_IOS_APP__ && w.ColeiraPetNativeNFC);
+}
+
 export default function TagNfcPairPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"scan" | "password">("scan");
+  const [step, setStep] = useState<"scan" | "password">(readInitialStep);
   const [password, setPassword] = useState("");
   const [isWriting, setIsWriting] = useState(false);
-  const [isIosNativeApp, setIsIosNativeApp] = useState(false);
+  const [isIosNativeApp] = useState<boolean>(readIsIosNativeApp);
+  const [publicUrl, setPublicUrl] = useState<string>("");
+  const [publicUrlError, setPublicUrlError] = useState<string | null>(null);
   const canFinish = password.trim().length >= 4;
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const w = window as NativeWindow;
-    setIsIosNativeApp(Boolean(w.__COLEIRAPET_IOS_APP__ && w.ColeiraPetNativeNFC));
-    const shouldGoPassword = window.location.search.includes(PASSWORD_STEP_QUERY);
-    setStep(shouldGoPassword ? "password" : "scan");
+    let cancelled = false;
+    async function loadPublicUrl() {
+      try {
+        const res = await fetch("/api/pets/current", { cache: "no-store" });
+        if (!res.ok) throw new Error("Falha ao carregar pet atual.");
+        const payload = (await res.json()) as { pet?: { publicPagePath?: string } };
+        const path = payload.pet?.publicPagePath?.trim();
+        if (!path) throw new Error("Endereco publico do pet indisponivel.");
+        const absolute = new URL(path, window.location.origin).toString();
+        if (!cancelled) {
+          setPublicUrl(absolute);
+          setPublicUrlError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setPublicUrl("");
+          setPublicUrlError(error instanceof Error ? error.message : "Falha ao carregar endereco publico.");
+        }
+      }
+    }
+    void loadPublicUrl();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function handleStartScan() {
@@ -46,11 +78,15 @@ export default function TagNfcPairPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canFinish) return;
+    if (!publicUrl) {
+      setPublicUrlError("Nao foi possivel carregar o endereco publico deste pet. Tente novamente.");
+      return;
+    }
     const nextPassword = password.trim();
     const w = typeof window !== "undefined" ? (window as NativeWindow) : undefined;
     if (w?.__COLEIRAPET_IOS_APP__ && w.ColeiraPetNativeNFC?.writePairingPassword) {
       setIsWriting(true);
-      w.ColeiraPetNativeNFC.writePairingPassword(nextPassword);
+      w.ColeiraPetNativeNFC.writePairingPassword(nextPassword, publicUrl);
       return;
     }
     document.cookie = `${NFC_PAIRED_COOKIE}=1; Path=/; Max-Age=${ONE_YEAR_IN_SECONDS}; SameSite=Lax`;
@@ -116,31 +152,42 @@ export default function TagNfcPairPage() {
       </section>
 
       {step === "password" ? (
-        <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "120ms" }}>
-          <form onSubmit={handleSubmit}>
-            <label htmlFor="tag-password" className="text-[12px] font-semibold text-zinc-700">
-              Senha da Tag NFC
-            </label>
-            <input
-              id="tag-password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Digite a senha da tag"
-              className="mt-2 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
-              autoComplete="new-password"
-            />
-            <p className="mt-2 text-[11px] text-zinc-500">Use pelo menos 4 caracteres.</p>
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/40 px-4 py-6">
+          <section className="w-full max-w-[420px] rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
+            <div className="mb-2">
+              <h3 className="text-[15px] font-semibold text-zinc-900">Cadastrar senha da Tag NFC</h3>
+              <p className="mt-1 text-[12px] text-zinc-600">
+                Defina a senha e clique em finalizar pareamento para concluir a conexao.
+              </p>
+            </div>
 
-            <button
-              type="submit"
-              disabled={!canFinish || isWriting}
-              className="mt-4 w-full rounded-2xl bg-emerald-600 px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
-            >
-              {isWriting ? "Gravando senha na Tag NFC..." : "Finalizar pareamento"}
-            </button>
-          </form>
-        </section>
+            <form onSubmit={handleSubmit}>
+              <label htmlFor="tag-password" className="text-[12px] font-semibold text-zinc-700">
+                Senha da Tag NFC
+              </label>
+              <input
+                id="tag-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Digite a senha da tag"
+                className="mt-2 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                autoComplete="new-password"
+                autoFocus
+              />
+              <p className="mt-2 text-[11px] text-zinc-500">Use pelo menos 4 caracteres.</p>
+              {publicUrlError ? <p className="mt-2 text-[11px] font-medium text-rose-600">{publicUrlError}</p> : null}
+
+              <button
+                type="submit"
+                disabled={!canFinish || isWriting || !publicUrl}
+                className="mt-4 w-full rounded-2xl bg-emerald-600 px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
+              >
+                {isWriting ? "Gravando senha na Tag NFC..." : "Finalizar pareamento"}
+              </button>
+            </form>
+          </section>
+        </div>
       ) : null}
     </AppShell>
   );

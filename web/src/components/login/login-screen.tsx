@@ -7,10 +7,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GoogleSignInGlyph } from "./brand-sign-in-icons";
 
-type LoginScreenProps = {
-  devBypassEnabled: boolean;
-};
-
 function formatAuthErrorMessage(payload: { error?: string; detail?: string } | null): string {
   const error = payload?.error?.trim() ?? "";
   const detail = payload?.detail?.trim() ?? "";
@@ -91,10 +87,8 @@ function nativeGoogleSignIn(): Promise<{ idToken: string }> {
   });
 }
 
-export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
+export function LoginScreen() {
   const router = useRouter();
-  const [devBusy, setDevBusy] = useState(false);
-  const [devError, setDevError] = useState<string | null>(null);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [oauthHint, setOauthHint] = useState<string | null>(null);
   const [legalDocOpen, setLegalDocOpen] = useState<"privacy" | "terms" | null>(null);
@@ -135,22 +129,6 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
       active = false;
     };
   }, [router]);
-
-  async function enterDev() {
-    setDevError(null);
-    setDevBusy(true);
-    try {
-      const res = await fetch("/api/auth/dev", { method: "POST" });
-      if (!res.ok) {
-        setDevError("Acesso dev indisponivel neste ambiente.");
-        return;
-      }
-      router.replace("/home");
-      router.refresh();
-    } finally {
-      setDevBusy(false);
-    }
-  }
 
   async function enterGoogle() {
     setOauthHint(null);
@@ -278,23 +256,6 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
           </div>
         </section>
 
-        {devBypassEnabled ? (
-          <div className="appear-up mt-4" style={{ animationDelay: "140ms" }}>
-            <button
-              type="button"
-              onClick={enterDev}
-              disabled={devBusy}
-              className="chip flex h-12 w-full items-center justify-center rounded-2xl text-[13px] font-semibold text-zinc-600 transition enabled:hover:bg-zinc-100 disabled:opacity-60"
-              aria-label="Acesso desenvolvedor sem login"
-            >
-              {devBusy ? "Entrando..." : "Acesso dev"}
-            </button>
-            <p className="mt-2 text-center text-[10px] font-medium uppercase tracking-wide text-amber-700/90">
-              Uso temporario - remover antes do lancamento
-            </p>
-            {devError ? <p className="mt-2 text-center text-[12px] font-medium text-red-600">{devError}</p> : null}
-          </div>
-        ) : null}
       </div>
 
       {legalDocOpen ? (

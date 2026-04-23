@@ -8,6 +8,8 @@ type PetDoc = {
   ownerId?: string;
   /** Segredo para URL pública de contato em situação de pet perdido (quem escaneia a tag). */
   finderShareToken?: string;
+  /** Endereço público estável para exibir somente dados públicos do pet. */
+  publicPageSlug?: string;
   name?: string;
   breed?: string;
   image?: string;
@@ -57,6 +59,8 @@ export type PetProfile = {
     notes: boolean;
   };
   finderShareToken: string;
+  publicPageSlug: string;
+  publicPagePath: string;
 };
 
 function parseNumber(value: unknown) {
@@ -81,7 +85,20 @@ function parsePublicFields(value: unknown) {
   };
 }
 
+function parsePublicPageSlug(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return null;
+  if (!/^[a-z0-9-]{8,64}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function generatePublicPageSlug() {
+  return `pet-${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+}
+
 function toPetProfile(petId: string, data: PetDoc): PetProfile {
+  const publicPageSlug = parsePublicPageSlug(data.publicPageSlug) ?? generatePublicPageSlug();
   return {
     id: petId,
     name: parseString(data.name) ?? mockPet.name,
@@ -97,6 +114,8 @@ function toPetProfile(petId: string, data: PetDoc): PetProfile {
     notes: parseString(data.notes),
     publicFields: parsePublicFields(data.publicFields),
     finderShareToken: parseString(data.finderShareToken) ?? "",
+    publicPageSlug,
+    publicPagePath: `/pet/${publicPageSlug}`,
   };
 }
 
@@ -112,10 +131,23 @@ async function ensureFinderShareToken<T extends PetDoc>(
   return { ...data, finderShareToken: token };
 }
 
+async function ensurePublicPageSlug<T extends PetDoc>(
+  petRef: DocumentReference,
+  data: T,
+): Promise<T & { publicPageSlug: string }> {
+  const existing = parsePublicPageSlug(data.publicPageSlug);
+  if (existing) return { ...data, publicPageSlug: existing };
+  const publicPageSlug = generatePublicPageSlug();
+  const nowIso = new Date().toISOString();
+  await petRef.set({ publicPageSlug, updatedAt: nowIso }, { merge: true });
+  return { ...data, publicPageSlug };
+}
+
 function defaultPetDoc(ownerId: string) {
   const nowIso = new Date().toISOString();
   return {
     ownerId,
+    publicPageSlug: generatePublicPageSlug(),
     name: mockPet.name,
     breed: mockPet.breed,
     image: mockPet.image,
@@ -199,7 +231,8 @@ async function migrateLegacyPetsSubcollection(db: Firestore, uid: string): Promi
 
 async function finalizePetProfile(petRef: DocumentReference, petId: string, raw: PetDoc) {
   const withToken = await ensureFinderShareToken(petRef, raw);
-  return { petRef, pet: toPetProfile(petId, withToken) };
+  const withPublicPage = await ensurePublicPageSlug(petRef, withToken);
+  return { petRef, pet: toPetProfile(petId, withPublicPage) };
 }
 
 export async function getOrCreateCurrentPet(uid: string) {
@@ -254,7 +287,8 @@ export async function listOwnedPets(uid: string) {
 
   const pets = await Promise.all(
     owned.docs.map(async (doc) => {
-      const normalized = await ensureFinderShareToken(doc.ref, doc.data() as PetDoc);
+      const withToken = await ensureFinderShareToken(doc.ref, doc.data() as PetDoc);
+      const normalized = await ensurePublicPageSlug(doc.ref, withToken);
       return toPetProfile(doc.id, normalized);
     }),
   );
@@ -281,5 +315,19 @@ export async function setCurrentPet(uid: string, petId: string) {
 
   await db.collection(COLLECTION_USER).doc(uid).set({ defaultPetId: normalizedPetId }, { merge: true });
   const normalized = await ensureFinderShareToken(petRef, petData);
-  return toPetProfile(normalizedPetId, normalized);
+  const withPublicPage = await ensurePublicPageSlug(petRef, normalized);
+  return toPetProfile(normalizedPetId, withPublicPage);
+}
+
+export async function getPublicPetBySlug(publicSlug: string) {
+  const normalizedSlug = publicSlug.trim().toLowerCase();
+  if (!/^[a-z0-9-]{8,64}$/.test(normalizedSlug)) return null;
+
+  const db = getFirebaseAdminDb();
+  const query = await db.collection(COLLECTION_PETS).where("publicPageSlug", "==", normalizedSlug).limit(1).get();
+  if (query.empty) return null;
+
+  const doc = query.docs[0];
+  const normalized = await ensurePublicPageSlug(doc.ref, doc.data() as PetDoc);
+  return toPetProfile(doc.id, normalized);
 }

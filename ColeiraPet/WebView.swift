@@ -55,8 +55,8 @@ struct WebView: UIViewRepresentable {
                 startPairing: () => {
                     window.webkit.messageHandlers.coleiraNativeNFC.postMessage({ action: 'startPairing' });
                 },
-                writePairingPassword: (password) => {
-                    window.webkit.messageHandlers.coleiraNativeNFC.postMessage({ action: 'writePairingPassword', password });
+                writePairingPassword: (password, publicUrl) => {
+                    window.webkit.messageHandlers.coleiraNativeNFC.postMessage({ action: 'writePairingPassword', password, publicUrl });
                 }
             };
         })();
@@ -98,7 +98,7 @@ struct WebView: UIViewRepresentable {
 
         private enum NFCPairingMode {
             case scanToPair
-            case writePassword(String)
+            case writePassword(password: String, publicUrl: URL)
         }
 
         init(parent: WebView) {
@@ -150,10 +150,25 @@ struct WebView: UIViewRepresentable {
                     showJSAlert("Senha da Tag NFC invalida.")
                     return
                 }
-                startNFCPairingSession(mode: .writePassword(password))
+                guard let rawPublicUrl = body["publicUrl"] as? String,
+                      let publicUrl = normalizePublicURL(rawPublicUrl) else {
+                    showJSAlert("Endereco publico do pet invalido.")
+                    return
+                }
+                startNFCPairingSession(mode: .writePassword(password: password, publicUrl: publicUrl))
             default:
                 break
             }
+        }
+
+        private func normalizePublicURL(_ rawValue: String) -> URL? {
+            let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            if let absolute = URL(string: trimmed), let scheme = absolute.scheme, scheme == "https" || scheme == "http" {
+                return absolute
+            }
+            guard let origin = parent.url.originURL else { return nil }
+            return URL(string: trimmed, relativeTo: origin)?.absoluteURL
         }
 
         private func startNFCPairingSession(mode: NFCPairingMode) {
@@ -168,7 +183,7 @@ struct WebView: UIViewRepresentable {
             switch mode {
             case .scanToPair:
                 session.alertMessage = "Aproxime a tag NFC da parte superior traseira do iPhone."
-            case .writePassword:
+            case .writePassword(_, _):
                 session.alertMessage = "Aproxime novamente a Tag NFC para gravar a senha de pareamento."
             }
             nfcSession = session
@@ -280,7 +295,7 @@ extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
             showJSAlert("Tag lida com sucesso. Agora cadastre a senha para finalizar o pareamento.")
             goToPairingPasswordStep()
 
-        case let .writePassword(password):
+        case let .writePassword(password, publicUrl):
             didHandleNfcSessionResult = true
             session.connect(to: tag) { [weak self] error in
                 guard let self else { return }
@@ -310,16 +325,30 @@ extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
                         return
                     }
 
-                    let message = NFCNDEFMessage(records: [payload])
+                    let publicUrlRecord = NFCNDEFPayload.wellKnownTypeURIPayload(string: publicUrl.absoluteString)
+                    let records: [NFCNDEFPayload]
+                    if let publicUrlRecord {
+                        records = [publicUrlRecord, payload]
+                    } else if let publicUrlTextPayload = NFCNDEFPayload.wellKnownTypeTextPayload(
+                        string: "cp_public_url:\(publicUrl.absoluteString)",
+                        locale: Locale(identifier: "pt_BR")
+                    ) {
+                        records = [publicUrlTextPayload, payload]
+                    } else {
+                        session.invalidate(errorMessage: "Falha ao preparar o endereco publico da Tag NFC.")
+                        return
+                    }
+
+                    let message = NFCNDEFMessage(records: records)
                     tag.writeNDEF(message) { error in
                         if let error {
                             session.invalidate(errorMessage: "Falha ao gravar senha na Tag NFC: \(error.localizedDescription)")
                             return
                         }
 
-                        session.alertMessage = "Senha gravada com sucesso na area protegida da Tag NFC."
+                        session.alertMessage = "Pareamento concluido. Endereco publico e senha gravados na Tag NFC."
                         session.invalidate()
-                        self.showJSAlert("Pareamento concluido. Senha gravada na Tag NFC.")
+                        self.showJSAlert("Pareamento concluido. Endereco publico e senha gravados na Tag NFC.")
                         self.finalizePairingAndGoHome()
                     }
                 }

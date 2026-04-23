@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/constants";
 import { COLLECTION_USER } from "@/lib/firebase/collections";
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from "@/lib/firebase/admin";
+import { getOrCreateCurrentPet } from "@/lib/pets/current";
 
 type Payload = {
   idToken?: string;
@@ -150,6 +151,14 @@ export async function POST(request: Request) {
       userPhotoUrl: verified.picture ?? null,
       provider: verified.firebaseProvider || provider,
     });
+    const defaultPetProvisionWarning = await (async () => {
+      try {
+        await getOrCreateCurrentPet(verified.uid);
+        return null;
+      } catch (error) {
+        return error instanceof Error ? error.message : "Falha desconhecida ao provisionar pet padrao.";
+      }
+    })();
 
     const res = NextResponse.json({
       ok: true,
@@ -157,6 +166,7 @@ export async function POST(request: Request) {
       provider: verified.firebaseProvider || provider,
       ...(adminVerifyError ? { warning: `Admin verify fallback: ${adminVerifyError}` } : {}),
       ...(profileWriteWarning ? { profileSyncWarning: profileWriteWarning } : {}),
+      ...(defaultPetProvisionWarning ? { petProvisionWarning: defaultPetProvisionWarning } : {}),
     });
     res.cookies.set(AUTH_SESSION_COOKIE, provider, {
       path: "/",

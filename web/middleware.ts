@@ -6,11 +6,10 @@ import { isProtectedAppPath, parseAuthSessionCookie } from "@/lib/auth/session";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const session = parseAuthSessionCookie(request.cookies.get(AUTH_SESSION_COOKIE)?.value);
+  const hasValidSession = session && !(session === "dev" && !isDevAuthBypassEnabled());
 
   if (pathname === "/") {
-    // Modo recuperação: raiz sempre leva para login para evitar cair direto
-    // em telas protegidas com dependências de backend ainda instáveis.
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL(hasValidSession ? "/home" : "/login", request.url));
   }
 
   if (pathname === "/login") {
@@ -18,6 +17,9 @@ export function middleware(request: NextRequest) {
       const res = NextResponse.next();
       res.cookies.delete(AUTH_SESSION_COOKIE);
       return res;
+    }
+    if (hasValidSession) {
+      return NextResponse.redirect(new URL("/home", request.url));
     }
     return NextResponse.next();
   }

@@ -43,10 +43,11 @@ const DISPLAY_MS = 2600;
 const FADE_MS = 520;
 
 function readInitialPhase(): "show" | "gone" {
+  if (typeof window === "undefined") return "show";
   try {
     if (sessionStorage.getItem(STORAGE_KEY) === "1") return "gone";
   } catch {
-    return "gone";
+    // ignore
   }
   return "show";
 }
