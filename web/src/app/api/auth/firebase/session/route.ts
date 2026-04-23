@@ -22,6 +22,14 @@ type VerifiedIdentity = {
   firebaseProvider: string;
 };
 
+type UserProfileUpsertInput = {
+  uid: string;
+  email: string | null;
+  userName: string;
+  userPhotoUrl: string | null;
+  provider: string;
+};
+
 async function verifyIdTokenWithAdmin(idToken: string): Promise<VerifiedIdentity> {
   const decoded = await getFirebaseAdminAuth().verifyIdToken(idToken);
   const firebaseProvider =
@@ -77,6 +85,31 @@ async function verifyIdTokenWithIdentityToolkit(idToken: string): Promise<Verifi
   };
 }
 
+async function upsertUserProfileSafe(input: UserProfileUpsertInput): Promise<string | null> {
+  try {
+    const nowIso = new Date().toISOString();
+    const userRef = getFirebaseAdminDb().collection(COLLECTION_USER).doc(input.uid);
+    const userSnapshot = await userRef.get();
+    await userRef.set(
+      {
+        uid: input.uid,
+        userId: input.uid,
+        UserID: input.uid,
+        email: input.email,
+        name: input.userName,
+        photoURL: input.userPhotoUrl,
+        provider: input.provider,
+        lastLoginAt: nowIso,
+        ...(userSnapshot.exists ? {} : { createdAt: nowIso, CreatedAt: nowIso }),
+      },
+      { merge: true },
+    );
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Falha desconhecida ao salvar perfil.";
+  }
+}
+
 export async function POST(request: Request) {
   let body: Payload;
 
@@ -110,30 +143,20 @@ export async function POST(request: Request) {
     const encodedUserName = encodeURIComponent(userName.slice(0, 80));
     const userPhotoUrl = typeof verified.picture === "string" ? verified.picture.trim() : "";
     const encodedUserPhotoUrl = userPhotoUrl ? encodeURIComponent(userPhotoUrl.slice(0, 1024)) : "";
-    const nowIso = new Date().toISOString();
-    const userRef = getFirebaseAdminDb().collection(COLLECTION_USER).doc(verified.uid);
-    const userSnapshot = await userRef.get();
-
-    await userRef.set(
-      {
-        uid: verified.uid,
-        userId: verified.uid,
-        UserID: verified.uid,
-        email: verified.email ?? null,
-        name: userName,
-        photoURL: verified.picture ?? null,
-        provider: verified.firebaseProvider || provider,
-        lastLoginAt: nowIso,
-        ...(userSnapshot.exists ? {} : { createdAt: nowIso, CreatedAt: nowIso }),
-      },
-      { merge: true },
-    );
+    const profileWriteWarning = await upsertUserProfileSafe({
+      uid: verified.uid,
+      email: verified.email ?? null,
+      userName,
+      userPhotoUrl: verified.picture ?? null,
+      provider: verified.firebaseProvider || provider,
+    });
 
     const res = NextResponse.json({
       ok: true,
       uid: verified.uid,
       provider: verified.firebaseProvider || provider,
       ...(adminVerifyError ? { warning: `Admin verify fallback: ${adminVerifyError}` } : {}),
+      ...(profileWriteWarning ? { profileSyncWarning: profileWriteWarning } : {}),
     });
     res.cookies.set(AUTH_SESSION_COOKIE, provider, {
       path: "/",

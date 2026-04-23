@@ -8,7 +8,7 @@ const SplashScreen = dynamic(() => import("@/components/splash-screen").then((m)
 });
 
 function shouldHideSplash(pathname: string) {
-  return pathname === "/login" || pathname === "/auth" || pathname.startsWith("/auth/");
+  return pathname === "/auth" || pathname.startsWith("/auth/");
 }
 
 export function SplashScreenRoot() {

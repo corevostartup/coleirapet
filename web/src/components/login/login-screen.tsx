@@ -21,6 +21,25 @@ declare global {
   }
 }
 
+const LOGIN_BG_STARS = [
+  { t: 7, l: 11, d: 0.1, s: 2 },
+  { t: 13, l: 80, d: 0.5, s: 1 },
+  { t: 21, l: 44, d: 0.85, s: 1 },
+  { t: 29, l: 92, d: 0.2, s: 2 },
+  { t: 36, l: 24, d: 1.15, s: 1 },
+  { t: 43, l: 68, d: 0.05, s: 2 },
+  { t: 51, l: 9, d: 1.35, s: 1 },
+  { t: 57, l: 89, d: 0.55, s: 2 },
+  { t: 64, l: 34, d: 0.95, s: 1 },
+  { t: 72, l: 62, d: 0.3, s: 1 },
+  { t: 79, l: 15, d: 1.55, s: 2 },
+  { t: 86, l: 73, d: 0.4, s: 1 },
+  { t: 10, l: 57, d: 1.2, s: 1 },
+  { t: 33, l: 96, d: 0.7, s: 1 },
+  { t: 46, l: 3, d: 1.45, s: 2 },
+  { t: 69, l: 84, d: 1.0, s: 1 },
+] as const;
+
 export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
   const router = useRouter();
   const [devBusy, setDevBusy] = useState(false);
@@ -122,8 +141,25 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
   }
 
   return (
-    <main className="ios-safe-top flex min-h-screen flex-col px-3 py-10 pb-16 sm:px-6">
-      <div className="mx-auto flex w-full max-w-[440px] flex-1 flex-col justify-center">
+    <main className="ios-safe-top relative flex min-h-screen flex-col overflow-hidden bg-black px-3 py-10 pb-16 sm:px-6">
+      <div className="splash-nebula pointer-events-none absolute inset-[-20%] opacity-70" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {LOGIN_BG_STARS.map((star, index) => (
+          <span
+            key={index}
+            className="splash-star absolute rounded-full bg-white"
+            style={{
+              top: `${star.t}%`,
+              left: `${star.l}%`,
+              width: star.s,
+              height: star.s,
+              animationDelay: `${star.d}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="relative z-[1] mx-auto flex w-full max-w-[440px] flex-1 flex-col justify-center">
         <header className="glass-card appear-up rounded-[28px] px-5 py-6 text-center">
           <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">ColeiraPet</p>
           <h1 className="mt-2 text-[22px] font-semibold tracking-tight text-zinc-900">Entrar</h1>
