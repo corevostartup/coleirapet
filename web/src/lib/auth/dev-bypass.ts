@@ -9,6 +9,7 @@
  */
 export function isDevAuthBypassEnabled() {
   if (process.env.DISABLE_DEV_AUTH_BYPASS === "true") return false;
-  if (process.env.NODE_ENV !== "production") return true;
-  return process.env.ENABLE_DEV_AUTH_BYPASS === "true";
+  // Temporario: manter acesso dev habilitado tambem em producao
+  // ate estabilizar o login social no app.
+  return true;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { consumeGoogleRedirectResult, signInWithGoogleOnWeb } from "@/lib/firebase/client";
 import { LegalContent } from "@/components/legal/legal-content";
 import { useRouter } from "next/navigation";
@@ -160,12 +161,17 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
       </div>
 
       <div className="relative z-[1] mx-auto flex w-full max-w-[440px] flex-1 flex-col justify-center">
-        <header className="glass-card appear-up rounded-[28px] px-5 py-6 text-center">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">ColeiraPet</p>
-          <h1 className="mt-2 text-[22px] font-semibold tracking-tight text-zinc-900">Entrar</h1>
-          <p className="mx-auto mt-2 max-w-[280px] text-[13px] leading-snug text-zinc-500">
-            Acompanhe saude, local e rotinas do seu pet com a coleira conectada.
-          </p>
+        <header className="glass-card appear-up overflow-hidden rounded-[28px] p-2">
+          <div className="relative h-[190px] w-full overflow-hidden rounded-[22px] border border-white/40 bg-zinc-100/80">
+            <Image
+              src="/login-space-hero.png"
+              alt="Dog astronauta ColeiraPet"
+              fill
+              priority
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 440px"
+            />
+          </div>
         </header>
 
         <section
@@ -241,7 +247,7 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
       </div>
 
       {legalDocOpen ? (
-        <div className="fixed inset-0 z-[2100] flex items-end justify-center bg-black/35 px-3 py-5 sm:items-center">
+        <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/35 px-3 py-5">
           <section className="w-full max-w-[520px] rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h2 className="text-[15px] font-semibold text-zinc-900">
@@ -257,15 +263,6 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
             </div>
             <div className="max-h-[62vh] overflow-y-auto pr-1">
               <LegalContent type={legalDocOpen} />
-            </div>
-            <div className="mt-3 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setLegalDocOpen(null)}
-                className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
-              >
-                Voltar para login
-              </button>
             </div>
           </section>
         </div>
