@@ -37,3 +37,6 @@ Thumbs.db
 
 # Testing
 coverage/
+
+# Firebase iOS secrets
+ColeiraPet/GoogleService-Info.plist

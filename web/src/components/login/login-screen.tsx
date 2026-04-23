@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { consumeGoogleRedirectResult, signInWithGoogleOnWeb } from "@/lib/firebase/client";
+import { consumeGoogleRedirectResult, signInWithGoogleNativeIdToken, signInWithGoogleOnWeb } from "@/lib/firebase/client";
 import { LegalContent } from "@/components/legal/legal-content";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -11,16 +11,30 @@ type LoginScreenProps = {
   devBypassEnabled: boolean;
 };
 
+function formatAuthErrorMessage(payload: { error?: string; detail?: string } | null): string {
+  const error = payload?.error?.trim() ?? "";
+  const detail = payload?.detail?.trim() ?? "";
+  if (error && detail) return `${error}: ${detail}`;
+  if (error) return error;
+  if (detail) return detail;
+  return "Falha ao concluir login Google.";
+}
+
 type IosNativeBridge = {
   startGoogleSignIn: () => void;
+};
+
+type NativeGoogleSignInWindow = Window & {
+  __coleiraGoogleSignInToken?: ((idToken: string) => void) | null;
+  __coleiraGoogleSignInError?: ((message?: string) => void) | null;
 };
 
 declare global {
   interface Window {
     ColeiraPetNativeAuth?: IosNativeBridge;
     __COLEIRAPET_IOS_APP__?: boolean;
-    __coleiraGoogleSignInToken?: (idToken: string) => void;
-    __coleiraGoogleSignInError?: (message: string) => void;
+    __coleiraGoogleSignInToken?: ((idToken: string) => void) | null;
+    __coleiraGoogleSignInError?: ((message?: string) => void) | null;
   }
 }
 
@@ -43,6 +57,40 @@ const LOGIN_BG_STARS = [
   { t: 69, l: 84, d: 1.0, s: 1 },
 ] as const;
 
+function nativeGoogleSignIn(): Promise<{ idToken: string }> {
+  return new Promise((resolve, reject) => {
+    const browserWindow = window as NativeGoogleSignInWindow;
+    const nativeBridge = browserWindow.ColeiraPetNativeAuth;
+    if (!nativeBridge?.startGoogleSignIn) {
+      reject(new Error("Native handler not available"));
+      return;
+    }
+
+    const onToken = (idToken: string) => {
+      browserWindow.__coleiraGoogleSignInToken = null;
+      browserWindow.__coleiraGoogleSignInError = null;
+      resolve({ idToken });
+    };
+
+    const onError = (message?: string) => {
+      browserWindow.__coleiraGoogleSignInToken = null;
+      browserWindow.__coleiraGoogleSignInError = null;
+      reject(new Error(message || "Login cancelado"));
+    };
+
+    browserWindow.__coleiraGoogleSignInToken = onToken;
+    browserWindow.__coleiraGoogleSignInError = onError;
+
+    try {
+      nativeBridge.startGoogleSignIn();
+    } catch (error) {
+      browserWindow.__coleiraGoogleSignInToken = null;
+      browserWindow.__coleiraGoogleSignInError = null;
+      reject(error instanceof Error ? error : new Error("Falha ao iniciar login Google nativo."));
+    }
+  });
+}
+
 export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
   const router = useRouter();
   const [devBusy, setDevBusy] = useState(false);
@@ -50,57 +98,6 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [oauthHint, setOauthHint] = useState<string | null>(null);
   const [legalDocOpen, setLegalDocOpen] = useState<"privacy" | "terms" | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const url = new URL(window.location.href);
-    const nativeError = url.searchParams.get("nativeGoogleError");
-    const nativeIdToken = url.searchParams.get("nativeGoogleIdToken");
-    if (!nativeError && !nativeIdToken) return;
-
-    function clearNativeGoogleParams() {
-      url.searchParams.delete("nativeGoogleError");
-      url.searchParams.delete("nativeGoogleIdToken");
-      window.history.replaceState(null, "", url.toString());
-    }
-
-    if (nativeError) {
-      setGoogleBusy(false);
-      setOauthHint(nativeError);
-      clearNativeGoogleParams();
-      return;
-    }
-
-    if (!nativeIdToken) return;
-    setGoogleBusy(true);
-    setOauthHint("Finalizando login Google...");
-    void (async () => {
-      try {
-        const res = await fetch("/api/auth/firebase/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken: nativeIdToken, provider: "google" }),
-        });
-
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-          setOauthHint(payload?.error ?? "Falha ao concluir login Google.");
-          setGoogleBusy(false);
-          clearNativeGoogleParams();
-          return;
-        }
-
-        clearNativeGoogleParams();
-        router.replace("/home");
-        router.refresh();
-      } catch (error) {
-        setOauthHint(error instanceof Error ? error.message : "Erro ao concluir login Google.");
-        setGoogleBusy(false);
-        clearNativeGoogleParams();
-      }
-    })();
-  }, [router]);
 
   useEffect(() => {
     let active = true;
@@ -118,8 +115,8 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
         });
 
         if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-          setOauthHint(payload?.error ?? "Falha ao concluir login Google.");
+          const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
+          setOauthHint(formatAuthErrorMessage(payload));
           setGoogleBusy(false);
           return;
         }
@@ -157,72 +154,32 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
 
   async function enterGoogle() {
     setOauthHint(null);
-
-    if (window.__COLEIRAPET_IOS_APP__ && window.ColeiraPetNativeAuth?.startGoogleSignIn) {
-      setGoogleBusy(true);
-      setOauthHint("Abrindo login Google nativo do iOS...");
-      try {
-        const idToken = await new Promise<string>((resolve, reject) => {
-          const onToken = (token: string) => {
-            cleanup();
-            resolve(token);
-          };
-          const onError = (message: string) => {
-            cleanup();
-            reject(new Error(message || "Falha ao autenticar com Google no iOS."));
-          };
-          const timeout = window.setTimeout(() => {
-            cleanup();
-            reject(new Error("Tempo esgotado no login Google nativo."));
-          }, 120000);
-          const cleanup = () => {
-            window.clearTimeout(timeout);
-            delete window.__coleiraGoogleSignInToken;
-            delete window.__coleiraGoogleSignInError;
-          };
-
-          window.__coleiraGoogleSignInToken = onToken;
-          window.__coleiraGoogleSignInError = onError;
-          window.ColeiraPetNativeAuth?.startGoogleSignIn();
-        });
-
-        const res = await fetch("/api/auth/firebase/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken, provider: "google" }),
-        });
-        if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-          setOauthHint(payload?.error ?? "Falha ao concluir login Google.");
-          setGoogleBusy(false);
-          return;
-        }
-        router.replace("/home");
-        router.refresh();
-      } catch (error) {
-        setOauthHint(error instanceof Error ? error.message : "Erro ao autenticar com Google.");
-        setGoogleBusy(false);
-      }
-      return;
-    }
-
     setGoogleBusy(true);
     try {
-      const result = await signInWithGoogleOnWeb();
-      if (result.type === "redirect") {
-        setOauthHint("Redirecionando para o Google...");
-        return;
+      let idToken: string;
+
+      if (window.__COLEIRAPET_IOS_APP__ && window.ColeiraPetNativeAuth?.startGoogleSignIn) {
+        setOauthHint("Abrindo login Google nativo do iOS...");
+        const result = await nativeGoogleSignIn();
+        idToken = await signInWithGoogleNativeIdToken(result.idToken);
+      } else {
+        const result = await signInWithGoogleOnWeb();
+        if (result.type === "redirect") {
+          setOauthHint("Redirecionando para o Google...");
+          return;
+        }
+        idToken = result.idToken;
       }
 
       const res = await fetch("/api/auth/firebase/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken: result.idToken, provider: "google" }),
+        body: JSON.stringify({ idToken, provider: "google" }),
       });
 
       if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        setOauthHint(payload?.error ?? "Falha ao concluir login Google.");
+        const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
+        setOauthHint(formatAuthErrorMessage(payload));
         setGoogleBusy(false);
         return;
       }

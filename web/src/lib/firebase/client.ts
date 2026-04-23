@@ -6,6 +6,7 @@ import {
   getRedirectResult,
   inMemoryPersistence,
   setPersistence,
+  signInWithCredential,
   signInWithPopup,
   signInWithRedirect,
 } from "firebase/auth";
@@ -98,6 +99,18 @@ export async function consumeGoogleRedirectResult(): Promise<string | null> {
   await ensureAuthPersistence();
   const result = await getRedirectResult(auth);
   if (!result?.user) return null;
+  return result.user.getIdToken();
+}
+
+/**
+ * Troca um Google ID token (vindo do SDK nativo iOS) por sessao Firebase Auth.
+ * Retorna o Firebase ID token para envio ao backend.
+ */
+export async function signInWithGoogleNativeIdToken(googleIdToken: string): Promise<string> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  const credential = GoogleAuthProvider.credential(googleIdToken);
+  const result = await signInWithCredential(auth, credential);
   return result.user.getIdToken();
 }
 

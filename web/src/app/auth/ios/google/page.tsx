@@ -1,6 +1,7 @@
 "use client";
 
 import { consumeGoogleRedirectResult, signInWithGoogleRedirectOnly } from "@/lib/firebase/client";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const CALLBACK_SCHEME = process.env.NEXT_PUBLIC_IOS_AUTH_CALLBACK_SCHEME ?? "coleirapet";
@@ -70,6 +71,8 @@ function setRedirectGuardInUrl() {
 }
 
 export default function IosGoogleAuthPage() {
+  const searchParams = useSearchParams();
+  const callbackScheme = searchParams.get("callbackScheme")?.trim() || CALLBACK_SCHEME;
   const [status, setStatus] = useState("Abrindo login Google...");
 
   useEffect(() => {
@@ -123,7 +126,7 @@ export default function IosGoogleAuthPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [callbackScheme]);
 
   return (
     <main className="ios-safe-top flex min-h-screen items-center justify-center bg-zinc-50 p-4 text-center">
