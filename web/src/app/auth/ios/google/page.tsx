@@ -1,6 +1,6 @@
 "use client";
 
-import { consumeGoogleRedirectResult, signInWithGoogleOnWeb } from "@/lib/firebase/client";
+import { consumeGoogleRedirectResult, signInWithGoogleRedirectOnly } from "@/lib/firebase/client";
 import { useEffect, useState } from "react";
 
 const CALLBACK_SCHEME = process.env.NEXT_PUBLIC_IOS_AUTH_CALLBACK_SCHEME ?? "coleirapet";
@@ -8,6 +8,12 @@ const CALLBACK_SCHEME = process.env.NEXT_PUBLIC_IOS_AUTH_CALLBACK_SCHEME ?? "col
 function goNative(path: string) {
   window.location.replace(`${CALLBACK_SCHEME}://auth${path}`);
 }
+
+/**
+ * Evita disparar o fluxo Google duas vezes (ex.: React Strict Mode em dev),
+ * o que causava redirect duplo e loop no seletor de conta.
+ */
+let iosGoogleAuthStarted = false;
 
 export default function IosGoogleAuthPage() {
   const [status, setStatus] = useState("Abrindo login Google...");
@@ -26,22 +32,21 @@ export default function IosGoogleAuthPage() {
           return;
         }
 
-        const result = await signInWithGoogleOnWeb();
-        if (cancelled) return;
-
-        if (result.type === "success") {
-          goNative(`?firebaseIdToken=${encodeURIComponent(result.idToken)}`);
+        if (iosGoogleAuthStarted) {
           return;
         }
+        iosGoogleAuthStarted = true;
 
         setStatus("Redirecionando para o Google...");
+        await signInWithGoogleRedirectOnly();
       } catch (error) {
+        iosGoogleAuthStarted = false;
         const message = error instanceof Error ? error.message : "Erro desconhecido";
         goNative(`?error=${encodeURIComponent(message)}`);
       }
     }
 
-    run();
+    void run();
     return () => {
       cancelled = true;
     };

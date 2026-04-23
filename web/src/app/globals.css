@@ -71,6 +71,111 @@ a {
 	animation: pulse-soft 2.2s ease-in-out infinite;
 }
 
+/* Splash: micro gravidade zero + estrelas + nebula (referencia espacial discreta) */
+@keyframes splash-zero-g {
+	0%,
+	100% {
+		transform: translateY(0) rotate(-1.1deg);
+	}
+	50% {
+		transform: translateY(-11px) rotate(1.1deg);
+	}
+}
+
+@keyframes splash-star-twinkle {
+	0%,
+	100% {
+		opacity: 0.12;
+		transform: scale(0.85);
+	}
+	50% {
+		opacity: 0.92;
+		transform: scale(1.05);
+	}
+}
+
+@keyframes splash-nebula-drift {
+	0% {
+		transform: translate(-4%, -2%) rotate(0deg) scale(1);
+		opacity: 0.55;
+	}
+	100% {
+		transform: translate(5%, 4%) rotate(8deg) scale(1.06);
+		opacity: 0.72;
+	}
+}
+
+@keyframes splash-orbit-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes splash-hud-blink {
+	0%,
+	100% {
+		opacity: 0.35;
+		transform: scale(0.88);
+		box-shadow: 0 0 6px rgba(52, 211, 153, 0.25);
+	}
+	50% {
+		opacity: 1;
+		transform: scale(1);
+		box-shadow: 0 0 14px rgba(52, 211, 153, 0.65);
+	}
+}
+
+.splash-nebula {
+	background:
+		radial-gradient(ellipse 80% 55% at 70% 25%, rgba(59, 130, 246, 0.14), transparent 52%),
+		radial-gradient(ellipse 70% 50% at 15% 80%, rgba(139, 92, 246, 0.12), transparent 48%),
+		radial-gradient(ellipse 60% 45% at 50% 50%, rgba(34, 197, 94, 0.06), transparent 55%);
+	animation: splash-nebula-drift 22s ease-in-out infinite alternate;
+}
+
+.splash-star {
+	animation: splash-star-twinkle 2.8s ease-in-out infinite;
+}
+
+.splash-logo-float {
+	animation: splash-zero-g 3.4s ease-in-out infinite;
+}
+
+.splash-orbit-ring {
+	animation: splash-orbit-spin 48s linear infinite;
+}
+
+.splash-hud-dot {
+	display: block;
+	width: 7px;
+	height: 7px;
+	border-radius: 999px;
+	background: rgba(52, 211, 153, 0.95);
+	animation: splash-hud-blink 1.35s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.splash-nebula,
+	.splash-star,
+	.splash-logo-float,
+	.splash-orbit-ring,
+	.splash-hud-dot {
+		animation: none !important;
+	}
+
+	.splash-logo-float {
+		transform: none;
+	}
+
+	.splash-orbit-ring {
+		transform: none;
+		opacity: 0.35;
+	}
+}
+
 @keyframes appear-up {
 	from {
 		opacity: 0;

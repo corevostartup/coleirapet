@@ -17,12 +17,25 @@ type Props = {
   initialPets: PetItem[];
 };
 
+/** Remove linhas repetidas com o mesmo nome, raca e foto (ex.: varios docs Firebase com defaults iguais). */
+function dedupePetsByIdentity(pets: PetItem[]): PetItem[] {
+  const seen = new Set<string>();
+  const out: PetItem[] = [];
+  for (const pet of pets) {
+    const key = `${pet.name.trim().toLowerCase()}|${pet.breed.trim().toLowerCase()}|${pet.image}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(pet);
+  }
+  return out;
+}
+
 export function ProfilePetSwitcher({ currentPet, initialPets }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busyPetId, setBusyPetId] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
-  const [pets, setPets] = useState(initialPets);
+  const [pets, setPets] = useState(() => dedupePetsByIdentity(initialPets));
   const [selectedPetId, setSelectedPetId] = useState(currentPet.id);
 
   const selectedPet = useMemo(() => pets.find((item) => item.id === selectedPetId) ?? currentPet, [currentPet, pets, selectedPetId]);
@@ -61,7 +74,7 @@ export function ProfilePetSwitcher({ currentPet, initialPets }: Props) {
       if (!res.ok) throw new Error(payload?.error ?? "Nao foi possivel trocar de pet.");
 
       setSelectedPetId(payload?.currentPetId ?? petId);
-      if (Array.isArray(payload?.pets)) setPets(payload.pets);
+      if (Array.isArray(payload?.pets)) setPets(dedupePetsByIdentity(payload.pets as PetItem[]));
       setOpen(false);
       router.refresh();
     } catch (error) {

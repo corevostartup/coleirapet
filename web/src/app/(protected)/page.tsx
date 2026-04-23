@@ -90,10 +90,7 @@ export default async function Home() {
         </section>
 
         <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "120ms" }}>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-zinc-900">Produtos conectados</h3>
-            <span className="text-[11px] text-zinc-500">Carrossel</span>
-          </div>
+          <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Produtos</h3>
 
           <ProductCarousel />
         </section>

@@ -24,10 +24,14 @@ export function TopBar({ title, subtitle, children, action }: { title: string; s
           <h1 className="mt-0.5 text-[20px] font-semibold tracking-tight text-zinc-900">{title}</h1>
         </div>
         {action ?? (
-          <button className="relative flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:text-zinc-900" aria-label="Notificacoes">
+          <Link
+            href="/notifications"
+            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:text-zinc-900"
+            aria-label="Notificacoes"
+          >
             <IconBell className="h-5 w-5" />
             <span className="pulse-soft absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-500" />
-          </button>
+          </Link>
         )}
       </div>
       {children ? <div className="mt-3">{children}</div> : null}

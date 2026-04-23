@@ -35,6 +35,50 @@ export const events = [
   { label: "Consulta de rotina", when: "Em 62 dias", kind: "info" },
 ];
 
+/** Alertas do app (mock); futuro: push / Firestore por usuario. */
+export const notifications = [
+  {
+    id: "nfc-bound",
+    title: "Tag NFC pareada",
+    body: "A coleira foi vinculada ao perfil da Luna. Dados publicos disponiveis ao escanear a tag.",
+    when: "Ha 24 min",
+    kind: "success" as const,
+    unread: true,
+  },
+  {
+    id: "safe-zone",
+    title: "Zona segura",
+    body: "Luna entrou na zona configurada em casa. Localizacao atualizada.",
+    when: "Ha 1 h",
+    kind: "info" as const,
+    unread: true,
+  },
+  {
+    id: "vitals",
+    title: "Frequencia cardiaca",
+    body: "Media nas ultimas 6 h dentro do esperado para o porte da Luna.",
+    when: "Ha 3 h",
+    kind: "info" as const,
+    unread: false,
+  },
+  {
+    id: "vaccine-reminder",
+    title: "Lembrete de vacina",
+    body: "Antirrabica com aplicacao prevista em 22/08/2026.",
+    when: "Ontem",
+    kind: "warning" as const,
+    unread: false,
+  },
+  {
+    id: "activity",
+    title: "Meta de atividade",
+    body: "Ontem a Luna passou da meta diaria de minutos ativos. Otimo!",
+    when: "Ontem",
+    kind: "success" as const,
+    unread: false,
+  },
+];
+
 export const heartTrend = [
   { time: "00h", bpm: 64 },
   { time: "02h", bpm: 60 },

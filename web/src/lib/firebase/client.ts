@@ -60,6 +60,11 @@ function buildGoogleProvider() {
   return provider;
 }
 
+/** Provider para fluxo só redirect (ex.: ASWebAuthenticationSession no iOS): evita repetição do seletor de conta. */
+function buildGoogleProviderForRedirectFlow() {
+  return new GoogleAuthProvider();
+}
+
 function shouldUseRedirect(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const code = "code" in error ? String((error as { code?: string }).code) : "";
@@ -94,4 +99,15 @@ export async function consumeGoogleRedirectResult(): Promise<string | null> {
   const result = await getRedirectResult(auth);
   if (!result?.user) return null;
   return result.user.getIdToken();
+}
+
+/**
+ * Apenas redirect — necessário no fluxo nativo iOS (Safari da ASWebAuthenticationSession):
+ * popup não é confiável e `prompt=select_account` pode gerar loop no seletor de conta.
+ */
+export async function signInWithGoogleRedirectOnly(): Promise<void> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  const provider = buildGoogleProviderForRedirectFlow();
+  await signInWithRedirect(auth, provider);
 }

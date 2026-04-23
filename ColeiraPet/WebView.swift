@@ -248,8 +248,9 @@ struct WebView: UIViewRepresentable {
 
 extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
     func readerSession(_ session: NFCNDEFReaderSession, didDetectNDEFs messages: [NFCNDEFMessage]) {
-        DispatchQueue.main.async {
-            session.invalidateSessionSuccess(with: "Tag lida. Continue no app para concluir o pareamento.")
+        DispatchQueue.main.async { [weak self] in
+            session.invalidate()
+            self?.showJSAlert("Tag lida. Continue no app para concluir o pareamento.")
         }
     }
 
@@ -262,9 +263,7 @@ extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
         }
 
         switch readerError.code {
-        case .readerSessionInvalidationErrorUserCanceled:
-            break
-        case .readerSessionInvalidationErrorSessionEnded,
+        case .readerSessionInvalidationErrorUserCanceled,
              .readerSessionInvalidationErrorFirstNDEFTagRead:
             break
         default:
