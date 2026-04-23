@@ -138,3 +138,24 @@ export function IconPill(props: IconProps) {
     </svg>
   );
 }
+
+export function IconStethoscope(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <path d="M6 8.5V7a4 4 0 0 1 7.7-1.6" />
+      <path d="M18 8.5a3 3 0 1 1-6 0" />
+      <path d="M8 12v3a4 4 0 0 0 8 0v-3" />
+      <path d="M12 15v4" />
+      <circle cx="12" cy="21" r="1.2" />
+    </svg>
+  );
+}
+
+export function IconMessages(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-9a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />
+      <path d="M17 3H7a4 4 0 0 0-4 4v7" />
+    </svg>
+  );
+}

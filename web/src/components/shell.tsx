@@ -6,7 +6,7 @@ type Tab = "home" | "health" | "location" | "dados" | "profile";
 
 export function AppShell({ children, tab }: { children: ReactNode; tab: Tab }) {
   return (
-    <main className="min-h-screen px-3 py-4 pb-28 sm:px-6">
+    <main className="ios-safe-top min-h-screen px-3 py-4 pb-28 sm:px-6">
       <div className="mx-auto w-full max-w-[440px]">
         {children}
         <BottomNav tab={tab} />
@@ -15,19 +15,22 @@ export function AppShell({ children, tab }: { children: ReactNode; tab: Tab }) {
   );
 }
 
-export function TopBar({ title, subtitle }: { title: string; subtitle: string }) {
+export function TopBar({ title, subtitle, children, action }: { title: string; subtitle: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <header className="glass-card appear-up rounded-[28px] px-4 py-3">
+    <header className="glass-card appear-up relative z-[1800] rounded-[28px] px-4 py-3">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[11px] tracking-wide text-zinc-500">{subtitle}</p>
           <h1 className="mt-0.5 text-[20px] font-semibold tracking-tight text-zinc-900">{title}</h1>
         </div>
-        <button className="relative flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:text-zinc-900" aria-label="Notificacoes">
-          <IconBell className="h-5 w-5" />
-          <span className="pulse-soft absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-500" />
-        </button>
+        {action ?? (
+          <button className="relative flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:text-zinc-900" aria-label="Notificacoes">
+            <IconBell className="h-5 w-5" />
+            <span className="pulse-soft absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-500" />
+          </button>
+        )}
       </div>
+      {children ? <div className="mt-3">{children}</div> : null}
     </header>
   );
 }

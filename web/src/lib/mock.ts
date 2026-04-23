@@ -56,6 +56,9 @@ export const location = {
   distance: "0.6 km",
   lastUpdate: "Atualizado ha 2 min",
   battery: 87,
+  /** Centro do mapa Leaflet (Av. Paulista ~1000). */
+  lat: -23.56155,
+  lng: -46.65605,
 };
 
 export const devices = [
@@ -63,6 +66,12 @@ export const devices = [
   { name: "Sensor de atividade", status: "Conectado", battery: "71%" },
   { name: "Esteira MalhaCao", status: "Conectado", battery: "AC" },
   { name: "AirTag (Apple)", status: "Conectado", battery: "94%" },
+];
+
+/** Apenas Coleira Smart + AirTag na aba Localizacao (AirTag desconectado). */
+export const locationPageDevices: Array<{ name: string; status: string; battery?: string }> = [
+  { name: "Coleira Smart", status: "Conectado", battery: "87%" },
+  { name: "AirTag", status: "Desconectado" },
 ];
 
 export const vaccines = [
@@ -75,4 +84,11 @@ export const records = [
   { type: "Alergia", detail: "Leite e derivados" },
   { type: "Medicacao", detail: "Suplemento articular 1x dia" },
   { type: "Veterinario", detail: "Dr. Carlos Nunes - CRMV 12345" },
+];
+
+export const publicData = [
+  { type: "Nome", detail: "Luna" },
+  { type: "Contato de emergencia", detail: "(11) 98888-1234" },
+  { type: "Alergias", detail: "Leite e derivados" },
+  { type: "Tag NFC", detail: "Ativa e vinculada ao perfil" },
 ];

@@ -8,8 +8,9 @@
 import SwiftUI
 
 struct ContentView: View {
-    // Troque para o endereco final de producao quando necessario.
-    private let appURL = URL(string: "http://localhost:3000")!
+    // Entrada em /login para a tela de auth aparecer antes da home (middleware redireciona se ja houver sessao).
+    private let appURL = URL(string: "https://coleirapet.netlify.app")!
+    // Base usada no fluxo de auth nativo iOS -> Firebase web.
 
     var body: some View {
         WebView(url: appURL)

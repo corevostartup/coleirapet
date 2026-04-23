@@ -2,18 +2,6 @@ import type { ComponentProps } from "react";
 
 type SvgProps = ComponentProps<"svg">;
 
-/** Logotipo Apple (glyph) para botão escuro — alinhado às diretrizes de contraste do Sign in with Apple. */
-export function AppleSignInGlyph(props: SvgProps) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden focusable="false" {...props}>
-      <path
-        fill="currentColor"
-        d="M16.365 1.43c0 1.14-.41 2.26-1.23 3.25-.83 1-1.95 1.77-3.13 1.95-.13-1.06.34-2.1 1.05-2.9.71-.8 1.74-1.42 2.9-1.67.15 1.05-.03 2.1-.59 3.37Zm4.29 14.51c-.55 1.28-1.22 2.45-2 3.52-.95 1.3-1.73 2.2-2.62 2.2-.88 0-1.46-.5-2.75-.5-1.3 0-1.7.52-2.77.52-.9 0-1.6-.85-2.55-2.32-1.39-2.4-2.5-6.1-2.5-9.62 0-2.8 1.85-4.28 3.66-4.28.96 0 1.76.62 2.36.62.58 0 1.48-.66 2.56-.66.41 0 1.93.04 2.93 1.58-2.54 1.38-2.13 4.98.44 6.24Z"
-      />
-    </svg>
-  );
-}
-
 /** Logotipo Google “G” oficial (quatro cores). */
 export function GoogleSignInGlyph(props: SvgProps) {
   return (

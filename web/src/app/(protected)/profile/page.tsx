@@ -1,49 +1,145 @@
 import Image from "next/image";
+import { cookies } from "next/headers";
+import { ProfilePetDetailsEditor } from "@/components/profile-pet-details-editor";
+import { ProfilePetSwitcher } from "@/components/profile-pet-switcher";
+import { ProfileUserDetailsEditor } from "@/components/profile-user-details-editor";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AppShell, TopBar } from "@/components/shell";
 import { IconCamera, IconCollar, IconHeart, IconShield } from "@/components/icons";
+import { AUTH_USER_NAME_COOKIE, AUTH_USER_PHOTO_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
+import { parseAuthUserNameCookie, parseAuthUserPhotoCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
+import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
+import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
+import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
 import { devices, pet } from "@/lib/mock";
 
-export default function ProfilePage() {
+const SIMULATED_PETS = [
+  {
+    id: "demo-max",
+    name: "Max",
+    breed: "Border Collie",
+    image: "https://images.unsplash.com/photo-1518717758536-85ae29035b6d?auto=format&fit=crop&w=900&q=80",
+    simulated: true,
+  },
+  {
+    id: "demo-nina",
+    name: "Nina",
+    breed: "Shih Tzu",
+    image: "https://images.unsplash.com/photo-1544568100-847a948585b9?auto=format&fit=crop&w=900&q=80",
+    simulated: true,
+  },
+  {
+    id: "demo-thor",
+    name: "Thor",
+    breed: "Labrador",
+    image: "https://images.unsplash.com/photo-1596492784531-6e6eb5ea9993?auto=format&fit=crop&w=900&q=80",
+    simulated: true,
+  },
+] as const;
+
+export default async function ProfilePage() {
+  const jar = await cookies();
+  const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
+  const tutorName = parseAuthUserNameCookie(jar.get(AUTH_USER_NAME_COOKIE)?.value) ?? "Tutor(a)";
+  const tutorPhoto =
+    parseAuthUserPhotoCookie(jar.get(AUTH_USER_PHOTO_COOKIE)?.value) ??
+    "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=700&q=80";
+  const currentPet = uid ? (await getOrCreateCurrentPet(uid)).pet : null;
+  const petList = uid ? await listOwnedPets(uid) : null;
+  const currentUser = uid ? await getOrCreateCurrentUserProfile(uid, { fallbackName: tutorName }) : null;
+  const currentVeterinarian = uid ? await getCurrentVeterinarianProfile(uid) : null;
+  const petData = currentPet
+    ? {
+        name: currentPet.name,
+        breed: currentPet.breed,
+        image: currentPet.image,
+        age: currentPet.age,
+        weightKg: currentPet.weightKg,
+        sex: currentPet.sex,
+        size: currentPet.size,
+        emergencyContact: currentPet.emergencyContact,
+        color: currentPet.color,
+        microchipId: currentPet.microchipId,
+        notes: currentPet.notes,
+        publicFields: currentPet.publicFields ?? {
+          name: true,
+          breed: false,
+          color: false,
+          emergencyContact: true,
+          microchipId: false,
+          notes: false,
+        },
+      }
+    : {
+        name: pet.name,
+        breed: pet.breed,
+        image: pet.image,
+        age: pet.age,
+        weightKg: pet.weightKg,
+        sex: pet.sex,
+        size: pet.size,
+        emergencyContact: "(11) 98888-1234",
+        color: "Dourado",
+        microchipId: null,
+        notes: null,
+        publicFields: {
+          name: true,
+          breed: false,
+          color: false,
+          emergencyContact: true,
+          microchipId: false,
+          notes: false,
+        },
+      };
+
   return (
     <AppShell tab="profile">
-      <TopBar title="Perfil do pet" subtitle="Dados gerais" />
+      <TopBar
+        title="Perfil do pet"
+        subtitle="Perfil"
+        action={
+          currentPet && petList ? (
+            <ProfilePetSwitcher
+              currentPet={{
+                id: currentPet.id,
+                name: currentPet.name,
+                breed: currentPet.breed,
+                image: currentPet.image,
+              }}
+              initialPets={petList.pets.map((item) => ({
+                id: item.id,
+                name: item.name,
+                breed: item.breed,
+                image: item.image,
+              })).concat(
+                SIMULATED_PETS.filter((simulated) => !petList.pets.some((item) => item.id === simulated.id)),
+              )}
+            />
+          ) : undefined
+        }
+      />
 
-      <section className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
-        <div className="relative h-[220px]">
-          <Image src={pet.image} alt="Foto da Luna" fill className="object-cover" sizes="(max-width: 768px) 100vw, 440px" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-          <div className="absolute bottom-4 left-4">
-            <h2 className="text-[28px] font-semibold text-white">{pet.name}</h2>
-            <p className="text-[12px] text-white/80">{pet.breed}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="appear-up mt-3 grid grid-cols-2 gap-2.5" style={{ animationDelay: "140ms" }}>
-        <article className="elev-card rounded-2xl p-3.5">
-          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Idade</p>
-          <p className="mt-2 text-[24px] font-semibold text-zinc-900">{pet.age} anos</p>
-        </article>
-        <article className="elev-card rounded-2xl p-3.5">
-          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Peso</p>
-          <p className="mt-2 text-[24px] font-semibold text-zinc-900">{pet.weightKg} kg</p>
-        </article>
-        <article className="elev-card rounded-2xl p-3.5">
-          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Sexo</p>
-          <p className="mt-2 text-[20px] font-semibold text-zinc-900">{pet.sex}</p>
-        </article>
-        <article className="elev-card rounded-2xl p-3.5">
-          <p className="text-[11px] uppercase tracking-wide text-zinc-500">Porte</p>
-          <p className="mt-2 text-[20px] font-semibold text-zinc-900">{pet.size}</p>
-        </article>
-      </section>
+      <ProfilePetDetailsEditor
+        petName={petData.name}
+        petBreed={petData.breed}
+        petImage={petData.image}
+        initialAge={petData.age}
+        initialWeightKg={petData.weightKg}
+        initialSex={petData.sex}
+        initialSize={petData.size}
+        initialEmergencyContact={petData.emergencyContact}
+        initialBreed={petData.breed}
+        initialColor={petData.color}
+        initialMicrochipId={petData.microchipId}
+        initialNotes={petData.notes}
+        initialPublicFields={petData.publicFields}
+      />
 
       <section className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "170ms" }}>
         <div className="flex items-center gap-3 p-3">
           <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-zinc-200">
             <Image
-              src="https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=700&q=80"
+              src={tutorPhoto}
               alt="Foto do tutor"
               fill
               className="object-cover"
@@ -52,11 +148,20 @@ export default function ProfilePage() {
           </div>
           <div>
             <p className="text-[11px] uppercase tracking-wide text-zinc-500">Tutor</p>
-            <p className="text-[15px] font-semibold text-zinc-900">Mariana Costa</p>
+            <p className="text-[15px] font-semibold text-zinc-900">{tutorName}</p>
             <p className="text-[12px] text-zinc-500">Responsavel principal</p>
           </div>
         </div>
       </section>
+
+      <ProfileUserDetailsEditor
+        initialName={currentUser?.name ?? tutorName}
+        initialEmail={currentUser?.email ?? ""}
+        initialPhone={currentUser?.phone ?? ""}
+        initialBirthDate={currentUser?.birthDate ?? ""}
+        initialUserType={currentUser?.userType ?? "Tutor"}
+        initialVeterinarian={currentVeterinarian}
+      />
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "200ms" }}>
         <div className="mb-3 flex items-center justify-between">

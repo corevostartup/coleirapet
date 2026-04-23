@@ -1,0 +1,398 @@
+"use client";
+
+import Image from "next/image";
+import { useState } from "react";
+
+type Props = {
+  petName: string;
+  petBreed: string;
+  petImage: string;
+  initialAge: number | null;
+  initialWeightKg: number | null;
+  initialSex: string | null;
+  initialSize: string | null;
+  initialEmergencyContact: string | null;
+  initialBreed: string | null;
+  initialColor: string | null;
+  initialMicrochipId: string | null;
+  initialNotes: string | null;
+  initialPublicFields?: {
+    name: boolean;
+    breed: boolean;
+    color: boolean;
+    emergencyContact: boolean;
+    microchipId: boolean;
+    notes: boolean;
+  };
+};
+
+type SaveState = "idle" | "saving" | "success" | "error";
+const DEFAULT_PUBLIC_FIELDS = {
+  name: true,
+  breed: false,
+  color: false,
+  emergencyContact: true,
+  microchipId: false,
+  notes: false,
+} as const;
+
+function formatWeight(value: number | null) {
+  if (value === null) return "Nao informado";
+  return `${value.toFixed(1)} kg`;
+}
+
+export function ProfilePetDetailsEditor({
+  petName,
+  petBreed,
+  petImage,
+  initialAge,
+  initialWeightKg,
+  initialSex,
+  initialSize,
+  initialEmergencyContact,
+  initialBreed,
+  initialColor,
+  initialMicrochipId,
+  initialNotes,
+  initialPublicFields,
+}: Props) {
+  const [name, setName] = useState(petName ?? "");
+  const [age, setAge] = useState<number | null>(initialAge);
+  const [weightKg, setWeightKg] = useState<number | null>(initialWeightKg);
+  const [sex, setSex] = useState(initialSex ?? "");
+  const [size, setSize] = useState(initialSize ?? "");
+  const [emergencyContact, setEmergencyContact] = useState(initialEmergencyContact ?? "");
+  const [breed, setBreed] = useState(initialBreed ?? petBreed ?? "");
+  const [color, setColor] = useState(initialColor ?? "");
+  const [microchipId, setMicrochipId] = useState(initialMicrochipId ?? "");
+  const [notes, setNotes] = useState(initialNotes ?? "");
+  const [publicFields, setPublicFields] = useState({
+    name: initialPublicFields?.name ?? DEFAULT_PUBLIC_FIELDS.name,
+    breed: initialPublicFields?.breed ?? DEFAULT_PUBLIC_FIELDS.breed,
+    color: initialPublicFields?.color ?? DEFAULT_PUBLIC_FIELDS.color,
+    emergencyContact: initialPublicFields?.emergencyContact ?? DEFAULT_PUBLIC_FIELDS.emergencyContact,
+    microchipId: initialPublicFields?.microchipId ?? DEFAULT_PUBLIC_FIELDS.microchipId,
+    notes: initialPublicFields?.notes ?? DEFAULT_PUBLIC_FIELDS.notes,
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaveState("saving");
+    setErrorMessage(null);
+
+    try {
+      const payload = {
+        age: age ?? undefined,
+        weightKg: weightKg ?? undefined,
+        name: name.trim(),
+        sex: sex.trim(),
+        size: size.trim(),
+        emergencyContact: emergencyContact.trim(),
+        breed: breed.trim(),
+        color: color.trim(),
+        microchipId: microchipId.trim(),
+        notes: notes.trim(),
+        publicFields,
+      };
+
+      const res = await fetch("/api/pets/current", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Falha ao salvar dados do pet.");
+      }
+
+      setSaveState("success");
+      setTimeout(() => {
+        setSaveState("idle");
+        setIsEditing(false);
+      }, 1300);
+    } catch (error) {
+      setSaveState("error");
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao salvar dados do pet.");
+    }
+  }
+
+  return (
+    <>
+      <section className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
+        <div className="relative h-[220px]">
+          <Image src={petImage} alt={`Foto da ${name || petName}`} fill className="object-cover" sizes="(max-width: 768px) 100vw, 440px" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+          <div className="absolute bottom-4 left-4">
+            <h2 className="text-[28px] font-semibold text-white">{name.trim() || "Pet"}</h2>
+            <p className="text-[12px] text-white/80">{petBreed}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsEditing((value) => !value);
+              setSaveState("idle");
+              setErrorMessage(null);
+            }}
+            className="absolute bottom-4 right-4 rounded-xl bg-white/92 px-3 py-1.5 text-[12px] font-semibold text-zinc-700 shadow-sm transition hover:bg-white"
+          >
+            {isEditing ? "Cancelar" : "Editar"}
+          </button>
+        </div>
+      </section>
+
+      <form onSubmit={handleSubmit} className="appear-up mt-3 space-y-3" style={{ animationDelay: "140ms" }}>
+        <section className="grid grid-cols-2 gap-2.5">
+          <article className="elev-card rounded-2xl p-3.5">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Idade</p>
+            {isEditing ? (
+              <input
+                type="number"
+                min={0}
+                max={40}
+                step={1}
+                value={age ?? ""}
+                onChange={(event) => setAge(event.target.value === "" ? null : Number(event.target.value))}
+                placeholder="Idade"
+                className="mt-2 h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+              />
+            ) : (
+              <p className="mt-2 text-[24px] font-semibold text-zinc-900">{age === null ? "Nao informado" : `${age} anos`}</p>
+            )}
+          </article>
+          <article className="elev-card rounded-2xl p-3.5">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Peso</p>
+            {isEditing ? (
+              <input
+                type="number"
+                min={0.1}
+                max={130}
+                step={0.1}
+                value={weightKg ?? ""}
+                onChange={(event) => setWeightKg(event.target.value === "" ? null : Number(event.target.value))}
+                placeholder="Peso (kg)"
+                className="mt-2 h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+              />
+            ) : (
+              <p className="mt-2 text-[24px] font-semibold text-zinc-900">{formatWeight(weightKg)}</p>
+            )}
+          </article>
+          <article className="elev-card rounded-2xl p-3.5">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Sexo</p>
+            {isEditing ? (
+              <input
+                type="text"
+                maxLength={20}
+                value={sex}
+                onChange={(event) => setSex(event.target.value)}
+                placeholder="Sexo"
+                className="mt-2 h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+              />
+            ) : (
+              <p className="mt-2 text-[20px] font-semibold text-zinc-900">{sex.trim() || "Nao informado"}</p>
+            )}
+          </article>
+          <article className="elev-card rounded-2xl p-3.5">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Porte</p>
+            {isEditing ? (
+              <input
+                type="text"
+                maxLength={20}
+                value={size}
+                onChange={(event) => setSize(event.target.value)}
+                placeholder="Porte"
+                className="mt-2 h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+              />
+            ) : (
+              <p className="mt-2 text-[20px] font-semibold text-zinc-900">{size.trim() || "Nao informado"}</p>
+            )}
+          </article>
+        </section>
+
+        <section className="rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
+          <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Dados complementares</h3>
+          <div className="space-y-2">
+            <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Nome</p>
+                <button
+                  type="button"
+                  disabled={!isEditing}
+                  onClick={() => setPublicFields((value) => ({ ...value, name: !value.name }))}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    publicFields.name ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
+                  }`}
+                >
+                  {publicFields.name ? "Publico" : "Privado"}
+                </button>
+              </div>
+              {isEditing ? (
+                <input
+                  type="text"
+                  maxLength={50}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Nome"
+                  className="mt-1 h-9 w-full rounded-lg border border-zinc-200 bg-white px-2.5 text-[14px] font-medium text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                />
+              ) : (
+                <p className="mt-0.5 text-[14px] font-medium text-zinc-800">{name.trim() || "Nao informado"}</p>
+              )}
+            </article>
+            <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Raca</p>
+                <button
+                  type="button"
+                  disabled={!isEditing}
+                  onClick={() => setPublicFields((value) => ({ ...value, breed: !value.breed }))}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    publicFields.breed ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
+                  }`}
+                >
+                  {publicFields.breed ? "Publico" : "Privado"}
+                </button>
+              </div>
+              {isEditing ? (
+                <input
+                  type="text"
+                  maxLength={50}
+                  value={breed}
+                  onChange={(event) => setBreed(event.target.value)}
+                  placeholder="Raca"
+                  className="mt-1 h-9 w-full rounded-lg border border-zinc-200 bg-white px-2.5 text-[14px] font-medium text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                />
+              ) : (
+                <p className="mt-0.5 text-[14px] font-medium text-zinc-800">{breed.trim() || "Nao informado"}</p>
+              )}
+            </article>
+            <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Cor</p>
+                <button
+                  type="button"
+                  disabled={!isEditing}
+                  onClick={() => setPublicFields((value) => ({ ...value, color: !value.color }))}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    publicFields.color ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
+                  }`}
+                >
+                  {publicFields.color ? "Publico" : "Privado"}
+                </button>
+              </div>
+              {isEditing ? (
+                <input
+                  type="text"
+                  maxLength={30}
+                  value={color}
+                  onChange={(event) => setColor(event.target.value)}
+                  placeholder="Cor"
+                  className="mt-1 h-9 w-full rounded-lg border border-zinc-200 bg-white px-2.5 text-[14px] font-medium text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                />
+              ) : (
+                <p className="mt-0.5 text-[14px] font-medium text-zinc-800">{color.trim() || "Nao informado"}</p>
+              )}
+            </article>
+            <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Contato de emergencia</p>
+                <button
+                  type="button"
+                  disabled={!isEditing}
+                  onClick={() => setPublicFields((value) => ({ ...value, emergencyContact: !value.emergencyContact }))}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    publicFields.emergencyContact ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
+                  }`}
+                >
+                  {publicFields.emergencyContact ? "Publico" : "Privado"}
+                </button>
+              </div>
+              {isEditing ? (
+                <input
+                  type="text"
+                  maxLength={40}
+                  value={emergencyContact}
+                  onChange={(event) => setEmergencyContact(event.target.value)}
+                  placeholder="Contato de emergencia"
+                  className="mt-1 h-9 w-full rounded-lg border border-zinc-200 bg-white px-2.5 text-[14px] font-medium text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                />
+              ) : (
+                <p className="mt-0.5 text-[14px] font-medium text-zinc-800">{emergencyContact.trim() || "Nao informado"}</p>
+              )}
+            </article>
+            <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Microchip</p>
+                <button
+                  type="button"
+                  disabled={!isEditing}
+                  onClick={() => setPublicFields((value) => ({ ...value, microchipId: !value.microchipId }))}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    publicFields.microchipId ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
+                  }`}
+                >
+                  {publicFields.microchipId ? "Publico" : "Privado"}
+                </button>
+              </div>
+              {isEditing ? (
+                <input
+                  type="text"
+                  maxLength={40}
+                  value={microchipId}
+                  onChange={(event) => setMicrochipId(event.target.value)}
+                  placeholder="ID do microchip"
+                  className="mt-1 h-9 w-full rounded-lg border border-zinc-200 bg-white px-2.5 text-[14px] font-medium text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                />
+              ) : (
+                <p className="mt-0.5 text-[14px] font-medium text-zinc-800">{microchipId.trim() || "Nao informado"}</p>
+              )}
+            </article>
+            <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Observações</p>
+                <button
+                  type="button"
+                  disabled={!isEditing}
+                  onClick={() => setPublicFields((value) => ({ ...value, notes: !value.notes }))}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    publicFields.notes ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
+                  }`}
+                >
+                  {publicFields.notes ? "Publico" : "Privado"}
+                </button>
+              </div>
+              {isEditing ? (
+                <textarea
+                  maxLength={280}
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Outros dados importantes do pet"
+                  rows={3}
+                  className="mt-1 w-full resize-none rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-[13px] text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                />
+              ) : (
+                <p className="mt-0.5 text-[14px] font-medium text-zinc-800">{notes.trim() || "Nao informado"}</p>
+              )}
+            </article>
+          </div>
+          {isEditing ? (
+            <div className="mt-3 rounded-[20px] bg-white p-3 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
+              <button
+                type="submit"
+                disabled={saveState === "saving"}
+                className="h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-70"
+              >
+                {saveState === "saving" ? "Salvando..." : "Salvar"}
+              </button>
+              {saveState === "success" ? <p className="mt-2 text-[12px] font-medium text-emerald-700">Dados salvos com sucesso.</p> : null}
+              {saveState === "error" && errorMessage ? <p className="mt-2 text-[12px] font-medium text-red-600">{errorMessage}</p> : null}
+            </div>
+          ) : null}
+        </section>
+      </form>
+    </>
+  );
+}
