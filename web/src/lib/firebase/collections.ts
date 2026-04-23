@@ -5,3 +5,9 @@ export const COLLECTION_VETERINARIANS = "Veterinarians";
 
 /** Subcoleção em `Pets/{petId}`: mensagens de quem encontrou o pet (NFC / pet perdido). */
 export const SUBCOLLECTION_FINDER_MESSAGES = "finderMessages";
+
+/** Subcoleção em `Pets/{petId}`: vacinas (nome canônico atual). */
+export const SUBCOLLECTION_VACCINES = "vacinas";
+
+/** Nome legado em inglês mantido para migração retrocompatível. */
+export const SUBCOLLECTION_VACCINES_LEGACY = "vaccines";

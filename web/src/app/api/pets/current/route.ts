@@ -68,8 +68,18 @@ export async function GET() {
   const auth = await requireAuthContext();
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
 
-  const { pet } = await getOrCreateCurrentPet(auth.uid);
-  return NextResponse.json({ pet });
+  try {
+    const { pet } = await getOrCreateCurrentPet(auth.uid);
+    return NextResponse.json({ pet });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Falha ao carregar pet atual",
+        detail: error instanceof Error ? error.message : "Erro desconhecido ao carregar pet atual.",
+      },
+      { status: 500 },
+    );
+  }
 }
 
 export async function PATCH(request: Request) {

@@ -44,7 +44,13 @@ export default function TagNfcPairPage() {
     async function loadPublicUrl() {
       try {
         const res = await fetch("/api/pets/current", { cache: "no-store" });
-        if (!res.ok) throw new Error("Falha ao carregar pet atual.");
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
+          if (res.status === 401) {
+            throw new Error("Sessao expirada. Faca login novamente.");
+          }
+          throw new Error(payload?.detail || payload?.error || "Falha ao carregar pet atual.");
+        }
         const payload = (await res.json()) as { pet?: { publicPagePath?: string } };
         const path = payload.pet?.publicPagePath?.trim();
         if (!path) throw new Error("Endereco publico do pet indisponivel.");
@@ -55,6 +61,11 @@ export default function TagNfcPairPage() {
         }
       } catch (error) {
         if (!cancelled) {
+          if (error instanceof Error && error.message === "Sessao expirada. Faca login novamente.") {
+            setPublicUrlError(error.message);
+            router.replace("/login");
+            return;
+          }
           setPublicUrl("");
           setPublicUrlError(error instanceof Error ? error.message : "Falha ao carregar endereco publico.");
         }
@@ -64,7 +75,7 @@ export default function TagNfcPairPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   function handleStartScan() {
     const w = typeof window !== "undefined" ? (window as NativeWindow) : undefined;

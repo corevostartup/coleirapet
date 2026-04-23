@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { DocumentReference, Firestore } from "firebase-admin/firestore";
-import { COLLECTION_PETS, COLLECTION_USER } from "@/lib/firebase/collections";
+import {
+  COLLECTION_PETS,
+  COLLECTION_USER,
+  SUBCOLLECTION_VACCINES,
+  SUBCOLLECTION_VACCINES_LEGACY,
+} from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { pet as mockPet } from "@/lib/mock";
 
@@ -175,7 +180,7 @@ function defaultPetDoc(ownerId: string) {
 const LEGACY_PETS_SUBCOLLECTION = "pets";
 
 /**
- * Migra User/{uid}/pets → Pets/{petId} (com ownerId) e subcoleção vaccines.
+ * Migra User/{uid}/pets → Pets/{petId} (com ownerId) e subcoleções de vacinas.
  * Idempotente: pode ser chamada várias vezes.
  */
 async function migrateLegacyPetsSubcollection(db: Firestore, uid: string): Promise<void> {
@@ -196,12 +201,16 @@ async function migrateLegacyPetsSubcollection(db: Firestore, uid: string): Promi
     };
     await petsRoot.doc(petId).set(merged, { merge: true });
 
-    const legacyVaccines = await legacyDoc.ref.collection("vaccines").get();
-    if (!legacyVaccines.empty) {
+    const legacyVaccinesByName = await Promise.all([
+      legacyDoc.ref.collection(SUBCOLLECTION_VACCINES).get(),
+      legacyDoc.ref.collection(SUBCOLLECTION_VACCINES_LEGACY).get(),
+    ]);
+    const legacyVaccines = legacyVaccinesByName.flatMap((snapshot) => snapshot.docs);
+    if (legacyVaccines.length > 0) {
       let batch = db.batch();
       let count = 0;
-      for (const vDoc of legacyVaccines.docs) {
-        batch.set(petsRoot.doc(petId).collection("vaccines").doc(vDoc.id), vDoc.data(), { merge: true });
+      for (const vDoc of legacyVaccines) {
+        batch.set(petsRoot.doc(petId).collection(SUBCOLLECTION_VACCINES).doc(vDoc.id), vDoc.data(), { merge: true });
         count++;
         if (count >= 400) {
           await batch.commit();
@@ -213,7 +222,7 @@ async function migrateLegacyPetsSubcollection(db: Firestore, uid: string): Promi
 
       let delBatch = db.batch();
       let delCount = 0;
-      for (const vDoc of legacyVaccines.docs) {
+      for (const vDoc of legacyVaccines) {
         delBatch.delete(vDoc.ref);
         delCount++;
         if (delCount >= 400) {
