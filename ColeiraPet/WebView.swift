@@ -200,9 +200,18 @@ struct WebView: UIViewRepresentable {
             ])
 
             do {
-                let (_, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await URLSession.shared.data(for: request)
                 guard let http = response as? HTTPURLResponse, 200 ..< 300 ~= http.statusCode else {
-                    reportLoginError("Falha ao validar sessao Firebase.")
+                    if
+                        let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                        let errorMessage = payload["error"] as? String
+                    {
+                        let detail = payload["detail"] as? String
+                        let composed = (detail?.isEmpty == false) ? "\(errorMessage): \(detail!)" : errorMessage
+                        reportLoginError(composed)
+                    } else {
+                        reportLoginError("Falha ao validar sessao Firebase.")
+                    }
                     return
                 }
 
