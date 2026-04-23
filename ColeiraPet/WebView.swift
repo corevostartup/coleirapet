@@ -54,6 +54,9 @@ struct WebView: UIViewRepresentable {
             window.ColeiraPetNativeNFC = {
                 startPairing: () => {
                     window.webkit.messageHandlers.coleiraNativeNFC.postMessage({ action: 'startPairing' });
+                },
+                writePairingPassword: (password) => {
+                    window.webkit.messageHandlers.coleiraNativeNFC.postMessage({ action: 'writePairingPassword', password });
                 }
             };
         })();
@@ -91,6 +94,13 @@ struct WebView: UIViewRepresentable {
         weak var webView: WKWebView?
         private var authSession: ASWebAuthenticationSession?
         private var nfcSession: NFCNDEFReaderSession?
+        private var nfcPairingMode: NFCPairingMode?
+        private var didHandleNfcSessionResult = false
+
+        private enum NFCPairingMode {
+            case scanToPair
+            case writePassword(String)
+        }
 
         init(parent: WebView) {
             self.parent = parent
@@ -122,27 +132,44 @@ struct WebView: UIViewRepresentable {
         private func handleNFCMessage(_ message: WKScriptMessage) {
             guard
                 let body = message.body as? [String: Any],
-                let action = body["action"] as? String,
-                action == "startPairing"
+                let action = body["action"] as? String
             else {
                 return
             }
 
-            startNFCPairingSession()
+            switch action {
+            case "startPairing":
+                startNFCPairingSession(mode: .scanToPair)
+            case "writePairingPassword":
+                guard let password = body["password"] as? String, !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    showJSAlert("Senha da Tag NFC invalida.")
+                    return
+                }
+                startNFCPairingSession(mode: .writePassword(password))
+            default:
+                break
+            }
         }
 
         func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
             webView?.window ?? ASPresentationAnchor()
         }
 
-        private func startNFCPairingSession() {
+        private func startNFCPairingSession(mode: NFCPairingMode) {
             guard NFCNDEFReaderSession.readingAvailable else {
                 showJSAlert("NFC não está disponível neste iPhone.")
                 return
             }
 
-            let session = NFCNDEFReaderSession(delegate: self, queue: nil, invalidateAfterFirstRead: true)
-            session.alertMessage = "Aproxime a tag NFC da parte superior traseira do iPhone."
+            nfcPairingMode = mode
+            didHandleNfcSessionResult = false
+            let session = NFCNDEFReaderSession(delegate: self, queue: nil, invalidateAfterFirstRead: false)
+            switch mode {
+            case .scanToPair:
+                session.alertMessage = "Aproxime a tag NFC da parte superior traseira do iPhone."
+            case .writePassword:
+                session.alertMessage = "Aproxime novamente a Tag NFC para gravar a senha de pareamento."
+            }
             nfcSession = session
             session.begin()
         }
@@ -162,12 +189,12 @@ struct WebView: UIViewRepresentable {
                 guard let self else { return }
 
                 if let error {
-                    self.reportLoginError(error.localizedDescription)
+                    self.returnToLoginWithNativeGoogleResult(errorMessage: error.localizedDescription, baseURL: baseURL)
                     return
                 }
 
                 guard let callbackURL else {
-                    self.reportLoginError("Callback do Google nao recebido.")
+                    self.returnToLoginWithNativeGoogleResult(errorMessage: "Callback do Google nao recebido.", baseURL: baseURL)
                     return
                 }
 
@@ -176,18 +203,16 @@ struct WebView: UIViewRepresentable {
                 let authError = components?.queryItems?.first(where: { $0.name == "error" })?.value
 
                 if let authError {
-                    self.reportLoginError(authError)
+                    self.returnToLoginWithNativeGoogleResult(errorMessage: authError, baseURL: baseURL)
                     return
                 }
 
                 guard let token else {
-                    self.reportLoginError("Token do Google nao recebido.")
+                    self.returnToLoginWithNativeGoogleResult(errorMessage: "Token do Google nao recebido.", baseURL: baseURL)
                     return
                 }
 
-                Task {
-                    await self.finishFirebaseSession(idToken: token, baseURL: baseURL)
-                }
+                self.returnToLoginWithNativeGoogleResult(idToken: token, baseURL: baseURL)
             }
 
             authSession?.presentationContextProvider = self
@@ -254,9 +279,41 @@ struct WebView: UIViewRepresentable {
             showJSAlert(message)
         }
 
+        private func returnToLoginWithNativeGoogleResult(idToken: String? = nil, errorMessage: String? = nil, baseURL: URL) {
+            guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { return }
+            components.path = "/login"
+            var queryItems: [URLQueryItem] = []
+            if let idToken, !idToken.isEmpty {
+                queryItems.append(URLQueryItem(name: "nativeGoogleIdToken", value: idToken))
+            }
+            if let errorMessage, !errorMessage.isEmpty {
+                queryItems.append(URLQueryItem(name: "nativeGoogleError", value: errorMessage))
+            }
+            components.queryItems = queryItems.isEmpty ? nil : queryItems
+            guard let loginURL = components.url else { return }
+
+            DispatchQueue.main.async { [weak self] in
+                self?.webView?.load(URLRequest(url: loginURL))
+            }
+        }
+
         private func showJSAlert(_ message: String) {
             DispatchQueue.main.async { [weak self] in
                 self?.webView?.evaluateJavaScript("window.alert('" + message.replacingOccurrences(of: "'", with: "\\'") + "')")
+            }
+        }
+
+        private func goToPairingPasswordStep() {
+            DispatchQueue.main.async { [weak self] in
+                self?.webView?.evaluateJavaScript("window.location.replace('/tag-nfc/parear?step=password')")
+            }
+        }
+
+        private func finalizePairingAndGoHome() {
+            let maxAgeSeconds = 60 * 60 * 24 * 365
+            let script = "document.cookie='cp_nfc_paired=1; Path=/; Max-Age=\(maxAgeSeconds); SameSite=Lax'; window.location.replace('/home');"
+            DispatchQueue.main.async { [weak self] in
+                self?.webView?.evaluateJavaScript(script)
             }
         }
     }
@@ -264,14 +321,80 @@ struct WebView: UIViewRepresentable {
 
 extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
     func readerSession(_ session: NFCNDEFReaderSession, didDetectNDEFs messages: [NFCNDEFMessage]) {
-        DispatchQueue.main.async { [weak self] in
+        guard !didHandleNfcSessionResult else { return }
+        guard case .scanToPair = nfcPairingMode else { return }
+        didHandleNfcSessionResult = true
+        session.invalidate()
+        showJSAlert("Tag lida com sucesso. Agora cadastre a senha para finalizar o pareamento.")
+        goToPairingPasswordStep()
+    }
+
+    func readerSession(_ session: NFCNDEFReaderSession, didDetect tags: [NFCNDEFTag]) {
+        guard !didHandleNfcSessionResult else { return }
+        guard let mode = nfcPairingMode else { return }
+        guard let tag = tags.first else {
+            session.invalidate(errorMessage: "Tag NFC nao detectada.")
+            return
+        }
+
+        switch mode {
+        case .scanToPair:
+            didHandleNfcSessionResult = true
             session.invalidate()
-            self?.showJSAlert("Tag lida. Continue no app para concluir o pareamento.")
+            showJSAlert("Tag lida com sucesso. Agora cadastre a senha para finalizar o pareamento.")
+            goToPairingPasswordStep()
+
+        case let .writePassword(password):
+            didHandleNfcSessionResult = true
+            session.connect(to: tag) { [weak self] error in
+                guard let self else { return }
+                if let error {
+                    session.invalidate(errorMessage: "Falha ao conectar na Tag NFC: \(error.localizedDescription)")
+                    return
+                }
+
+                tag.queryNDEFStatus { status, _, error in
+                    if let error {
+                        session.invalidate(errorMessage: "Falha ao verificar status da Tag NFC: \(error.localizedDescription)")
+                        return
+                    }
+
+                    guard status == .readWrite else {
+                        session.invalidate(errorMessage: "A Tag NFC nao permite gravacao no momento.")
+                        return
+                    }
+
+                    guard
+                        let payload = NFCNDEFPayload.wellKnownTypeTextPayload(
+                            string: "cp_protected_password:\(password)",
+                            locale: Locale(identifier: "pt_BR")
+                        )
+                    else {
+                        session.invalidate(errorMessage: "Falha ao preparar os dados da senha.")
+                        return
+                    }
+
+                    let message = NFCNDEFMessage(records: [payload])
+                    tag.writeNDEF(message) { error in
+                        if let error {
+                            session.invalidate(errorMessage: "Falha ao gravar senha na Tag NFC: \(error.localizedDescription)")
+                            return
+                        }
+
+                        session.alertMessage = "Senha gravada com sucesso na area protegida da Tag NFC."
+                        session.invalidate()
+                        self.showJSAlert("Pareamento concluido. Senha gravada na Tag NFC.")
+                        self.finalizePairingAndGoHome()
+                    }
+                }
+            }
         }
     }
 
     func readerSession(_ session: NFCNDEFReaderSession, didInvalidateWithError error: Error) {
         nfcSession = nil
+        nfcPairingMode = nil
+        didHandleNfcSessionResult = false
 
         guard let readerError = error as? NFCReaderError else {
             showJSAlert(error.localizedDescription)

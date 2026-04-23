@@ -69,12 +69,12 @@ export default async function TagNfcPage() {
           >
             Parear Tag NFC
           </Link>
-          <button
-            type="button"
-            className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-left text-[12px] font-semibold text-zinc-800 transition hover:bg-zinc-100"
+          <Link
+            href="/tag-nfc/testar-leitura"
+            className="block w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-left text-[12px] font-semibold text-zinc-800 transition hover:bg-zinc-100"
           >
             Testar leitura
-          </button>
+          </Link>
           <button
             type="button"
             className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-left text-[12px] font-semibold text-zinc-800 transition hover:bg-zinc-100"

@@ -50,6 +50,57 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
   const [legalDocOpen, setLegalDocOpen] = useState<"privacy" | "terms" | null>(null);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    const nativeError = url.searchParams.get("nativeGoogleError");
+    const nativeIdToken = url.searchParams.get("nativeGoogleIdToken");
+    if (!nativeError && !nativeIdToken) return;
+
+    function clearNativeGoogleParams() {
+      url.searchParams.delete("nativeGoogleError");
+      url.searchParams.delete("nativeGoogleIdToken");
+      window.history.replaceState(null, "", url.toString());
+    }
+
+    if (nativeError) {
+      setGoogleBusy(false);
+      setOauthHint(nativeError);
+      clearNativeGoogleParams();
+      return;
+    }
+
+    if (!nativeIdToken) return;
+    setGoogleBusy(true);
+    setOauthHint("Finalizando login Google...");
+    void (async () => {
+      try {
+        const res = await fetch("/api/auth/firebase/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken: nativeIdToken, provider: "google" }),
+        });
+
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          setOauthHint(payload?.error ?? "Falha ao concluir login Google.");
+          setGoogleBusy(false);
+          clearNativeGoogleParams();
+          return;
+        }
+
+        clearNativeGoogleParams();
+        router.replace("/home");
+        router.refresh();
+      } catch (error) {
+        setOauthHint(error instanceof Error ? error.message : "Erro ao concluir login Google.");
+        setGoogleBusy(false);
+        clearNativeGoogleParams();
+      }
+    })();
+  }, [router]);
+
+  useEffect(() => {
     let active = true;
 
     async function finishRedirectFlow() {
