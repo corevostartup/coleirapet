@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GoogleSignIn
 
 struct ContentView: View {
     // Entrada em /login para a tela de auth aparecer antes da home (middleware redireciona se ja houver sessao).
@@ -16,6 +17,9 @@ struct ContentView: View {
         WebView(url: appURL)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
+            .onOpenURL { url in
+                _ = GIDSignIn.sharedInstance.handle(url)
+            }
     }
 }
 

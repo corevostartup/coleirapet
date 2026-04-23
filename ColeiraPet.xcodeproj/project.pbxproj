@@ -23,6 +23,10 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXBuildFile section */
+		A1B2C3D62F8052650025D5B2 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D52F8052650025D5B2 /* GoogleSignIn */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		DFE18E542F80525D0025D5B2 /* ColeiraPet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ColeiraPet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DFE18E642F8052650025D5B2 /* ColeiraPetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ColeiraPetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D62F8052650025D5B2 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = ColeiraPet;
 			packageProductDependencies = (
+				A1B2C3D52F8052650025D5B2 /* GoogleSignIn */,
 			);
 			productName = ColeiraPet;
 			productReference = DFE18E542F80525D0025D5B2 /* ColeiraPet.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = DFE18E4B2F80525D0025D5B2;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A1B2C3D42F8052650025D5B2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DFE18E552F80525D0025D5B2 /* Products */;
 			projectDirPath = "";
@@ -527,6 +536,25 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A1B2C3D42F8052650025D5B2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1B2C3D52F8052650025D5B2 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D42F8052650025D5B2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		DFE18E4F2F80525D0025D5B2 /* Build configuration list for PBXProject "ColeiraPet" */ = {

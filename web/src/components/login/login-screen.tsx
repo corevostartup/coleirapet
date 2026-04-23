@@ -12,15 +12,19 @@ type LoginScreenProps = {
 };
 
 type IosNativeBridge = {
-  startGoogleSignIn: () => void;
+  startGoogleSignIn: (payload?: { clientId?: string }) => void;
 };
 
 declare global {
   interface Window {
     ColeiraPetNativeAuth?: IosNativeBridge;
     __COLEIRAPET_IOS_APP__?: boolean;
+    __coleiraGoogleSignInToken?: (idToken: string) => void;
+    __coleiraGoogleSignInError?: (message: string) => void;
   }
 }
+
+const IOS_NATIVE_GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_IOS_GOOGLE_CLIENT_ID?.trim() ?? "";
 
 const LOGIN_BG_STARS = [
   { t: 7, l: 11, d: 0.1, s: 2 },
@@ -157,9 +161,54 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
     setOauthHint(null);
 
     if (window.__COLEIRAPET_IOS_APP__ && window.ColeiraPetNativeAuth?.startGoogleSignIn) {
+      if (!IOS_NATIVE_GOOGLE_CLIENT_ID) {
+        setOauthHint("Configuracao ausente: NEXT_PUBLIC_IOS_GOOGLE_CLIENT_ID.");
+        return;
+      }
       setGoogleBusy(true);
       setOauthHint("Abrindo login Google nativo do iOS...");
-      window.ColeiraPetNativeAuth.startGoogleSignIn();
+      try {
+        const idToken = await new Promise<string>((resolve, reject) => {
+          const onToken = (token: string) => {
+            cleanup();
+            resolve(token);
+          };
+          const onError = (message: string) => {
+            cleanup();
+            reject(new Error(message || "Falha ao autenticar com Google no iOS."));
+          };
+          const timeout = window.setTimeout(() => {
+            cleanup();
+            reject(new Error("Tempo esgotado no login Google nativo."));
+          }, 120000);
+          const cleanup = () => {
+            window.clearTimeout(timeout);
+            delete window.__coleiraGoogleSignInToken;
+            delete window.__coleiraGoogleSignInError;
+          };
+
+          window.__coleiraGoogleSignInToken = onToken;
+          window.__coleiraGoogleSignInError = onError;
+          window.ColeiraPetNativeAuth?.startGoogleSignIn({ clientId: IOS_NATIVE_GOOGLE_CLIENT_ID });
+        });
+
+        const res = await fetch("/api/auth/firebase/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken, provider: "google" }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          setOauthHint(payload?.error ?? "Falha ao concluir login Google.");
+          setGoogleBusy(false);
+          return;
+        }
+        router.replace("/home");
+        router.refresh();
+      } catch (error) {
+        setOauthHint(error instanceof Error ? error.message : "Erro ao autenticar com Google.");
+        setGoogleBusy(false);
+      }
       return;
     }
 

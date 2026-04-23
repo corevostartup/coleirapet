@@ -5,8 +5,8 @@
 //  Created by Cássio on 03/04/26.
 //
 
-import AuthenticationServices
 import CoreNFC
+import GoogleSignIn
 import SwiftUI
 import WebKit
 
@@ -47,8 +47,9 @@ struct WebView: UIViewRepresentable {
 
             window.__COLEIRAPET_IOS_APP__ = true;
             window.ColeiraPetNativeAuth = {
-                startGoogleSignIn: () => {
-                    window.webkit.messageHandlers.coleiraNativeAuth.postMessage({ action: 'googleSignIn' });
+                startGoogleSignIn: (payload) => {
+                    const clientId = payload?.clientId ?? null;
+                    window.webkit.messageHandlers.coleiraNativeAuth.postMessage({ action: 'googleSignIn', clientId });
                 }
             };
             window.ColeiraPetNativeNFC = {
@@ -89,10 +90,9 @@ struct WebView: UIViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, ASWebAuthenticationPresentationContextProviding {
+    final class Coordinator: NSObject, WKScriptMessageHandler {
         private let parent: WebView
         weak var webView: WKWebView?
-        private var authSession: ASWebAuthenticationSession?
         private var nfcSession: NFCNDEFReaderSession?
         private var nfcPairingMode: NFCPairingMode?
         private var didHandleNfcSessionResult = false
@@ -126,7 +126,14 @@ struct WebView: UIViewRepresentable {
                 return
             }
 
-            startNativeGoogleSignIn()
+            let clientId = (body["clientId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let clientId, !clientId.isEmpty else {
+                sendNativeGoogleSignInError("Client ID do Google nao informado.")
+                return
+            }
+            Task { @MainActor in
+                await startNativeGoogleSignIn(clientId: clientId)
+            }
         }
 
         private func handleNFCMessage(_ message: WKScriptMessage) {
@@ -151,10 +158,6 @@ struct WebView: UIViewRepresentable {
             }
         }
 
-        func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-            webView?.window ?? ASPresentationAnchor()
-        }
-
         private func startNFCPairingSession(mode: NFCPairingMode) {
             guard NFCNDEFReaderSession.readingAvailable else {
                 showJSAlert("NFC não está disponível neste iPhone.")
@@ -174,136 +177,49 @@ struct WebView: UIViewRepresentable {
             session.begin()
         }
 
-        private func startNativeGoogleSignIn() {
-            guard let baseURL = parent.url.originURL else { return }
-            let callbackScheme = "coleirapet"
-            var components = URLComponents()
-            components.path = "/auth/ios/google"
-            components.queryItems = [
-                URLQueryItem(name: "callbackScheme", value: callbackScheme),
-                URLQueryItem(name: "native", value: "1"),
-            ]
-            guard let authURL = components.url(relativeTo: baseURL)?.absoluteURL else { return }
-
-            authSession = ASWebAuthenticationSession(url: authURL, callbackURLScheme: callbackScheme) { [weak self] callbackURL, error in
-                guard let self else { return }
-
-                if let error {
-                    self.returnToLoginWithNativeGoogleResult(errorMessage: error.localizedDescription, baseURL: baseURL)
-                    return
-                }
-
-                guard let callbackURL else {
-                    self.returnToLoginWithNativeGoogleResult(errorMessage: "Callback do Google nao recebido.", baseURL: baseURL)
-                    return
-                }
-
-                let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
-                let token = components?.queryItems?.first(where: { $0.name == "firebaseIdToken" })?.value
-                let authError = components?.queryItems?.first(where: { $0.name == "error" })?.value
-
-                if let authError {
-                    self.returnToLoginWithNativeGoogleResult(errorMessage: authError, baseURL: baseURL)
-                    return
-                }
-
-                guard let token else {
-                    self.returnToLoginWithNativeGoogleResult(errorMessage: "Token do Google nao recebido.", baseURL: baseURL)
-                    return
-                }
-
-                Task {
-                    await self.finishFirebaseSession(idToken: token, baseURL: baseURL)
-                }
+        @MainActor
+        private func startNativeGoogleSignIn(clientId: String) async {
+            guard let webView else { return }
+            guard
+                let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController ?? windowScene.windows.first?.rootViewController
+            else {
+                sendNativeGoogleSignInError("Janela indisponivel para login Google.")
+                return
             }
-
-            authSession?.presentationContextProvider = self
-            authSession?.prefersEphemeralWebBrowserSession = false
-            _ = authSession?.start()
-        }
-
-        private func finishFirebaseSession(idToken: String, baseURL: URL) async {
-            guard let endpoint = URL(string: "/api/auth/firebase/session", relativeTo: baseURL)?.absoluteURL else { return }
-
-            var request = URLRequest(url: endpoint)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try? JSONSerialization.data(withJSONObject: [
-                "idToken": idToken,
-                "provider": "google"
-            ])
 
             do {
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let http = response as? HTTPURLResponse, 200 ..< 300 ~= http.statusCode else {
-                    if
-                        let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                        let errorMessage = payload["error"] as? String
-                    {
-                        let detail = payload["detail"] as? String
-                        let composed = (detail?.isEmpty == false) ? "\(errorMessage): \(detail!)" : errorMessage
-                        reportLoginError(composed)
-                    } else {
-                        reportLoginError("Falha ao validar sessao Firebase.")
-                    }
+                GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientId)
+                let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootVC)
+                guard let idToken = result.user.idToken?.tokenString, !idToken.isEmpty else {
+                    sendNativeGoogleSignInError("Token do Google nao recebido.")
                     return
                 }
-
-                guard let webView else { return }
-                let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
-                let headerFields = http.allHeaderFields.reduce(into: [String: String]()) { partial, item in
-                    guard let key = item.key as? String, let value = item.value as? String else { return }
-                    partial[key] = value
-                }
-                let responseCookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: endpoint)
-                for cookie in responseCookies {
-                    await cookieStore.setCookie(cookie)
-                }
-
-                // Fallback defensivo caso Set-Cookie nao seja propagado pelo proxy.
-                if responseCookies.isEmpty, let host = baseURL.host {
-                    let cookieProps: [HTTPCookiePropertyKey: Any] = [
-                        .domain: host,
-                        .path: "/",
-                        .name: "cp_session",
-                        .value: "google",
-                        .expires: Date().addingTimeInterval(60 * 60 * 24 * 30),
-                        .secure: baseURL.scheme == "https",
-                    ]
-                    if let fallbackCookie = HTTPCookie(properties: cookieProps) {
-                        await cookieStore.setCookie(fallbackCookie)
-                    }
-                }
-                if let homeURL = URL(string: "/home", relativeTo: baseURL)?.absoluteURL {
-                    DispatchQueue.main.async {
-                        webView.load(URLRequest(url: homeURL))
-                    }
-                }
+                sendNativeGoogleSignInToken(idToken, to: webView)
             } catch {
-                returnToLoginWithNativeGoogleResult(errorMessage: error.localizedDescription, baseURL: baseURL)
+                sendNativeGoogleSignInError(error.localizedDescription)
             }
         }
 
-        private func reportLoginError(_ message: String) {
-            showJSAlert(message)
+        private func sendNativeGoogleSignInToken(_ idToken: String, to webView: WKWebView) {
+            let escaped = escapeForJavaScriptLiteral(idToken)
+            let script = "if(typeof window.__coleiraGoogleSignInToken==='function'){window.__coleiraGoogleSignInToken('\(escaped)');}"
+            webView.evaluateJavaScript(script)
         }
 
-        private func returnToLoginWithNativeGoogleResult(idToken: String? = nil, errorMessage: String? = nil, baseURL: URL) {
-            guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { return }
-            components.path = "/login"
-            var queryItems: [URLQueryItem] = []
-            if let idToken, !idToken.isEmpty {
-                queryItems.append(URLQueryItem(name: "nativeGoogleIdToken", value: idToken))
-            }
-            if let errorMessage, !errorMessage.isEmpty {
-                queryItems.append(URLQueryItem(name: "nativeGoogleError", value: errorMessage))
-            }
-            components.queryItems = queryItems.isEmpty ? nil : queryItems
-            guard let loginURL = components.url else { return }
+        private func sendNativeGoogleSignInError(_ message: String) {
+            guard let webView else { return }
+            let escaped = escapeForJavaScriptLiteral(message)
+            let script = "if(typeof window.__coleiraGoogleSignInError==='function'){window.__coleiraGoogleSignInError('\(escaped)');}"
+            webView.evaluateJavaScript(script)
+        }
 
-            DispatchQueue.main.async { [weak self] in
-                self?.webView?.load(URLRequest(url: loginURL))
-            }
+        private func escapeForJavaScriptLiteral(_ value: String) -> String {
+            value
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+                .replacingOccurrences(of: "\n", with: " ")
+                .replacingOccurrences(of: "\r", with: " ")
         }
 
         private func showJSAlert(_ message: String) {
