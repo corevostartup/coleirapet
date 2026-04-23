@@ -4,6 +4,8 @@ import { consumeGoogleRedirectResult, signInWithGoogleRedirectOnly } from "@/lib
 import { useEffect, useState } from "react";
 
 const CALLBACK_SCHEME = process.env.NEXT_PUBLIC_IOS_AUTH_CALLBACK_SCHEME ?? "coleirapet";
+const IOS_GOOGLE_REDIRECT_MARKER = "cp-ios-google-redirect-started-at";
+const IOS_GOOGLE_REDIRECT_TTL_MS = 10 * 60 * 1000;
 
 function goNative(path: string) {
   window.location.replace(`${CALLBACK_SCHEME}://auth${path}`);
@@ -15,6 +17,37 @@ function goNative(path: string) {
  */
 let iosGoogleAuthStarted = false;
 
+function markRedirectStarted() {
+  try {
+    sessionStorage.setItem(IOS_GOOGLE_REDIRECT_MARKER, String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+function clearRedirectMarker() {
+  try {
+    sessionStorage.removeItem(IOS_GOOGLE_REDIRECT_MARKER);
+  } catch {
+    // ignore
+  }
+}
+
+function hadPendingRedirectMarker() {
+  try {
+    const raw = sessionStorage.getItem(IOS_GOOGLE_REDIRECT_MARKER);
+    if (!raw) return false;
+    const timestamp = Number(raw);
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp > IOS_GOOGLE_REDIRECT_TTL_MS) {
+      sessionStorage.removeItem(IOS_GOOGLE_REDIRECT_MARKER);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export default function IosGoogleAuthPage() {
   const [status, setStatus] = useState("Abrindo login Google...");
 
@@ -23,24 +56,34 @@ export default function IosGoogleAuthPage() {
 
     async function run() {
       try {
+        const hadPendingRedirect = hadPendingRedirectMarker();
         const redirectToken = await consumeGoogleRedirectResult();
         if (cancelled) return;
 
         if (redirectToken) {
+          clearRedirectMarker();
           setStatus("Finalizando autenticacao...");
           goNative(`?firebaseIdToken=${encodeURIComponent(redirectToken)}`);
           return;
         }
 
-        if (iosGoogleAuthStarted) {
+        // Se voltou do Google sem token, interrompe para nao relancar redirect infinito.
+        if (hadPendingRedirect) {
+          clearRedirectMarker();
+          iosGoogleAuthStarted = false;
+          goNative(`?error=${encodeURIComponent("Falha ao concluir login Google. Tente novamente.")}`);
           return;
         }
-        iosGoogleAuthStarted = true;
 
+        if (iosGoogleAuthStarted) return;
+
+        iosGoogleAuthStarted = true;
+        markRedirectStarted();
         setStatus("Redirecionando para o Google...");
         await signInWithGoogleRedirectOnly();
       } catch (error) {
         iosGoogleAuthStarted = false;
+        clearRedirectMarker();
         const message = error instanceof Error ? error.message : "Erro desconhecido";
         goNative(`?error=${encodeURIComponent(message)}`);
       }
