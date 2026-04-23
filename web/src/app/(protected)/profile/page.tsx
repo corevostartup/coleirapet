@@ -21,21 +21,21 @@ const SIMULATED_PETS = [
     id: "demo-max",
     name: "Max",
     breed: "Border Collie",
-    image: "https://images.unsplash.com/photo-1518717758536-85ae29035b6d?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1518717758536-85ae29035b6d?auto=format&fm=jpg&fit=crop&w=900&q=80",
     simulated: true,
   },
   {
     id: "demo-nina",
     name: "Nina",
     breed: "Shih Tzu",
-    image: "https://images.unsplash.com/photo-1544568100-847a948585b9?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1544568100-847a948585b9?auto=format&fm=jpg&fit=crop&w=900&q=80",
     simulated: true,
   },
   {
     id: "demo-thor",
     name: "Thor",
     breed: "Labrador",
-    image: "https://images.unsplash.com/photo-1596492784531-6e6eb5ea9993?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1596492784531-6e6eb5ea9993?auto=format&fm=jpg&fit=crop&w=900&q=80",
     simulated: true,
   },
 ] as const;
@@ -47,7 +47,7 @@ export default async function ProfilePage() {
   const tutorName = parseAuthUserNameCookie(jar.get(AUTH_USER_NAME_COOKIE)?.value) ?? "Tutor(a)";
   const tutorPhoto =
     parseAuthUserPhotoCookie(jar.get(AUTH_USER_PHOTO_COOKIE)?.value) ??
-    "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=700&q=80";
+    "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fm=jpg&fit=crop&w=700&q=80";
   let currentPet = null;
   let petList = null;
   let currentUser = null;

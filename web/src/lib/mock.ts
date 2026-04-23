@@ -7,7 +7,7 @@ export const pet = {
   sex: "Femea",
   birthday: "14/02/2023",
   wellbeing: 96,
-  image: "https://images.unsplash.com/photo-1612774412771-005ed8e861d2?auto=format&fit=crop&w=1400&q=80",
+  image: "https://images.unsplash.com/photo-1612774412771-005ed8e861d2?auto=format&fm=jpg&fit=crop&w=1400&q=80",
 };
 
 export const metrics = [

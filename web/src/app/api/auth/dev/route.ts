@@ -30,7 +30,7 @@ export async function POST() {
   });
   res.cookies.set(
     AUTH_USER_PHOTO_COOKIE,
-    encodeURIComponent("https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=700&q=80"),
+    encodeURIComponent("https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fm=jpg&fit=crop&w=700&q=80"),
     {
       path: "/",
       httpOnly: true,
