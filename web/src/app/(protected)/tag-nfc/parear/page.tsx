@@ -31,7 +31,7 @@ function readIsIosNativeApp(): boolean {
 
 export default function TagNfcPairPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"scan" | "password">(readInitialStep);
+  const [step, setStep] = useState<"scan" | "password" | "write">(readInitialStep);
   const [password, setPassword] = useState("");
   const [isWriting, setIsWriting] = useState(false);
   const [isIosNativeApp] = useState<boolean>(readIsIosNativeApp);
@@ -82,6 +82,11 @@ export default function TagNfcPairPage() {
       setPublicUrlError("Nao foi possivel carregar o endereco publico deste pet. Tente novamente.");
       return;
     }
+    setStep("write");
+  }
+
+  function handleWriteToNfc() {
+    if (!publicUrl || !canFinish) return;
     const nextPassword = password.trim();
     const w = typeof window !== "undefined" ? (window as NativeWindow) : undefined;
     if (w?.__COLEIRAPET_IOS_APP__ && w.ColeiraPetNativeNFC?.writePairingPassword) {
@@ -97,7 +102,7 @@ export default function TagNfcPairPage() {
     <AppShell tab="profile">
       <TopBar
         title="Parear Tag NFC"
-        subtitle={step === "scan" ? "Escaneamento" : "Cadastro de senha"}
+        subtitle={step === "scan" ? "Escaneamento" : step === "password" ? "Cadastro de senha" : "Gravar na Tag"}
         leadingAction={
           <Link
             href="/tag-nfc"
@@ -114,7 +119,9 @@ export default function TagNfcPairPage() {
         style={{ animationDelay: "60ms" }}
       >
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-[14px] font-semibold text-zinc-900">{step === "scan" ? "Escanear Tag NFC" : "Senha da Tag"}</h3>
+          <h3 className="text-[14px] font-semibold text-zinc-900">
+            {step === "scan" ? "Escanear Tag NFC" : step === "password" ? "Senha da Tag" : "Gravacao na Tag NFC"}
+          </h3>
           <IconCollar className="h-5 w-5 text-emerald-700" aria-hidden />
         </div>
         {step === "scan" ? (
@@ -131,9 +138,13 @@ export default function TagNfcPairPage() {
             </button>
             {!isIosNativeApp ? <p className="mt-2 text-[11px] text-zinc-500">Modo web: apos confirmar o escaneamento, continue para cadastrar a senha.</p> : null}
           </>
-        ) : (
+        ) : step === "password" ? (
           <p className="text-[12px] text-zinc-700">
             Defina uma senha para proteger alteracoes da Tag NFC.
+          </p>
+        ) : (
+          <p className="text-[12px] text-zinc-700">
+            Aproxime novamente a Tag NFC para gravar senha e endereco publico do pet.
           </p>
         )}
       </section>
@@ -186,6 +197,39 @@ export default function TagNfcPairPage() {
                 {isWriting ? "Gravando senha na Tag NFC..." : "Finalizar pareamento"}
               </button>
             </form>
+          </section>
+        </div>
+      ) : null}
+
+      {step === "write" ? (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/40 px-4 py-6">
+          <section className="w-full max-w-[420px] rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
+            <div className="mb-2">
+              <h3 className="text-[15px] font-semibold text-zinc-900">Aproxime novamente o NFC</h3>
+              <p className="mt-1 text-[12px] text-zinc-600">
+                Toque em “Gravar na Tag NFC” e aproxime a tag para salvar a senha e o endereco publico do pet.
+              </p>
+            </div>
+
+            {publicUrlError ? <p className="mb-3 text-[11px] font-medium text-rose-600">{publicUrlError}</p> : null}
+
+            <button
+              type="button"
+              onClick={handleWriteToNfc}
+              disabled={isWriting || !publicUrl || !canFinish}
+              className="w-full rounded-2xl bg-emerald-600 px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            >
+              {isWriting ? "Aguardando aproximacao da Tag NFC..." : "Gravar na Tag NFC"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep("password")}
+              disabled={isWriting}
+              className="mt-2 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Voltar e editar senha
+            </button>
           </section>
         </div>
       ) : null}
