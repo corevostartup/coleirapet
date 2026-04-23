@@ -212,7 +212,9 @@ struct WebView: UIViewRepresentable {
                     return
                 }
 
-                self.returnToLoginWithNativeGoogleResult(idToken: token, baseURL: baseURL)
+                Task {
+                    await self.finishFirebaseSession(idToken: token, baseURL: baseURL)
+                }
             }
 
             authSession?.presentationContextProvider = self
@@ -248,30 +250,37 @@ struct WebView: UIViewRepresentable {
                 }
 
                 guard let webView else { return }
-                guard let host = baseURL.host else { return }
-
-                let cookieProps: [HTTPCookiePropertyKey: Any] = [
-                    .domain: host,
-                    .path: "/",
-                    .name: "cp_session",
-                    .value: "google",
-                    .expires: Date().addingTimeInterval(60 * 60 * 24 * 30),
-                    .secure: baseURL.scheme == "https",
-                ]
-
-                guard let cookie = HTTPCookie(properties: cookieProps) else {
-                    reportLoginError("Falha ao criar cookie de sessao.")
-                    return
+                let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+                let headerFields = http.allHeaderFields.reduce(into: [String: String]()) { partial, item in
+                    guard let key = item.key as? String, let value = item.value as? String else { return }
+                    partial[key] = value
+                }
+                let responseCookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: endpoint)
+                for cookie in responseCookies {
+                    await cookieStore.setCookie(cookie)
                 }
 
-                await webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
+                // Fallback defensivo caso Set-Cookie nao seja propagado pelo proxy.
+                if responseCookies.isEmpty, let host = baseURL.host {
+                    let cookieProps: [HTTPCookiePropertyKey: Any] = [
+                        .domain: host,
+                        .path: "/",
+                        .name: "cp_session",
+                        .value: "google",
+                        .expires: Date().addingTimeInterval(60 * 60 * 24 * 30),
+                        .secure: baseURL.scheme == "https",
+                    ]
+                    if let fallbackCookie = HTTPCookie(properties: cookieProps) {
+                        await cookieStore.setCookie(fallbackCookie)
+                    }
+                }
                 if let homeURL = URL(string: "/home", relativeTo: baseURL)?.absoluteURL {
                     DispatchQueue.main.async {
                         webView.load(URLRequest(url: homeURL))
                     }
                 }
             } catch {
-                reportLoginError(error.localizedDescription)
+                returnToLoginWithNativeGoogleResult(errorMessage: error.localizedDescription, baseURL: baseURL)
             }
         }
 
