@@ -12,7 +12,7 @@ type LoginScreenProps = {
 };
 
 type IosNativeBridge = {
-  startGoogleSignIn: (payload?: { clientId?: string }) => void;
+  startGoogleSignIn: () => void;
 };
 
 declare global {
@@ -23,8 +23,6 @@ declare global {
     __coleiraGoogleSignInError?: (message: string) => void;
   }
 }
-
-const IOS_NATIVE_GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_IOS_GOOGLE_CLIENT_ID?.trim() ?? "";
 
 const LOGIN_BG_STARS = [
   { t: 7, l: 11, d: 0.1, s: 2 },
@@ -161,10 +159,6 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
     setOauthHint(null);
 
     if (window.__COLEIRAPET_IOS_APP__ && window.ColeiraPetNativeAuth?.startGoogleSignIn) {
-      if (!IOS_NATIVE_GOOGLE_CLIENT_ID) {
-        setOauthHint("Configuracao ausente: NEXT_PUBLIC_IOS_GOOGLE_CLIENT_ID.");
-        return;
-      }
       setGoogleBusy(true);
       setOauthHint("Abrindo login Google nativo do iOS...");
       try {
@@ -189,7 +183,7 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
 
           window.__coleiraGoogleSignInToken = onToken;
           window.__coleiraGoogleSignInError = onError;
-          window.ColeiraPetNativeAuth?.startGoogleSignIn({ clientId: IOS_NATIVE_GOOGLE_CLIENT_ID });
+          window.ColeiraPetNativeAuth?.startGoogleSignIn();
         });
 
         const res = await fetch("/api/auth/firebase/session", {

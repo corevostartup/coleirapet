@@ -47,9 +47,8 @@ struct WebView: UIViewRepresentable {
 
             window.__COLEIRAPET_IOS_APP__ = true;
             window.ColeiraPetNativeAuth = {
-                startGoogleSignIn: (payload) => {
-                    const clientId = payload?.clientId ?? null;
-                    window.webkit.messageHandlers.coleiraNativeAuth.postMessage({ action: 'googleSignIn', clientId });
+                startGoogleSignIn: () => {
+                    window.webkit.messageHandlers.coleiraNativeAuth.postMessage({ action: 'googleSignIn' });
                 }
             };
             window.ColeiraPetNativeNFC = {
@@ -126,9 +125,8 @@ struct WebView: UIViewRepresentable {
                 return
             }
 
-            let clientId = (body["clientId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let clientId, !clientId.isEmpty else {
-                sendNativeGoogleSignInError("Client ID do Google nao informado.")
+            guard let clientId = googleClientIdFromFirebasePlist() else {
+                sendNativeGoogleSignInError("CLIENT_ID ausente em GoogleService-Info.plist.")
                 return
             }
             Task { @MainActor in
@@ -220,6 +218,19 @@ struct WebView: UIViewRepresentable {
                 .replacingOccurrences(of: "'", with: "\\'")
                 .replacingOccurrences(of: "\n", with: " ")
                 .replacingOccurrences(of: "\r", with: " ")
+        }
+
+        private func googleClientIdFromFirebasePlist() -> String? {
+            guard
+                let url = Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist"),
+                let data = try? Data(contentsOf: url),
+                let raw = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                let clientId = (raw["CLIENT_ID"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                !clientId.isEmpty
+            else {
+                return nil
+            }
+            return clientId
         }
 
         private func showJSAlert(_ message: String) {

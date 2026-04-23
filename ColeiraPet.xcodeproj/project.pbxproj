@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A1B2C3D62F8052650025D5B2 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D52F8052650025D5B2 /* GoogleSignIn */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		DFE18E652F8052650025D5B2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -22,10 +26,6 @@
 			remoteInfo = ColeiraPet;
 		};
 /* End PBXContainerItemProxy section */
-
-/* Begin PBXBuildFile section */
-		A1B2C3D62F8052650025D5B2 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D52F8052650025D5B2 /* GoogleSignIn */; };
-/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		DFE18E542F80525D0025D5B2 /* ColeiraPet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ColeiraPet.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -410,7 +410,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lyka;
-				INFOPLIST_KEY_CFBundleURLTypes = "({CFBundleTypeRole=Editor;CFBundleURLSchemes=(coleirapet);})";
+				INFOPLIST_KEY_CFBundleURLTypes = "({CFBundleTypeRole=Editor;CFBundleURLSchemes=(coleirapet,com.googleusercontent.apps.1007800015677-cam1452i2e9jdsod1j3b1agf94euj5c1);})";
 				INFOPLIST_KEY_NFCReaderUsageDescription = "Lyka usa NFC para ler a tag na coleira e parear com o perfil.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -443,7 +443,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lyka;
-				INFOPLIST_KEY_CFBundleURLTypes = "({CFBundleTypeRole=Editor;CFBundleURLSchemes=(coleirapet);})";
+				INFOPLIST_KEY_CFBundleURLTypes = "({CFBundleTypeRole=Editor;CFBundleURLSchemes=(coleirapet,com.googleusercontent.apps.1007800015677-cam1452i2e9jdsod1j3b1agf94euj5c1);})";
 				INFOPLIST_KEY_NFCReaderUsageDescription = "Lyka usa NFC para ler a tag na coleira e parear com o perfil.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -537,25 +537,6 @@
 		};
 /* End XCBuildConfiguration section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		A1B2C3D42F8052650025D5B2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 8.0.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		A1B2C3D52F8052650025D5B2 /* GoogleSignIn */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A1B2C3D42F8052650025D5B2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
-			productName = GoogleSignIn;
-		};
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin XCConfigurationList section */
 		DFE18E4F2F80525D0025D5B2 /* Build configuration list for PBXProject "ColeiraPet" */ = {
 			isa = XCConfigurationList;
@@ -594,6 +575,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A1B2C3D42F8052650025D5B2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1B2C3D52F8052650025D5B2 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D42F8052650025D5B2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = DFE18E4C2F80525D0025D5B2 /* Project object */;
 }
