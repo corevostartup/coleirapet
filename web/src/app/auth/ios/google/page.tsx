@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 const CALLBACK_SCHEME = process.env.NEXT_PUBLIC_IOS_AUTH_CALLBACK_SCHEME ?? "coleirapet";
 const IOS_GOOGLE_REDIRECT_MARKER = "cp-ios-google-redirect-started-at";
 const IOS_GOOGLE_REDIRECT_TTL_MS = 10 * 60 * 1000;
+const IOS_GOOGLE_REDIRECT_GUARD_QUERY = "cpGoogleRedirect";
 
 function goNative(path: string) {
   window.location.replace(`${CALLBACK_SCHEME}://auth${path}`);
@@ -48,6 +49,26 @@ function hadPendingRedirectMarker() {
   }
 }
 
+function hasRedirectGuardInUrl() {
+  try {
+    const url = new URL(window.location.href);
+    return url.searchParams.get(IOS_GOOGLE_REDIRECT_GUARD_QUERY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setRedirectGuardInUrl() {
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get(IOS_GOOGLE_REDIRECT_GUARD_QUERY) === "1") return;
+    url.searchParams.set(IOS_GOOGLE_REDIRECT_GUARD_QUERY, "1");
+    window.history.replaceState(null, "", url.toString());
+  } catch {
+    // ignore
+  }
+}
+
 export default function IosGoogleAuthPage() {
   const [status, setStatus] = useState("Abrindo login Google...");
 
@@ -56,7 +77,7 @@ export default function IosGoogleAuthPage() {
 
     async function run() {
       try {
-        const hadPendingRedirect = hadPendingRedirectMarker();
+        const hadPendingRedirect = hadPendingRedirectMarker() || hasRedirectGuardInUrl();
         const redirectToken = await consumeGoogleRedirectResult();
         if (cancelled) return;
 
@@ -79,6 +100,7 @@ export default function IosGoogleAuthPage() {
 
         iosGoogleAuthStarted = true;
         markRedirectStarted();
+        setRedirectGuardInUrl();
         setStatus("Redirecionando para o Google...");
         await signInWithGoogleRedirectOnly();
       } catch (error) {
