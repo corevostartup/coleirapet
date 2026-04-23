@@ -48,8 +48,7 @@ export function parseAuthUserUidCookie(raw: string | undefined): string | null {
 }
 
 export function isProtectedAppPath(pathname: string) {
-  if (pathname === "/") return true;
-  return ["/health", "/location", "/dados", "/profile", "/vet"].some(
+  return ["/home", "/health", "/location", "/dados", "/profile", "/vet"].some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }

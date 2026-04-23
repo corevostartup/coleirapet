@@ -233,7 +233,7 @@ struct WebView: UIViewRepresentable {
                 }
 
                 await webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
-                if let homeURL = URL(string: "/", relativeTo: baseURL)?.absoluteURL {
+                if let homeURL = URL(string: "/home", relativeTo: baseURL)?.absoluteURL {
                     DispatchQueue.main.async {
                         webView.load(URLRequest(url: homeURL))
                     }

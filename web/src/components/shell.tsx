@@ -59,7 +59,7 @@ export function TopBar({
 
 function BottomNav({ tab }: { tab: Tab }) {
   const items = [
-    { key: "home", label: "Home", href: "/", Icon: IconHome },
+    { key: "home", label: "Home", href: "/home", Icon: IconHome },
     { key: "health", label: "Saude", href: "/health", Icon: IconHeart },
     { key: "location", label: "Local", href: "/location", Icon: IconPin },
     { key: "dados", label: "Dados", href: "/dados", Icon: IconFile },

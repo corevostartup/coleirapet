@@ -70,7 +70,7 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
           return;
         }
 
-        router.replace("/");
+        router.replace("/home");
         router.refresh();
       } catch (error) {
         if (!active) return;
@@ -94,7 +94,7 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
         setDevError("Acesso dev indisponivel neste ambiente.");
         return;
       }
-      router.replace("/");
+      router.replace("/home");
       router.refresh();
     } finally {
       setDevBusy(false);
@@ -132,7 +132,7 @@ export function LoginScreen({ devBypassEnabled }: LoginScreenProps) {
         return;
       }
 
-      router.replace("/");
+      router.replace("/home");
       router.refresh();
     } catch (error) {
       setOauthHint(error instanceof Error ? error.message : "Erro ao autenticar com Google.");

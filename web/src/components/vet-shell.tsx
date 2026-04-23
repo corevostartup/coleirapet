@@ -31,7 +31,7 @@ export function VetShell({
           subtitle={subtitle}
           action={
             <Link
-              href="/"
+              href="/home"
               className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-zinc-800 shadow-sm transition hover:bg-zinc-50 sm:text-[12px]"
               aria-label="Voltar para area do usuario"
             >

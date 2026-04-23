@@ -7,9 +7,19 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const session = parseAuthSessionCookie(request.cookies.get(AUTH_SESSION_COOKIE)?.value);
 
+  if (pathname === "/") {
+    if (!session) return NextResponse.redirect(new URL("/login", request.url));
+    if (session === "dev" && !isDevAuthBypassEnabled()) {
+      const res = NextResponse.redirect(new URL("/login", request.url));
+      res.cookies.delete(AUTH_SESSION_COOKIE);
+      return res;
+    }
+    return NextResponse.redirect(new URL("/home", request.url));
+  }
+
   if (pathname === "/login") {
     if (session) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return NextResponse.redirect(new URL("/home", request.url));
     }
     return NextResponse.next();
   }
