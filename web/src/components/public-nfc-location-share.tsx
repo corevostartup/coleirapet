@@ -6,14 +6,58 @@ type Props = {
   publicSlug: string;
 };
 
+type DeviceContext = {
+  os: "ios" | "android" | "desktop";
+  browser: "safari" | "chrome" | "firefox" | "edge" | "other";
+};
+
+function detectDeviceContext(): DeviceContext {
+  const ua = navigator.userAgent.toLowerCase();
+  const isIOS = /iphone|ipad|ipod/.test(ua);
+  const isAndroid = /android/.test(ua);
+
+  const browser: DeviceContext["browser"] = ua.includes("edg/")
+    ? "edge"
+    : ua.includes("firefox/")
+      ? "firefox"
+      : ua.includes("chrome/") || ua.includes("crios/")
+        ? "chrome"
+        : ua.includes("safari/")
+          ? "safari"
+          : "other";
+
+  return {
+    os: isIOS ? "ios" : isAndroid ? "android" : "desktop",
+    browser,
+  };
+}
+
+function permissionHelpText(ctx: DeviceContext) {
+  if (ctx.os === "ios") {
+    return "No iPhone/iPad, toque no icone Aa na barra do Safari, abra Configuracoes do Site e permita Localizacao. Depois toque em Tentar novamente.";
+  }
+  if (ctx.os === "android") {
+    return "No Android, toque no cadeado ao lado da URL, abra Permissoes e permita Localizacao para este site. Depois toque em Tentar novamente.";
+  }
+  if (ctx.browser === "chrome" || ctx.browser === "edge") {
+    return "No navegador, clique no cadeado da URL, permita Localizacao para este site e recarregue a pagina se necessario.";
+  }
+  if (ctx.browser === "firefox") {
+    return "No Firefox, clique no cadeado da URL, ajuste a permissao de Localizacao e tente novamente.";
+  }
+  return "Permita localizacao nas configuracoes do navegador para este site e tente novamente.";
+}
+
 export function PublicNfcLocationShare({ publicSlug }: Props) {
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [permissionHelp, setPermissionHelp] = useState<string | null>(null);
 
   async function shareCurrentLocation() {
     if (busy || done) return;
     setHint(null);
+    setPermissionHelp(null);
 
     if (!navigator.geolocation) {
       setHint("Seu navegador nao suporta geolocalizacao.");
@@ -31,7 +75,9 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
           resolve,
           (error) => {
             if (error.code === error.PERMISSION_DENIED) {
-              reject(new Error("Permissao de localizacao negada. Ative a permissao e tente novamente."));
+              const ctx = detectDeviceContext();
+              setPermissionHelp(permissionHelpText(ctx));
+              reject(new Error("Permissao de localizacao negada."));
               return;
             }
             if (error.code === error.POSITION_UNAVAILABLE) {
@@ -88,6 +134,19 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
         {busy ? "Registrando localizacao..." : done ? "Localizacao registrada" : "Aceitar e compartilhar localizacao atual"}
       </button>
       {hint ? <p className={`mt-2 text-[12px] ${done ? "text-emerald-700" : "text-rose-600"}`}>{hint}</p> : null}
+      {permissionHelp ? (
+        <>
+          <p className="mt-2 text-[12px] text-zinc-600">{permissionHelp}</p>
+          <button
+            type="button"
+            disabled={busy || done}
+            onClick={() => void shareCurrentLocation()}
+            className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white py-2.5 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-60"
+          >
+            Tentar novamente
+          </button>
+        </>
+      ) : null}
     </section>
   );
 }
