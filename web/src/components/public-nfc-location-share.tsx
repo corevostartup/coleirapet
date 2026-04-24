@@ -19,15 +19,37 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
       setHint("Seu navegador nao suporta geolocalizacao.");
       return;
     }
+    if (!window.isSecureContext) {
+      setHint("Para compartilhar localizacao, abra esta pagina em HTTPS.");
+      return;
+    }
 
     setBusy(true);
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 12000,
-          maximumAge: 15000,
-        });
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          (error) => {
+            if (error.code === error.PERMISSION_DENIED) {
+              reject(new Error("Permissao de localizacao negada. Ative a permissao e tente novamente."));
+              return;
+            }
+            if (error.code === error.POSITION_UNAVAILABLE) {
+              reject(new Error("Nao foi possivel obter sua localizacao atual."));
+              return;
+            }
+            if (error.code === error.TIMEOUT) {
+              reject(new Error("Tempo esgotado ao tentar obter localizacao."));
+              return;
+            }
+            reject(new Error("Falha ao capturar localizacao."));
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 15000,
+          },
+        );
       });
 
       const res = await fetch("/api/public/nfc-access", {

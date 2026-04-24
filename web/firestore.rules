@@ -13,18 +13,34 @@ service cloud.firestore {
       return isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
+    function isPetOwnerById(petId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/Pets/$(petId)).data.ownerId == request.auth.uid;
+    }
+
     // Perfil do tutor
     match /User/{uid} {
       allow read, write: if isOwner(uid);
     }
 
-    // Pet principal e subcoleções (vacinas/mensagens de encontrado)
+    // Pet principal e subcoleções privadas do tutor
     match /Pets/{petId} {
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow read, update, delete: if isPetOwner();
 
-      match /{subcollection}/{docId} {
-        allow read, write: if isPetOwner();
+      // Vacinas do pet
+      match /vacinas/{docId} {
+        allow read, write: if isPetOwnerById(petId);
+      }
+
+      // Mensagens recebidas de quem encontrou o pet
+      match /finderMessages/{docId} {
+        allow read, write: if isPetOwnerById(petId);
+      }
+
+      // Histórico de acessos/localizações via NFC
+      match /nfcAccessLogs/{docId} {
+        allow read, write: if isPetOwnerById(petId);
       }
     }
 
