@@ -22,6 +22,7 @@ type LocationHistoryItem = {
   id: string;
   at: string;
   atLabel: string;
+  address: string;
   lat: number | null;
   lng: number | null;
   accuracyM: number | null;
@@ -31,6 +32,7 @@ type LocationHistoryItem = {
 type CurrentPetLocation = {
   lat: number;
   lng: number;
+  addressLabel: string;
   lastUpdateLabel: string;
 };
 
@@ -55,7 +57,7 @@ function LocationAddressCard({ point }: { point: CurrentPetLocation }) {
       <div className="flex items-start gap-2">
         <IconPin className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-zinc-900">{formatLatLngLabel(point.lat, point.lng)}</p>
+          <p className="text-[13px] font-semibold text-zinc-900">{point.addressLabel}</p>
           <p className="mt-0.5 text-[11px] text-zinc-500">{point.lastUpdateLabel}</p>
         </div>
       </div>
@@ -72,6 +74,7 @@ export function LocationView() {
   const [petLocation, setPetLocation] = useState<CurrentPetLocation>({
     lat: location.lat,
     lng: location.lng,
+    addressLabel: location.address,
     lastUpdateLabel: location.lastUpdate,
   });
   const disconnectedDevices = locationPageDevices.map((device) => ({
@@ -86,6 +89,35 @@ export function LocationView() {
       .some((item) => item.trim().startsWith(`${NFC_PAIRED_COOKIE}=1`));
     setIsNfcPaired(hasPairedCookie);
   }, []);
+
+  useEffect(() => {
+    if (locationHistory.length === 0) return;
+    const pending = locationHistory.filter((item) => !item.address && typeof item.lat === "number" && typeof item.lng === "number");
+    if (pending.length === 0) return;
+    let cancelled = false;
+
+    async function fillMissingAddresses() {
+      for (const item of pending) {
+        try {
+          const res = await fetch(`/api/pets/reverse-geocode?lat=${item.lat}&lng=${item.lng}`);
+          if (!res.ok) continue;
+          const data = (await res.json()) as { address?: string };
+          const address = typeof data.address === "string" ? data.address.trim() : "";
+          if (!address || cancelled) continue;
+          setLocationHistory((prev) =>
+            prev.map((row) => (row.id === item.id ? { ...row, address } : row)),
+          );
+        } catch {
+          /* noop */
+        }
+      }
+    }
+
+    void fillMissingAddresses();
+    return () => {
+      cancelled = true;
+    };
+  }, [locationHistory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +153,7 @@ export function LocationView() {
             lastNfcAccessLat?: number | null;
             lastNfcAccessLng?: number | null;
             lastNfcAccessAt?: string | null;
+            lastNfcAccessAddress?: string | null;
           };
         };
         const lat = data.pet?.lastNfcAccessLat;
@@ -133,6 +166,7 @@ export function LocationView() {
           setPetLocation({
             lat,
             lng,
+            addressLabel: data.pet?.lastNfcAccessAddress?.trim() || "Endereco ainda nao disponivel",
             lastUpdateLabel: label,
           });
         }
@@ -148,6 +182,28 @@ export function LocationView() {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function reverseGeocode() {
+      try {
+        const res = await fetch(`/api/pets/reverse-geocode?lat=${petLocation.lat}&lng=${petLocation.lng}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { address?: string };
+        const address = typeof data.address === "string" ? data.address.trim() : "";
+        if (!address || cancelled) return;
+        setPetLocation((prev) => ({ ...prev, addressLabel: address }));
+      } catch {
+        /* noop */
+      }
+    }
+
+    reverseGeocode();
+    return () => {
+      cancelled = true;
+    };
+  }, [petLocation.lat, petLocation.lng]);
 
   useEffect(() => {
     let cancelled = false;
@@ -331,11 +387,7 @@ export function LocationView() {
               <ul className="space-y-2">
                 {locationHistory.map((item) => (
                   <li key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50/90 px-3 py-2.5">
-                    <p className="text-[12px] font-medium text-zinc-800">
-                      {typeof item.lat === "number" && typeof item.lng === "number"
-                        ? formatLatLngLabel(item.lat, item.lng)
-                        : "Coordenadas indisponiveis"}
-                    </p>
+                    <p className="text-[12px] font-medium text-zinc-800">{item.address || "Endereco indisponivel"}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-zinc-500">
                       <time dateTime={item.at}>{item.atLabel}</time>
                       {typeof item.accuracyM === "number" ? (

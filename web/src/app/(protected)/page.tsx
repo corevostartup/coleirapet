@@ -2,9 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { NFCPairLink } from "@/components/nfc-pair-link";
+import { HomeLocationSecurityCard } from "@/components/home-location-security-card";
 import { AppShell, TopBar } from "@/components/shell";
 import { ProductCarousel } from "@/components/product-carousel";
-import { IconCollar, IconPin, IconShield, IconStethoscope, IconWave } from "@/components/icons";
+import { IconCollar, IconStethoscope, IconWave } from "@/components/icons";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import { events, metrics, pet, weeklyActivity } from "@/lib/mock";
@@ -12,6 +13,23 @@ import { getOrCreateCurrentPet } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 const NFC_PAIRED_COOKIE = "cp_nfc_paired";
+
+function formatPtBrDateTime(iso: string | null | undefined) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
+function isCoordinateLikeAddress(value: string | null | undefined) {
+  if (!value) return false;
+  return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(value.trim());
+}
 
 export default async function Home() {
   const jar = await cookies();
@@ -40,6 +58,19 @@ export default async function Home() {
     age: currentPet?.age ?? pet.age ?? null,
     wellbeing: pet.wellbeing,
   };
+  const nfcLat = currentPet?.lastNfcAccessLat;
+  const nfcLng = currentPet?.lastNfcAccessLng;
+  const hasRealNfcLocation = typeof nfcLat === "number" && typeof nfcLng === "number";
+  const storedAddress = currentPet?.lastNfcAccessAddress;
+  const locationAddressLabel =
+    storedAddress && !isCoordinateLikeAddress(storedAddress)
+      ? storedAddress
+      : hasRealNfcLocation
+        ? "Endereco ainda nao disponivel"
+        : "Nenhuma localizacao registrada";
+  const locationUpdateLabel = hasRealNfcLocation
+    ? `Ultimo acesso NFC: ${formatPtBrDateTime(currentPet?.lastNfcAccessAt) ?? "agora"} · Zona segura ativa`
+    : "Aguardando compartilhamento de localizacao via NFC";
 
   const maxActivity = Math.max(...weeklyActivity.map((item) => item.activeMinutes));
   const avgActivity = Math.round(
@@ -167,21 +198,13 @@ export default async function Home() {
           <p className="mt-3 text-[11px] text-zinc-500">Media: {avgActivity} min/dia · {Math.round(avgSteps / 100) / 10} mil passos por dia</p>
         </section>
 
-        <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "300ms" }}>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-zinc-900">Localizacao e seguranca</h3>
-            <IconShield className="h-5 w-5 text-emerald-600" />
-          </div>
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3">
-            <div className="flex items-start gap-2">
-              <IconPin className="mt-0.5 h-4.5 w-4.5 text-emerald-700" />
-              <div>
-                <p className="text-[13px] font-medium text-emerald-800">Av. Paulista, 1000 · Sao Paulo</p>
-                <p className="mt-0.5 text-[11px] text-emerald-700">Atualizado ha 2 min · Zona segura ativa</p>
-              </div>
-            </div>
-          </div>
-        </section>
+        <HomeLocationSecurityCard
+          addressLabel={locationAddressLabel}
+          updateLabel={locationUpdateLabel}
+          lat={hasRealNfcLocation ? nfcLat : null}
+          lng={hasRealNfcLocation ? nfcLng : null}
+          animationDelay="300ms"
+        />
 
         <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "360ms" }}>
           <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Proximos eventos</h3>

@@ -31,6 +31,7 @@ type PetDoc = {
   lastNfcAccessAt?: string;
   lastNfcAccessLat?: number;
   lastNfcAccessLng?: number;
+  lastNfcAccessAddress?: string;
   lastNfcAccessAccuracyM?: number;
   publicFields?: {
     name?: boolean;
@@ -65,6 +66,7 @@ export type PetProfile = {
   lastNfcAccessAt: string | null;
   lastNfcAccessLat: number | null;
   lastNfcAccessLng: number | null;
+  lastNfcAccessAddress: string | null;
   lastNfcAccessAccuracyM: number | null;
   publicFields: {
     name: boolean;
@@ -143,6 +145,7 @@ function toPetProfile(petId: string, data: PetDoc): PetProfile {
     lastNfcAccessAt: parseString(data.lastNfcAccessAt),
     lastNfcAccessLat: parseNumber(data.lastNfcAccessLat),
     lastNfcAccessLng: parseNumber(data.lastNfcAccessLng),
+    lastNfcAccessAddress: parseString(data.lastNfcAccessAddress),
     lastNfcAccessAccuracyM: parseNumber(data.lastNfcAccessAccuracyM),
     publicFields: parsePublicFields(data.publicFields),
     finderShareToken: parseString(data.finderShareToken) ?? "",

@@ -36,6 +36,7 @@ export async function GET() {
       at?: string;
       lat?: number;
       lng?: number;
+      address?: string;
       accuracyM?: number;
       source?: string;
     };
@@ -46,6 +47,7 @@ export async function GET() {
       atLabel: formatPtBrShort(at),
       lat: typeof data.lat === "number" ? data.lat : null,
       lng: typeof data.lng === "number" ? data.lng : null,
+      address: typeof data.address === "string" ? data.address.trim() : "",
       accuracyM: typeof data.accuracyM === "number" ? data.accuracyM : null,
       source: typeof data.source === "string" ? data.source : "",
     };

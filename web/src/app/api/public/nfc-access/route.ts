@@ -9,6 +9,46 @@ type Body = {
   accuracyM?: number;
 };
 
+function pickFirstText(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+
+function compactAddressFromNominatim(payload: { address?: Record<string, unknown> }) {
+  const address = payload.address ?? {};
+  const road = pickFirstText(address.road, address.pedestrian, address.footway, address.path, address.cycleway);
+  const number = pickFirstText(address.house_number);
+  const suburb = pickFirstText(address.suburb, address.neighbourhood, address.quarter);
+  const city = pickFirstText(address.city, address.town, address.village, address.municipality);
+  const streetLine = pickFirstText(road && number ? `${road}, ${number}` : "", road);
+  return [streetLine, suburb, city].filter(Boolean).join(" · ");
+}
+
+async function reverseGeocodeAddress(lat: number, lng: number) {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+      {
+        headers: {
+          "User-Agent": "ColeiraPet/1.0 (support@coleirapet.app)",
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { address?: Record<string, unknown>; display_name?: string };
+    const compactAddress = compactAddressFromNominatim(payload);
+    return compactAddress || null;
+  } catch {
+    return null;
+  }
+}
+
 function parseSlug(value: unknown) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim().toLowerCase();
@@ -60,10 +100,12 @@ export async function POST(request: Request) {
 
   const nowIso = new Date().toISOString();
   const petRef = query.docs[0].ref;
+  const address = await reverseGeocodeAddress(lat, lng);
   const payload = {
     lastNfcAccessAt: nowIso,
     lastNfcAccessLat: lat,
     lastNfcAccessLng: lng,
+    ...(address ? { lastNfcAccessAddress: address } : {}),
     ...(accuracyM !== undefined ? { lastNfcAccessAccuracyM: accuracyM } : {}),
     updatedAt: nowIso,
   };
@@ -72,6 +114,7 @@ export async function POST(request: Request) {
     at: nowIso,
     lat,
     lng,
+    ...(address ? { address } : {}),
     ...(accuracyM !== undefined ? { accuracyM } : {}),
     source: "public-nfc-page",
   });

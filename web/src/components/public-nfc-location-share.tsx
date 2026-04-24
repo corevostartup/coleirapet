@@ -85,11 +85,6 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
 
     setBusy(true);
     try {
-      const permissionState = await getGeoPermissionState();
-      if (permissionState !== "unknown") {
-        setPermissionStateLabel(`Estado da permissao: ${permissionState}.`);
-      }
-
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
           resolve,
@@ -121,6 +116,13 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
           },
         );
       });
+
+      // No Safari iOS, chamar geolocation imediatamente no clique ajuda a preservar
+      // o gesto do usuário para abrir o prompt nativo. Consultamos estado depois.
+      const permissionState = await getGeoPermissionState();
+      if (permissionState !== "unknown") {
+        setPermissionStateLabel(`Estado da permissao: ${permissionState}.`);
+      }
 
       const res = await fetch("/api/public/nfc-access", {
         method: "POST",
