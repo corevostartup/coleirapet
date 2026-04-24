@@ -78,6 +78,7 @@ export default async function ProfilePage() {
   const petData = currentPet
     ? {
         name: currentPet.name,
+        petIdentity: currentPet.petIdentity,
         breed: currentPet.breed,
         image: currentPet.image,
         age: currentPet.age,
@@ -99,6 +100,7 @@ export default async function ProfilePage() {
       }
     : {
         name: pet.name,
+        petIdentity: "Nao disponivel",
         breed: pet.breed,
         image: pet.image,
         age: pet.age,
@@ -152,6 +154,7 @@ export default async function ProfilePage() {
 
       <ProfilePetDetailsEditor
         petName={petData.name}
+        petIdentity={petData.petIdentity}
         petBreed={petData.breed}
         petImage={petData.image}
         initialAge={petData.age}

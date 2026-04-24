@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { getPetImageOrDefault } from "@/lib/pets/image";
 
 type Props = {
   petName: string;
+  petIdentity: string;
   petBreed: string;
   petImage: string;
   initialAge: number | null;
@@ -27,6 +29,7 @@ type Props = {
 };
 
 type SaveState = "idle" | "saving" | "success" | "error";
+type PhotoState = "idle" | "uploading" | "error";
 const DEFAULT_PUBLIC_FIELDS = {
   name: true,
   breed: false,
@@ -43,6 +46,7 @@ function formatWeight(value: number | null) {
 
 export function ProfilePetDetailsEditor({
   petName,
+  petIdentity,
   petBreed,
   petImage,
   initialAge,
@@ -56,7 +60,11 @@ export function ProfilePetDetailsEditor({
   initialNotes,
   initialPublicFields,
 }: Props) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(petName ?? "");
+  const [photoUrl, setPhotoUrl] = useState(getPetImageOrDefault(petImage));
+  const [photoState, setPhotoState] = useState<PhotoState>("idle");
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [age, setAge] = useState<number | null>(initialAge);
   const [weightKg, setWeightKg] = useState<number | null>(initialWeightKg);
   const [sex, setSex] = useState(initialSex ?? "");
@@ -120,32 +128,68 @@ export function ProfilePetDetailsEditor({
     }
   }
 
+  async function handleChoosePhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+
+    setPhotoState("uploading");
+    setPhotoError(null);
+
+    try {
+      const formData = new FormData();
+      formData.set("image", file);
+      const res = await fetch("/api/pets/current/photo", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | {
+            error?: string;
+            image?: string;
+          }
+        | null;
+      if (!res.ok) throw new Error(payload?.error ?? "Falha ao enviar foto do pet.");
+      setPhotoUrl(getPetImageOrDefault(payload?.image ?? ""));
+      setPhotoState("idle");
+    } catch (error) {
+      setPhotoState("error");
+      setPhotoError(error instanceof Error ? error.message : "Falha ao enviar foto do pet.");
+    }
+  }
+
+  const isPhotoBusy = photoState === "uploading";
+
   return (
     <>
       <section className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
         <div className="relative h-[220px]">
-          <Image src={petImage} alt={`Foto da ${name || petName}`} fill className="object-cover" sizes="(max-width: 768px) 100vw, 440px" />
+          <Image src={photoUrl} alt={`Foto da ${name || petName}`} fill className="object-cover" sizes="(max-width: 768px) 100vw, 440px" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           <div className="absolute bottom-4 left-4">
             <h2 className="text-[28px] font-semibold text-white">{name.trim() || "Pet"}</h2>
             <p className="text-[12px] text-white/80">{petBreed}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setIsEditing((value) => !value);
-              setSaveState("idle");
-              setErrorMessage(null);
-            }}
-            className="absolute bottom-4 right-4 rounded-xl bg-white/92 px-3 py-1.5 text-[12px] font-semibold text-zinc-700 shadow-sm transition hover:bg-white"
-          >
-            {isEditing ? "Cancelar" : "Editar"}
-          </button>
+          <div className="absolute bottom-4 right-4 flex items-center gap-2">
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleChoosePhoto} />
+            <button
+              type="button"
+              disabled={isPhotoBusy}
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-xl bg-white/92 px-3 py-1.5 text-[12px] font-semibold text-zinc-700 shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {photoState === "uploading" ? "Enviando..." : "Editar"}
+            </button>
+          </div>
         </div>
       </section>
 
       <form onSubmit={handleSubmit} className="appear-up mt-3 space-y-3" style={{ animationDelay: "140ms" }}>
         <section className="grid grid-cols-2 gap-2.5">
+          <article className="elev-card col-span-2 rounded-2xl p-3.5">
+            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Identidade do pet</p>
+            <p className="mt-1.5 text-[16px] font-semibold tracking-[0.08em] text-zinc-900">{petIdentity}</p>
+          </article>
           <article className="elev-card rounded-2xl p-3.5">
             <p className="text-[11px] uppercase tracking-wide text-zinc-500">Idade</p>
             {isEditing ? (
@@ -213,7 +257,21 @@ export function ProfilePetDetailsEditor({
         </section>
 
         <section className="rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
-          <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Dados complementares</h3>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-[14px] font-semibold text-zinc-900">Dados complementares</h3>
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditing((value) => !value);
+                setSaveState("idle");
+                setErrorMessage(null);
+              }}
+              className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
+            >
+              {isEditing ? "Cancelar" : "Editar"}
+            </button>
+          </div>
+          {photoError ? <p className="mb-2 text-[12px] font-medium text-red-600">{photoError}</p> : null}
           <div className="space-y-2">
             <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
               <div className="flex items-start justify-between gap-2">

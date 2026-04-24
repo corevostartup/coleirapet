@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { PublicNfcLocationShare } from "@/components/public-nfc-location-share";
 import { getPublicPetBySlug } from "@/lib/pets/current";
+import { getPetImageOrDefault } from "@/lib/pets/image";
 
 type PublicPetPageProps = {
   params: Promise<{ publicSlug: string }>;
@@ -30,7 +32,7 @@ export default async function PublicPetPage(props: PublicPetPageProps) {
         <section className="overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
           <div className="relative h-[220px] w-full">
             <Image
-              src={pet.image}
+              src={getPetImageOrDefault(pet.image)}
               alt={`Foto de ${pet.name}`}
               fill
               className="object-cover"
@@ -58,6 +60,8 @@ export default async function PublicPetPage(props: PublicPetPageProps) {
             </div>
           )}
         </section>
+
+        <PublicNfcLocationShare publicSlug={publicSlug} />
       </div>
     </main>
   );

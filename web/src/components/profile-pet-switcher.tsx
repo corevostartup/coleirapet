@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { getPetImageOrDefault } from "@/lib/pets/image";
 
 type PetItem = {
   id: string;
@@ -92,7 +93,7 @@ export function ProfilePetSwitcher({ currentPet, initialPets }: Props) {
         className="relative h-11 w-11 overflow-hidden rounded-full border border-zinc-200 bg-white shadow-sm"
         onClick={() => setOpen((value) => !value)}
       >
-        <Image src={selectedPet.image} alt={`Foto de ${selectedPet.name}`} fill className="object-cover" sizes="44px" />
+        <Image src={getPetImageOrDefault(selectedPet.image)} alt={`Foto de ${selectedPet.name}`} fill className="object-cover" sizes="44px" />
       </button>
 
       {open ? (
@@ -113,7 +114,7 @@ export function ProfilePetSwitcher({ currentPet, initialPets }: Props) {
                     }`}
                   >
                     <span className="relative h-9 w-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-                      <Image src={pet.image} alt={`Foto de ${pet.name}`} fill className="object-cover" sizes="36px" />
+                      <Image src={getPetImageOrDefault(pet.image)} alt={`Foto de ${pet.name}`} fill className="object-cover" sizes="36px" />
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-[12px] font-semibold text-zinc-800">{pet.name}</span>

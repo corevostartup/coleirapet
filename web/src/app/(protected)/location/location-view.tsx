@@ -18,14 +18,45 @@ type FinderMessageItem = {
   createdAtLabel: string;
 };
 
-function LocationAddressCard() {
+type LocationHistoryItem = {
+  id: string;
+  at: string;
+  atLabel: string;
+  lat: number | null;
+  lng: number | null;
+  accuracyM: number | null;
+  source: string;
+};
+
+type CurrentPetLocation = {
+  lat: number;
+  lng: number;
+  lastUpdateLabel: string;
+};
+
+function formatPtBrDateTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Atualizado recentemente";
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
+function formatLatLngLabel(lat: number, lng: number) {
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function LocationAddressCard({ point }: { point: CurrentPetLocation }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white/90 p-3 shadow-sm backdrop-blur-md">
       <div className="flex items-start gap-2">
         <IconPin className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-zinc-900">{location.address}</p>
-          <p className="mt-0.5 text-[11px] text-zinc-500">{location.lastUpdate}</p>
+          <p className="text-[13px] font-semibold text-zinc-900">{formatLatLngLabel(point.lat, point.lng)}</p>
+          <p className="mt-0.5 text-[11px] text-zinc-500">{point.lastUpdateLabel}</p>
         </div>
       </div>
     </div>
@@ -36,7 +67,13 @@ export function LocationView() {
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [finderMessages, setFinderMessages] = useState<FinderMessageItem[]>([]);
+  const [locationHistory, setLocationHistory] = useState<LocationHistoryItem[]>([]);
   const [isNfcPaired, setIsNfcPaired] = useState(false);
+  const [petLocation, setPetLocation] = useState<CurrentPetLocation>({
+    lat: location.lat,
+    lng: location.lng,
+    lastUpdateLabel: location.lastUpdate,
+  });
   const disconnectedDevices = locationPageDevices.map((device) => ({
     ...device,
     status: device.name === "Tag NFC" && isNfcPaired ? "Conectado" : "Desconectado",
@@ -48,6 +85,68 @@ export function LocationView() {
       .split(";")
       .some((item) => item.trim().startsWith(`${NFC_PAIRED_COOKIE}=1`));
     setIsNfcPaired(hasPairedCookie);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLocationHistory() {
+      try {
+        const res = await fetch("/api/pets/location-history");
+        if (!res.ok) return;
+        const data = (await res.json()) as { history?: LocationHistoryItem[] };
+        if (!cancelled) setLocationHistory(data.history ?? []);
+      } catch {
+        /* noop */
+      }
+    }
+
+    loadLocationHistory();
+    const interval = setInterval(loadLocationHistory, 45000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCurrentPetLocation() {
+      try {
+        const res = await fetch("/api/pets/current");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          pet?: {
+            lastNfcAccessLat?: number | null;
+            lastNfcAccessLng?: number | null;
+            lastNfcAccessAt?: string | null;
+          };
+        };
+        const lat = data.pet?.lastNfcAccessLat;
+        const lng = data.pet?.lastNfcAccessLng;
+        if (typeof lat !== "number" || typeof lng !== "number") return;
+        const label = data.pet?.lastNfcAccessAt
+          ? `Ultimo acesso NFC: ${formatPtBrDateTime(data.pet.lastNfcAccessAt)}`
+          : "Ultimo acesso NFC registrado";
+        if (!cancelled) {
+          setPetLocation({
+            lat,
+            lng,
+            lastUpdateLabel: label,
+          });
+        }
+      } catch {
+        /* noop */
+      }
+    }
+
+    loadCurrentPetLocation();
+    const interval = setInterval(loadCurrentPetLocation, 45000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -98,8 +197,8 @@ export function LocationView() {
         {/* Mapa: Leaflet usa panes ate z-index 700 e controles ate ~1000 — UI fica numa camada acima */}
         <div className="absolute inset-0 z-0 min-h-0">
           <LocationLeafletMap
-            lat={location.lat}
-            lng={location.lng}
+            lat={petLocation.lat}
+            lng={petLocation.lng}
             zoom={17}
             className="h-full min-h-[100dvh] w-full"
           />
@@ -121,7 +220,7 @@ export function LocationView() {
             className="pointer-events-auto fixed left-1/2 flex w-[min(428px,calc(100%-1.5rem))] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-col gap-2 px-1"
             style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 5.75rem)" }}
           >
-            <LocationAddressCard />
+            <LocationAddressCard point={petLocation} />
             <button
               type="button"
               className="w-full rounded-2xl border border-emerald-200/90 bg-emerald-50/95 py-3 text-[13px] font-semibold text-emerald-900 shadow-[0_12px_28px_-22px_rgba(16,24,18,0.35)] backdrop-blur-md transition active:scale-[0.99] hover:bg-emerald-100/90"
@@ -145,8 +244,8 @@ export function LocationView() {
             <div className="relative isolate h-[200px] w-full overflow-hidden">
               <div className="absolute inset-0 z-0 min-h-0">
                 <LocationLeafletMap
-                  lat={location.lat}
-                  lng={location.lng}
+                  lat={petLocation.lat}
+                  lng={petLocation.lng}
                   zoom={16}
                   className="h-full w-full min-h-[200px]"
                   onMapClick={() => setMapFullscreen(true)}
@@ -155,7 +254,7 @@ export function LocationView() {
               <div className="pointer-events-none absolute inset-0 z-[1200]">
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10" aria-hidden />
                 <div className="pointer-events-auto absolute inset-x-3 bottom-3">
-                  <LocationAddressCard />
+                  <LocationAddressCard point={petLocation} />
                 </div>
               </div>
             </div>
@@ -206,6 +305,45 @@ export function LocationView() {
                             ·
                           </span>
                           <span>{m.senderLabel}</span>
+                        </>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "185ms" }}>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-[14px] font-semibold text-zinc-900">Historico de localizacao</h3>
+                <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">Ultimos pontos compartilhados por leitura NFC.</p>
+              </div>
+              <IconPin className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+            </div>
+
+            {locationHistory.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-3 py-4 text-center text-[12px] text-zinc-500">
+                Nenhum ponto registrado.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {locationHistory.map((item) => (
+                  <li key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50/90 px-3 py-2.5">
+                    <p className="text-[12px] font-medium text-zinc-800">
+                      {typeof item.lat === "number" && typeof item.lng === "number"
+                        ? formatLatLngLabel(item.lat, item.lng)
+                        : "Coordenadas indisponiveis"}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-zinc-500">
+                      <time dateTime={item.at}>{item.atLabel}</time>
+                      {typeof item.accuracyM === "number" ? (
+                        <>
+                          <span aria-hidden className="text-zinc-300">
+                            ·
+                          </span>
+                          <span>Precisao {Math.round(item.accuracyM)}m</span>
                         </>
                       ) : null}
                     </div>

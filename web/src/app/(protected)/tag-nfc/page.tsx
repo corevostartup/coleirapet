@@ -7,6 +7,7 @@ import { pet } from "@/lib/mock";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { getPetImageOrDefault } from "@/lib/pets/image";
 
 export default async function TagNfcPage() {
   const jar = await cookies();
@@ -95,7 +96,7 @@ export default async function TagNfcPage() {
           <p className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">Foto</p>
           <div className="relative h-[180px] w-full overflow-hidden rounded-xl border border-zinc-200 bg-white">
             <Image
-              src={currentPet?.image ?? pet.image}
+              src={getPetImageOrDefault(currentPet?.image ?? pet.image)}
               alt={`Foto de ${currentPet?.name ?? pet.name}`}
               fill
               className="object-cover"

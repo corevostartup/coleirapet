@@ -8,6 +8,7 @@ import { IconCollar, IconPin, IconShield, IconStethoscope, IconWave } from "@/co
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import { events, metrics, pet, weeklyActivity } from "@/lib/mock";
+import { getOrCreateCurrentPet } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 const NFC_PAIRED_COOKIE = "cp_nfc_paired";
@@ -17,6 +18,7 @@ export default async function Home() {
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
   const isNfcPaired = jar.get(NFC_PAIRED_COOKIE)?.value === "1";
   let currentUser = null;
+  let currentPet = null;
   if (uid) {
     try {
       currentUser = await getOrCreateCurrentUserProfile(uid);
@@ -24,8 +26,20 @@ export default async function Home() {
       // Evita tela branca/500 quando ambiente está sem Firebase Admin em produção.
       currentUser = null;
     }
+    try {
+      currentPet = (await getOrCreateCurrentPet(uid)).pet;
+    } catch {
+      currentPet = null;
+    }
   }
   const isVet = currentUser?.userType === "vet";
+  const cardPet = {
+    image: currentPet?.image ?? pet.image,
+    name: currentPet?.name ?? pet.name,
+    breed: currentPet?.breed ?? pet.breed,
+    age: currentPet?.age ?? pet.age ?? null,
+    wellbeing: pet.wellbeing,
+  };
 
   const maxActivity = Math.max(...weeklyActivity.map((item) => item.activeMinutes));
   const avgActivity = Math.round(
@@ -84,7 +98,7 @@ export default async function Home() {
         <section className="appear-up mt-3 overflow-hidden rounded-[30px] border border-zinc-200 bg-white shadow-[0_20px_40px_-28px_rgba(12,18,14,0.5)]" style={{ animationDelay: "60ms" }}>
           <div className="relative h-[260px]">
             <Image
-              src={pet.image}
+              src={cardPet.image}
               alt="Pet com coleira inteligente"
               fill
               priority
@@ -94,10 +108,12 @@ export default async function Home() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">
               <div>
-                <h2 className="text-[30px] font-semibold leading-none tracking-tight text-white">Luna</h2>
-                <p className="mt-1 text-[13px] text-white/80">Golden Retriever · 3 anos</p>
+                <h2 className="text-[30px] font-semibold leading-none tracking-tight text-white">{cardPet.name}</h2>
+                <p className="mt-1 text-[13px] text-white/80">
+                  {cardPet.breed} · {cardPet.age === null ? "Idade nao informada" : `${cardPet.age} anos`}
+                </p>
               </div>
-              <span className="rounded-full border border-white/25 bg-white/20 px-3 py-1 text-[12px] font-medium text-white backdrop-blur">Bem-estar {pet.wellbeing}%</span>
+              <span className="rounded-full border border-white/25 bg-white/20 px-3 py-1 text-[12px] font-medium text-white backdrop-blur">Bem-estar {cardPet.wellbeing}%</span>
             </div>
           </div>
         </section>
