@@ -118,12 +118,20 @@ function generatePublicPageSlug() {
 function parsePetIdentity(value: unknown) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim().toUpperCase();
-  if (!/^[A-Z0-9]{12}$/.test(trimmed)) return null;
+  if (!/^[A-Z0-9]{8}$/.test(trimmed)) return null;
   return trimmed;
 }
 
 function generatePetIdentity() {
-  return randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase();
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const bytes = randomUUID().replace(/-/g, "");
+  let out = "";
+  for (let i = 0; i < 8; i++) {
+    const hexPair = bytes.slice(i * 2, i * 2 + 2);
+    const value = Number.parseInt(hexPair, 16);
+    out += alphabet[value % alphabet.length];
+  }
+  return out;
 }
 
 function toPetProfile(petId: string, data: PetDoc): PetProfile {
@@ -184,7 +192,21 @@ async function ensurePetIdentity<T extends PetDoc>(
 ): Promise<T & { petIdentity: string }> {
   const existing = parsePetIdentity(data.petIdentity);
   if (existing) return { ...data, petIdentity: existing };
-  const petIdentity = generatePetIdentity();
+
+  const db = getFirebaseAdminDb();
+  let petIdentity = "";
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const candidate = generatePetIdentity();
+    const duplicated = await db.collection(COLLECTION_PETS).where("petIdentity", "==", candidate).limit(1).get();
+    if (duplicated.empty) {
+      petIdentity = candidate;
+      break;
+    }
+  }
+  if (!petIdentity) {
+    throw new Error("Nao foi possivel gerar identidade unica para o pet.");
+  }
+
   const nowIso = new Date().toISOString();
   await petRef.set({ petIdentity, updatedAt: nowIso }, { merge: true });
   return { ...data, petIdentity };
