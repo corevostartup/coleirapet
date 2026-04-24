@@ -11,6 +11,8 @@ type DeviceContext = {
   browser: "safari" | "chrome" | "firefox" | "edge" | "other";
 };
 
+type GeoPermissionState = "granted" | "denied" | "prompt" | "unknown";
+
 function detectDeviceContext(): DeviceContext {
   const ua = navigator.userAgent.toLowerCase();
   const isIOS = /iphone|ipad|ipod/.test(ua);
@@ -30,6 +32,17 @@ function detectDeviceContext(): DeviceContext {
     os: isIOS ? "ios" : isAndroid ? "android" : "desktop",
     browser,
   };
+}
+
+async function getGeoPermissionState(): Promise<GeoPermissionState> {
+  try {
+    if (!("permissions" in navigator) || typeof navigator.permissions.query !== "function") return "unknown";
+    const status = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+    if (status.state === "granted" || status.state === "denied" || status.state === "prompt") return status.state;
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 function permissionHelpText(ctx: DeviceContext) {
@@ -53,11 +66,13 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
   const [hint, setHint] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [permissionHelp, setPermissionHelp] = useState<string | null>(null);
+  const [permissionStateLabel, setPermissionStateLabel] = useState<string | null>(null);
 
   async function shareCurrentLocation() {
     if (busy || done) return;
     setHint(null);
     setPermissionHelp(null);
+    setPermissionStateLabel(null);
 
     if (!navigator.geolocation) {
       setHint("Seu navegador nao suporta geolocalizacao.");
@@ -70,14 +85,23 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
 
     setBusy(true);
     try {
+      const permissionState = await getGeoPermissionState();
+      if (permissionState !== "unknown") {
+        setPermissionStateLabel(`Estado da permissao: ${permissionState}.`);
+      }
+
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
           resolve,
           (error) => {
             if (error.code === error.PERMISSION_DENIED) {
               const ctx = detectDeviceContext();
-              setPermissionHelp(permissionHelpText(ctx));
-              reject(new Error("Permissao de localizacao negada."));
+              setPermissionHelp(
+                ctx.os === "ios"
+                  ? `${permissionHelpText(ctx)} Se continuar negando sem perguntar, abra Ajustes > Privacidade e Seguranca > Servicos de Localizacao > Safari Websites e escolha "Perguntar".`
+                  : permissionHelpText(ctx),
+              );
+              reject(new Error("Permissao de localizacao negada pelo navegador/dispositivo."));
               return;
             }
             if (error.code === error.POSITION_UNAVAILABLE) {
@@ -134,6 +158,7 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
         {busy ? "Registrando localizacao..." : done ? "Localizacao registrada" : "Aceitar e compartilhar localizacao atual"}
       </button>
       {hint ? <p className={`mt-2 text-[12px] ${done ? "text-emerald-700" : "text-rose-600"}`}>{hint}</p> : null}
+      {permissionStateLabel ? <p className="mt-2 text-[11px] text-zinc-500">{permissionStateLabel}</p> : null}
       {permissionHelp ? (
         <>
           <p className="mt-2 text-[12px] text-zinc-600">{permissionHelp}</p>
