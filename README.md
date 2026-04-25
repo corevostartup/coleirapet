@@ -1,10 +1,10 @@
-# ColeiraPet
+# Lyka
 
-Um aplicativo de gerenciamento de pets com arquitetura web-first.
+Aplicativo de monitoramento e cuidado de pets (marca **Lyka**; repositório e pastas do Xcode ainda usam o nome de projeto `Lyka`).
 
 ## Estrutura do Projeto
 
-- **ColeiraPet/** - Aplicativo iOS (SwiftUI)
+- **Lyka/** - Aplicativo iOS (SwiftUI)
 - **web/** - Frontend/Backend (Next.js + React)
 
 ## Configução para Desenvolvimento
@@ -23,8 +23,8 @@ O aplicativo iOS agora usa WebKit para carregar a interface web do Next.js. Por 
    O servidor rodará em `http://localhost:3000`
 
 2. **Configure o Xcode para aceitar localhost**:
-   - Abra `ColeiraPet.xcodeproj` no Xcode
-   - Selecione o target "ColeiraPet"
+   - Abra `Lyka.xcodeproj` no Xcode
+   - Selecione o target "Lyka"
    - Vá para "Build Settings" e procure por "App Transport Security"
    - Você pode precisar adicionar as seguintes configurações ao Info.plist (se não existir, crie um):
      ```xml

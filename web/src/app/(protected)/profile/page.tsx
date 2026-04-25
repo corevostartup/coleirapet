@@ -6,44 +6,24 @@ import { ProfilePetSwitcher } from "@/components/profile-pet-switcher";
 import { ProfileUserDetailsEditor } from "@/components/profile-user-details-editor";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AppShell, TopBar } from "@/components/shell";
-import { IconCamera, IconCollar, IconHeart, IconShield } from "@/components/icons";
+import { IconCamera, IconCollar, IconHeart, IconSettings, IconShield } from "@/components/icons";
 import { AUTH_USER_NAME_COOKIE, AUTH_USER_PHOTO_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserNameCookie, parseAuthUserPhotoCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
+import { filterLegacyUiDemoPetsFromSwitcherList } from "@/lib/pets/legacy-ui-demo-pets";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
 import { devices, pet } from "@/lib/mock";
 
-const NFC_PAIRED_COOKIE = "cp_nfc_paired";
-
-const SIMULATED_PETS = [
-  {
-    id: "demo-max",
-    name: "Max",
-    breed: "Border Collie",
-    image: "https://images.unsplash.com/photo-1518717758536-85ae29035b6d?auto=format&fm=jpg&fit=crop&w=900&q=80",
-    simulated: true,
-  },
-  {
-    id: "demo-nina",
-    name: "Nina",
-    breed: "Shih Tzu",
-    image: "https://images.unsplash.com/photo-1544568100-847a948585b9?auto=format&fm=jpg&fit=crop&w=900&q=80",
-    simulated: true,
-  },
-  {
-    id: "demo-thor",
-    name: "Thor",
-    breed: "Labrador",
-    image: "https://images.unsplash.com/photo-1596492784531-6e6eb5ea9993?auto=format&fm=jpg&fit=crop&w=900&q=80",
-    simulated: true,
-  },
-] as const;
-
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const isNewPetFlow = (Array.isArray(resolvedSearchParams?.newPet) ? resolvedSearchParams?.newPet[0] : resolvedSearchParams?.newPet) === "1";
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
-  const isNfcPaired = jar.get(NFC_PAIRED_COOKIE)?.value === "1";
   const tutorName = parseAuthUserNameCookie(jar.get(AUTH_USER_NAME_COOKIE)?.value) ?? "Tutor(a)";
   const tutorPhoto =
     parseAuthUserPhotoCookie(jar.get(AUTH_USER_PHOTO_COOKIE)?.value) ??
@@ -77,18 +57,18 @@ export default async function ProfilePage() {
   }
   const petData = currentPet
     ? {
-        name: currentPet.name,
+        name: isNewPetFlow ? "" : currentPet.name,
         petIdentity: currentPet.petIdentity,
-        breed: currentPet.breed,
+        breed: isNewPetFlow ? "" : currentPet.breed,
         image: currentPet.image,
-        age: currentPet.age,
-        weightKg: currentPet.weightKg,
-        sex: currentPet.sex,
-        size: currentPet.size,
-        emergencyContact: currentPet.emergencyContact,
-        color: currentPet.color,
-        microchipId: currentPet.microchipId,
-        notes: currentPet.notes,
+        age: isNewPetFlow ? null : currentPet.age,
+        weightKg: isNewPetFlow ? null : currentPet.weightKg,
+        sex: isNewPetFlow ? null : currentPet.sex,
+        size: isNewPetFlow ? null : currentPet.size,
+        emergencyContact: isNewPetFlow ? "" : currentPet.emergencyContact,
+        color: isNewPetFlow ? "" : currentPet.color,
+        microchipId: isNewPetFlow ? "" : currentPet.microchipId,
+        notes: isNewPetFlow ? "" : currentPet.notes,
         publicFields: currentPet.publicFields ?? {
           name: true,
           breed: false,
@@ -122,7 +102,7 @@ export default async function ProfilePage() {
       };
   const profileDevices = devices.map((device) => ({
     ...device,
-    status: device.name === "Tag NFC" && isNfcPaired ? "Conectado" : "Desconectado",
+    status: device.name === "Tag NFC" && Boolean(currentPet?.nfcId) ? "Conectado" : "Desconectado",
   }));
 
   return (
@@ -131,24 +111,33 @@ export default async function ProfilePage() {
         title="Perfil do pet"
         subtitle="Perfil"
         action={
-          currentPet && petList ? (
-            <ProfilePetSwitcher
-              currentPet={{
-                id: currentPet.id,
-                name: currentPet.name,
-                breed: currentPet.breed,
-                image: currentPet.image,
-              }}
-              initialPets={petList.pets.map((item) => ({
-                id: item.id,
-                name: item.name,
-                breed: item.breed,
-                image: item.image,
-              })).concat(
-                SIMULATED_PETS.filter((simulated) => !petList.pets.some((item) => item.id === simulated.id)),
-              )}
-            />
-          ) : undefined
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Link
+              href="/profile/settings"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200/90 bg-zinc-50/80 text-zinc-600 transition hover:border-zinc-300 hover:bg-white hover:text-zinc-900"
+              aria-label="Configuracoes"
+            >
+              <IconSettings className="h-5 w-5" aria-hidden />
+            </Link>
+            {currentPet && petList ? (
+              <ProfilePetSwitcher
+                currentPet={{
+                  id: currentPet.id,
+                  name: currentPet.name,
+                  breed: currentPet.breed,
+                  image: currentPet.image,
+                }}
+                initialPets={filterLegacyUiDemoPetsFromSwitcherList(
+                  petList.pets.map((item) => ({
+                    id: item.id,
+                    name: item.name,
+                    breed: item.breed,
+                    image: item.image,
+                  })),
+                )}
+              />
+            ) : null}
+          </div>
         }
       />
 
@@ -242,7 +231,7 @@ export default async function ProfilePage() {
           </button>
           <button className="chip rounded-2xl px-2 py-3 text-center transition hover:bg-zinc-100">
             <IconCollar className="mx-auto h-5 w-5 text-zinc-700" />
-            <span className="mt-1.5 block text-[11px] font-medium text-zinc-600">Coleira</span>
+            <span className="mt-1.5 block text-[11px] font-medium text-zinc-600">Lyka</span>
           </button>
           <button className="chip rounded-2xl px-2 py-3 text-center transition hover:bg-zinc-100">
             <IconCamera className="mx-auto h-5 w-5 text-zinc-700" />

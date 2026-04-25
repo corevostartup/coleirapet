@@ -4,8 +4,8 @@ import Link from "next/link";
 import type { ComponentProps } from "react";
 
 type NativeWindow = Window & {
-  __COLEIRAPET_IOS_APP__?: boolean;
-  ColeiraPetNativeNFC?: { startPairing: () => void };
+  __LYKA_IOS_APP__?: boolean;
+  LykaNativeNFC?: { startPairing: () => void };
 };
 
 export function NFCPairLink(props: Omit<ComponentProps<typeof Link>, "href"> & { href?: string }) {
@@ -19,9 +19,9 @@ export function NFCPairLink(props: Omit<ComponentProps<typeof Link>, "href"> & {
         onClick?.(e);
         if (e.defaultPrevented) return;
         const w = typeof window !== "undefined" ? (window as NativeWindow) : undefined;
-        if (w?.__COLEIRAPET_IOS_APP__ && w.ColeiraPetNativeNFC?.startPairing) {
+        if (w?.__LYKA_IOS_APP__ && w.LykaNativeNFC?.startPairing) {
           e.preventDefault();
-          w.ColeiraPetNativeNFC.startPairing();
+          w.LykaNativeNFC.startPairing();
           return;
         }
         e.preventDefault();

@@ -27,7 +27,7 @@ export const weeklyActivity = [
   { day: "Dom", activeMinutes: 93, steps: 12680 },
 ];
 
-export const quickActions = ["Coleira", "Saude", "Historico"];
+export const quickActions = ["Lyka", "Saude", "Historico"];
 
 export const events = [
   { label: "Antipulga", when: "Em 11 dias", kind: "warning" },

@@ -8,7 +8,7 @@ const records = [
 
 export default function VetProntuarioPage() {
   return (
-    <VetShell tab="prontuario" title="Prontuario" subtitle="Area medica">
+    <VetShell title="Prontuario" subtitle="Area medica">
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
         <h3 className="text-[14px] font-semibold text-zinc-900">Ultimos registros clinicos</h3>
         <div className="mt-3 space-y-2">

@@ -1,16 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { getPetImageOrDefault } from "@/lib/pets/image";
+import { filterLegacyUiDemoPetsFromSwitcherList } from "@/lib/pets/legacy-ui-demo-pets";
 
 type PetItem = {
   id: string;
   name: string;
   breed: string;
   image: string;
-  simulated?: boolean;
 };
 
 type Props = {
@@ -18,12 +18,12 @@ type Props = {
   initialPets: PetItem[];
 };
 
-/** Remove linhas repetidas com o mesmo nome, raca e foto (ex.: varios docs Firebase com defaults iguais). */
+/** Evita itens duplicados por id no seletor. */
 function dedupePetsByIdentity(pets: PetItem[]): PetItem[] {
   const seen = new Set<string>();
   const out: PetItem[] = [];
   for (const pet of pets) {
-    const key = `${pet.name.trim().toLowerCase()}|${pet.breed.trim().toLowerCase()}|${pet.image}`;
+    const key = pet.id.trim();
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(pet);
@@ -31,25 +31,36 @@ function dedupePetsByIdentity(pets: PetItem[]): PetItem[] {
   return out;
 }
 
+function preparePetsList(pets: PetItem[]) {
+  return filterLegacyUiDemoPetsFromSwitcherList(dedupePetsByIdentity(pets));
+}
+
 export function ProfilePetSwitcher({ currentPet, initialPets }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [busyPetId, setBusyPetId] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
-  const [pets, setPets] = useState(() => dedupePetsByIdentity(initialPets));
+  const [pets, setPets] = useState(() => preparePetsList(initialPets));
   const [selectedPetId, setSelectedPetId] = useState(currentPet.id);
+
+  useEffect(() => {
+    setPets(preparePetsList(initialPets));
+  }, [initialPets]);
+
+  useEffect(() => {
+    if (pets.length === 0) return;
+    if (pets.some((p) => p.id === selectedPetId)) return;
+    if (pets.some((p) => p.id === currentPet.id)) {
+      setSelectedPetId(currentPet.id);
+      return;
+    }
+    setSelectedPetId(pets[0].id);
+  }, [pets, selectedPetId, currentPet.id]);
 
   const selectedPet = useMemo(() => pets.find((item) => item.id === selectedPetId) ?? currentPet, [currentPet, pets, selectedPetId]);
 
   async function switchPet(petId: string) {
-    const chosen = pets.find((item) => item.id === petId);
-    if (chosen?.simulated) {
-      setSelectedPetId(petId);
-      setHint("Pet de exemplo (simulado).");
-      setOpen(false);
-      return;
-    }
-
     if (petId === selectedPetId || busyPetId) {
       setOpen(false);
       return;
@@ -75,11 +86,47 @@ export function ProfilePetSwitcher({ currentPet, initialPets }: Props) {
       if (!res.ok) throw new Error(payload?.error ?? "Nao foi possivel trocar de pet.");
 
       setSelectedPetId(payload?.currentPetId ?? petId);
-      if (Array.isArray(payload?.pets)) setPets(dedupePetsByIdentity(payload.pets as PetItem[]));
+      if (Array.isArray(payload?.pets)) setPets(preparePetsList(payload.pets as PetItem[]));
       setOpen(false);
-      router.refresh();
+      {
+        const path = typeof window !== "undefined" ? window.location.pathname : pathname;
+        const next = new URLSearchParams(
+          typeof window !== "undefined" ? window.location.search : "",
+        );
+        next.set("_r", String(Date.now()));
+        const q = next.toString();
+        await router.replace(q ? `${path}?${q}` : `${path}?_r=${Date.now()}`);
+        router.refresh();
+      }
     } catch (error) {
       setHint(error instanceof Error ? error.message : "Falha ao trocar pet.");
+    } finally {
+      setBusyPetId(null);
+    }
+  }
+
+  async function createNewPet() {
+    if (busyPetId) return;
+    setHint(null);
+    setBusyPetId("new-pet");
+    try {
+      const res = await fetch("/api/pets/list", { method: "POST" });
+      const payload = (await res.json().catch(() => null)) as
+        | {
+            error?: string;
+            currentPetId?: string;
+            pets?: PetItem[];
+          }
+        | null;
+      if (!res.ok) throw new Error(payload?.error ?? "Nao foi possivel criar novo pet.");
+
+      const nextPets = Array.isArray(payload?.pets) ? preparePetsList(payload.pets as PetItem[]) : pets;
+      setPets(nextPets);
+      setSelectedPetId(payload?.currentPetId ?? nextPets[0]?.id ?? selectedPetId);
+      setOpen(false);
+      window.location.assign(`/profile?newPet=1&t=${Date.now()}`);
+    } catch (error) {
+      setHint(error instanceof Error ? error.message : "Falha ao criar novo pet.");
     } finally {
       setBusyPetId(null);
     }
@@ -120,7 +167,6 @@ export function ProfilePetSwitcher({ currentPet, initialPets }: Props) {
                       <span className="block truncate text-[12px] font-semibold text-zinc-800">{pet.name}</span>
                       <span className="block truncate text-[11px] text-zinc-500">
                         {pet.breed || "Sem raca"}
-                        {pet.simulated ? " · Exemplo" : ""}
                       </span>
                     </span>
                     <span className="ml-auto text-[10px] font-semibold text-emerald-700">{isSaving ? "..." : active ? "Atual" : ""}</span>
@@ -129,6 +175,14 @@ export function ProfilePetSwitcher({ currentPet, initialPets }: Props) {
               );
             })}
           </ul>
+          <button
+            type="button"
+            onClick={() => void createNewPet()}
+            disabled={Boolean(busyPetId)}
+            className="mt-2 flex w-full items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50/70 px-2 py-2 text-[12px] font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-70"
+          >
+            {busyPetId === "new-pet" ? "Criando..." : "Novo pet"}
+          </button>
           {hint ? <p className="px-1 pt-2 text-[11px] text-rose-600">{hint}</p> : null}
         </div>
       ) : null}

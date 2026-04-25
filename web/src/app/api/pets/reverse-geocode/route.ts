@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
       {
         headers: {
-          "User-Agent": "ColeiraPet/1.0 (support@coleirapet.app)",
+          "User-Agent": "Lyka/1.0 (support@lyka.app)",
           Accept: "application/json",
         },
         cache: "no-store",

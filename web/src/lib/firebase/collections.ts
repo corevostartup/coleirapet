@@ -9,6 +9,12 @@ export const SUBCOLLECTION_FINDER_MESSAGES = "finderMessages";
 /** Subcoleção em `Pets/{petId}`: histórico de localizações compartilhadas por leitura NFC. */
 export const SUBCOLLECTION_NFC_ACCESS_LOGS = "nfcAccessLogs";
 
+/** Subcoleção em `Pets/{petId}`: minutos ativos cadastrados por dia. */
+export const SUBCOLLECTION_ACTIVITY_MINUTES = "activityMinutes";
+
+/** Subcoleção em `Pets/{petId}`: lembretes de medicação. */
+export const SUBCOLLECTION_MEDICATION_REMINDERS = "medicationReminders";
+
 /** Subcoleção em `Pets/{petId}`: vacinas (nome canônico atual). */
 export const SUBCOLLECTION_VACCINES = "vacinas";
 

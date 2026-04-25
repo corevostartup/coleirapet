@@ -9,10 +9,13 @@ import {
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { pet as mockPet } from "@/lib/mock";
 import { getPetImageOrDefault } from "@/lib/pets/image";
+import { isLegacyUiDemoPetName } from "@/lib/pets/legacy-ui-demo-pets";
 
 type PetDoc = {
   ownerId?: string;
   petIdentity?: string;
+  nfcId?: string;
+  nfcPairedAt?: string;
   /** Segredo para URL pública de contato em situação de pet perdido (quem escaneia a tag). */
   finderShareToken?: string;
   /** Endereço público estável para exibir somente dados públicos do pet. */
@@ -49,9 +52,27 @@ type UserDoc = {
   defaultPetId?: string;
 };
 
+/** Ids de pets de demonstração antigos; não devem aparecer nem ser defaultPetId. */
+const DEMO_PET_ID_BLOCKLIST = new Set(["demo-max", "demo-nina", "demo-thor"]);
+
+function isDemoPetId(petId: string) {
+  const id = petId.trim();
+  if (DEMO_PET_ID_BLOCKLIST.has(id)) return true;
+  if (id.toLowerCase().startsWith("demo-")) return true;
+  return false;
+}
+
+/** Pets de demo antigos: ids reservados ou um dos 3 nomes forçados pela UI. */
+function isDemoPetDocContent(data: PetDoc, docId: string) {
+  if (isDemoPetId(docId)) return true;
+  return isLegacyUiDemoPetName(typeof data.name === "string" ? data.name : "");
+}
+
 export type PetProfile = {
   id: string;
   petIdentity: string;
+  nfcId: string | null;
+  nfcPairedAt: string | null;
   name: string;
   breed: string;
   image: string;
@@ -139,6 +160,8 @@ function toPetProfile(petId: string, data: PetDoc): PetProfile {
   return {
     id: petId,
     petIdentity: parsePetIdentity(data.petIdentity) ?? generatePetIdentity(),
+    nfcId: parseString(data.nfcId),
+    nfcPairedAt: parseString(data.nfcPairedAt),
     name: parseString(data.name) ?? mockPet.name,
     breed: parseString(data.breed) ?? mockPet.breed,
     image: getPetImageOrDefault(parseString(data.image) ?? mockPet.image),
@@ -217,6 +240,8 @@ function defaultPetDoc(ownerId: string) {
   return {
     ownerId,
     petIdentity: generatePetIdentity(),
+    nfcId: "",
+    nfcPairedAt: "",
     publicPageSlug: generatePublicPageSlug(),
     name: mockPet.name,
     breed: mockPet.breed,
@@ -320,7 +345,8 @@ export async function getOrCreateCurrentPet(uid: string) {
 
   const petsRoot = db.collection(COLLECTION_PETS);
 
-  const candidatePetId = typeof userData.defaultPetId === "string" ? userData.defaultPetId.trim() : "";
+  const rawDefaultId = typeof userData.defaultPetId === "string" ? userData.defaultPetId.trim() : "";
+  const candidatePetId = rawDefaultId && isDemoPetId(rawDefaultId) ? "" : rawDefaultId;
   if (candidatePetId) {
     const petRef = petsRoot.doc(candidatePetId);
     const petSnap = await petRef.get();
@@ -330,9 +356,12 @@ export async function getOrCreateCurrentPet(uid: string) {
     }
   }
 
-  const owned = await petsRoot.where("ownerId", "==", uid).limit(1).get();
-  if (!owned.empty) {
-    const doc = owned.docs[0];
+  const owned = await petsRoot.where("ownerId", "==", uid).get();
+  const firstReal = owned.docs.find(
+    (doc) => !isDemoPetDocContent(doc.data() as PetDoc, doc.id),
+  );
+  if (firstReal) {
+    const doc = firstReal;
     await userRef.set({ defaultPetId: doc.id }, { merge: true });
     return finalizePetProfile(doc.ref, doc.id, doc.data() as PetDoc);
   }
@@ -352,7 +381,10 @@ export async function listOwnedPets(uid: string) {
   const userData = (userSnap.data() ?? {}) as UserDoc;
 
   const owned = await db.collection(COLLECTION_PETS).where("ownerId", "==", uid).get();
-  if (owned.empty) {
+  const realDocs = owned.docs.filter(
+    (doc) => !isDemoPetDocContent(doc.data() as PetDoc, doc.id),
+  );
+  if (realDocs.length === 0) {
     const created = await getOrCreateCurrentPet(uid);
     return {
       currentPetId: created.pet.id,
@@ -361,7 +393,7 @@ export async function listOwnedPets(uid: string) {
   }
 
   const pets = await Promise.all(
-    owned.docs.map(async (doc) => {
+    realDocs.map(async (doc) => {
       const withToken = await ensureFinderShareToken(doc.ref, doc.data() as PetDoc);
       const normalized = await ensurePublicPageSlug(doc.ref, withToken);
       const withIdentity = await ensurePetIdentity(doc.ref, normalized);
@@ -384,16 +416,29 @@ export async function setCurrentPet(uid: string, petId: string) {
   const normalizedPetId = petId.trim();
   if (!normalizedPetId) return null;
 
+  if (isDemoPetId(normalizedPetId)) return null;
   const petRef = db.collection(COLLECTION_PETS).doc(normalizedPetId);
   const petSnap = await petRef.get();
   const petData = petSnap.data() as PetDoc | undefined;
   if (!petSnap.exists || petData?.ownerId !== uid) return null;
+  if (isDemoPetDocContent(petData, normalizedPetId)) return null;
 
   await db.collection(COLLECTION_USER).doc(uid).set({ defaultPetId: normalizedPetId }, { merge: true });
   const normalized = await ensureFinderShareToken(petRef, petData);
   const withPublicPage = await ensurePublicPageSlug(petRef, normalized);
   const withIdentity = await ensurePetIdentity(petRef, withPublicPage);
   return toPetProfile(normalizedPetId, withIdentity);
+}
+
+export async function createOwnedPet(uid: string) {
+  const db = getFirebaseAdminDb();
+  const petsRoot = db.collection(COLLECTION_PETS);
+  const createdRef = await petsRoot.add(defaultPetDoc(uid));
+
+  await db.collection(COLLECTION_USER).doc(uid).set({ defaultPetId: createdRef.id }, { merge: true });
+
+  const createdSnap = await createdRef.get();
+  return finalizePetProfile(createdRef, createdSnap.id, (createdSnap.data() ?? {}) as PetDoc);
 }
 
 export async function getPublicPetBySlug(publicSlug: string) {

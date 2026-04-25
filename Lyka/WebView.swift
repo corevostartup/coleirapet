@@ -45,18 +45,18 @@ struct WebView: UIViewRepresentable {
             `;
             document.head.appendChild(style);
 
-            window.__COLEIRAPET_IOS_APP__ = true;
-            window.ColeiraPetNativeAuth = {
+            window.__LYKA_IOS_APP__ = true;
+            window.LykaNativeAuth = {
                 startGoogleSignIn: () => {
-                    window.webkit.messageHandlers.coleiraNativeAuth.postMessage({ action: 'googleSignIn' });
+                    window.webkit.messageHandlers.lykaNativeAuth.postMessage({ action: 'googleSignIn' });
                 }
             };
-            window.ColeiraPetNativeNFC = {
+            window.LykaNativeNFC = {
                 startPairing: () => {
-                    window.webkit.messageHandlers.coleiraNativeNFC.postMessage({ action: 'startPairing' });
+                    window.webkit.messageHandlers.lykaNativeNFC.postMessage({ action: 'startPairing' });
                 },
                 writePairingPassword: (password, publicUrl) => {
-                    window.webkit.messageHandlers.coleiraNativeNFC.postMessage({ action: 'writePairingPassword', password, publicUrl });
+                    window.webkit.messageHandlers.lykaNativeNFC.postMessage({ action: 'writePairingPassword', password, publicUrl });
                 }
             };
         })();
@@ -64,8 +64,8 @@ struct WebView: UIViewRepresentable {
 
         let userScript = WKUserScript(source: script, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
         contentController.addUserScript(userScript)
-        contentController.add(context.coordinator, name: "coleiraNativeAuth")
-        contentController.add(context.coordinator, name: "coleiraNativeNFC")
+        contentController.add(context.coordinator, name: "lykaNativeAuth")
+        contentController.add(context.coordinator, name: "lykaNativeNFC")
 
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = contentController
@@ -107,9 +107,9 @@ struct WebView: UIViewRepresentable {
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             switch message.name {
-            case "coleiraNativeAuth":
+            case "lykaNativeAuth":
                 handleAuthMessage(message)
-            case "coleiraNativeNFC":
+            case "lykaNativeNFC":
                 handleNFCMessage(message)
             default:
                 break
@@ -216,14 +216,14 @@ struct WebView: UIViewRepresentable {
 
         private func sendNativeGoogleSignInToken(_ idToken: String, to webView: WKWebView) {
             let escaped = escapeForJavaScriptLiteral(idToken)
-            let script = "if(typeof window.__coleiraGoogleSignInToken==='function'){window.__coleiraGoogleSignInToken('\(escaped)');}"
+            let script = "if(typeof window.__lykaGoogleSignInToken==='function'){window.__lykaGoogleSignInToken('\(escaped)');}"
             webView.evaluateJavaScript(script)
         }
 
         private func sendNativeGoogleSignInError(_ message: String) {
             guard let webView else { return }
             let escaped = escapeForJavaScriptLiteral(message)
-            let script = "if(typeof window.__coleiraGoogleSignInError==='function'){window.__coleiraGoogleSignInError('\(escaped)');}"
+            let script = "if(typeof window.__lykaGoogleSignInError==='function'){window.__lykaGoogleSignInError('\(escaped)');}"
             webView.evaluateJavaScript(script)
         }
 

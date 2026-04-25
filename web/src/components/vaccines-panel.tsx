@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 import { IconCalendar } from "@/components/icons";
 
 type VaccineStatus = "applied" | "pending";
@@ -27,11 +28,17 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const [name, setName] = useState("");
   const [status, setStatus] = useState<VaccineStatus>("pending");
   const [date, setDate] = useState("");
-  const [isFormExpanded, setIsFormExpanded] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -63,19 +70,41 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
     };
   }, []);
 
-  const appliedVaccines = useMemo(
-    () => vaccines.filter((vaccine) => vaccine.status === "applied"),
-    [vaccines],
-  );
-  const pendingVaccines = useMemo(
-    () => vaccines.filter((vaccine) => vaccine.status === "pending"),
-    [vaccines],
-  );
+  useEffect(() => {
+    if (!modalOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [modalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modalOpen]);
+
+  function openModal() {
+    setModalError(null);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setModalError(null);
+    setName("");
+    setStatus("pending");
+    setDate("");
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setError(null);
+    setModalError(null);
 
     try {
       const res = await fetch("/api/vaccines", {
@@ -92,11 +121,9 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
       const payload = (await res.json()) as CreateVaccineResponse;
       const created = payload.vaccine;
       setVaccines((current) => [created, ...current]);
-      setName("");
-      setStatus("pending");
-      setDate("");
+      closeModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao cadastrar vacina.");
+      setModalError(err instanceof Error ? err.message : "Falha ao cadastrar vacina.");
     } finally {
       setSaving(false);
     }
@@ -107,98 +134,144 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
       className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
       style={{ animationDelay }}
     >
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-[14px] font-semibold text-zinc-900">Vacinas</h3>
-        <IconCalendar className="h-5 w-5 text-zinc-600" />
-      </div>
-
-      <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Cadastrar vacina</p>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Vacinas</h3>
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setIsFormExpanded((value) => !value)}
-            className="chip rounded-xl px-3 py-1.5 text-[11px] font-semibold text-zinc-600 transition hover:bg-zinc-100"
-            aria-expanded={isFormExpanded}
+            onClick={openModal}
+            aria-label="Adicionar vacina"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200/90 bg-zinc-50/80 text-zinc-500 transition hover:border-zinc-300 hover:bg-white hover:text-zinc-800 active:scale-[0.97]"
           >
-            {isFormExpanded ? "Recolher" : "Expandir"}
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <path d="M12 5v14M5 12h14" />
+            </svg>
           </button>
+          <IconCalendar className="h-5 w-5 text-zinc-600" aria-hidden />
         </div>
+      </div>
 
-        {isFormExpanded ? (
-          <form onSubmit={handleSubmit} className="mt-2">
-            <div className="grid gap-2">
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Nome da vacina"
-                className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-[13px] text-zinc-800 outline-none ring-emerald-200 transition focus:ring"
-                required
-                minLength={2}
-                maxLength={80}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value as VaccineStatus)}
-                  className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-[13px] text-zinc-800 outline-none ring-emerald-200 transition focus:ring"
-                >
-                  <option value="pending">Pendente</option>
-                  <option value="applied">Aplicada</option>
-                </select>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                  className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-[13px] text-zinc-800 outline-none ring-emerald-200 transition focus:ring"
-                  required
-                />
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={saving}
-              className="mt-2 h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-semibold text-white transition enabled:hover:bg-emerald-700 disabled:opacity-70"
-            >
-              {saving ? "Salvando..." : "Adicionar vacina"}
-            </button>
-          </form>
-        ) : null}
-      </section>
-
-      {error ? <p className="mt-2 text-[12px] font-medium text-red-600">{error}</p> : null}
+      {error ? <p className="mt-1 text-[12px] font-medium text-red-600">{error}</p> : null}
 
       {loading ? (
         <p className="mt-3 text-[12px] text-zinc-500">Carregando vacinas...</p>
+      ) : vaccines.length === 0 ? (
+        <p className="mt-3 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-3 py-3 text-[12px] text-zinc-500">
+          Nenhuma vacina cadastrada.
+        </p>
       ) : (
-        <div className="mt-3 grid gap-3">
-          <div>
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">Pendentes</p>
-            <div className="space-y-2">
-              {pendingVaccines.length ? (
-                pendingVaccines.map((vaccine) => <VaccineCard key={vaccine.id} vaccine={vaccine} />)
-              ) : (
-                <p className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[11px] text-zinc-500">
-                  Nenhuma vacina pendente cadastrada.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">Aplicadas</p>
-            <div className="space-y-2">
-              {appliedVaccines.length ? (
-                appliedVaccines.map((vaccine) => <VaccineCard key={vaccine.id} vaccine={vaccine} />)
-              ) : (
-                <p className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[11px] text-zinc-500">
-                  Nenhuma vacina aplicada cadastrada.
-                </p>
-              )}
-            </div>
-          </div>
+        <div className="mt-3 space-y-2">
+          {vaccines.map((vaccine) => (
+            <VaccineCard key={vaccine.id} vaccine={vaccine} />
+          ))}
         </div>
       )}
+
+      {mounted && modalOpen
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[3000] flex min-h-[100dvh] items-center justify-center bg-black/40 px-3 py-6 pb-28 sm:px-6"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="vaccine-modal-title"
+            >
+              <button
+                type="button"
+                aria-label="Fechar"
+                className="absolute inset-0 cursor-default"
+                onClick={() => !saving && closeModal()}
+              />
+              <section className="relative z-[1] mx-auto w-[min(420px,calc(100vw-1.5rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <div>
+                    <h3 id="vaccine-modal-title" className="text-[15px] font-semibold text-zinc-900">
+                      Nova vacina
+                    </h3>
+                    <p className="mt-1 text-[12px] text-zinc-600">Cadastre nome, status e data da vacina.</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={closeModal}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50"
+                    aria-label="Fechar"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="grid gap-3">
+                  <div>
+                    <label htmlFor="vaccine-name" className="text-[12px] font-semibold text-zinc-700">
+                      Nome da vacina
+                    </label>
+                    <input
+                      id="vaccine-name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="Nome da vacina"
+                      className="mt-2 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label htmlFor="vaccine-status" className="text-[12px] font-semibold text-zinc-700">
+                        Status
+                      </label>
+                      <select
+                        id="vaccine-status"
+                        value={status}
+                        onChange={(event) => setStatus(event.target.value as VaccineStatus)}
+                        className="mt-2 h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                      >
+                        <option value="pending">Pendente</option>
+                        <option value="applied">Aplicada</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="vaccine-date" className="text-[12px] font-semibold text-zinc-700">
+                        Data
+                      </label>
+                      <input
+                        id="vaccine-date"
+                        type="date"
+                        value={date}
+                        onChange={(event) => setDate(event.target.value)}
+                        className="mt-2 h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {modalError ? <p className="text-[11px] font-medium text-rose-600">{modalError}</p> : null}
+
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="mt-1 w-full rounded-2xl bg-emerald-600 px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                  >
+                    {saving ? "Salvando..." : "Salvar vacina"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Cancelar
+                  </button>
+                </form>
+              </section>
+            </div>,
+            document.body,
+          )
+        : null}
     </section>
   );
 }

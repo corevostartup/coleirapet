@@ -6,7 +6,7 @@ import { AppShell, TopBar } from "@/components/shell";
 import { IconChevronLeft } from "@/components/icons";
 
 export default function NotificationSettingsPage() {
-  const [coleiraSaude, setColeiraSaude] = useState(true);
+  const [lykaSaude, setLykaSaude] = useState(true);
   const [localizacao, setLocalizacao] = useState(true);
   const [vacinas, setVacinas] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -34,10 +34,10 @@ export default function NotificationSettingsPage() {
 
       <section className="appear-up mt-4 space-y-2 rounded-[26px] bg-white p-3 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
         <ToggleRow
-          label="Coleira e saude"
+          label="Lyka e saude"
           description="Batimento, atividade e eventos da coleira"
-          checked={coleiraSaude}
-          onChange={setColeiraSaude}
+          checked={lykaSaude}
+          onChange={setLykaSaude}
         />
         <ToggleRow
           label="Localizacao"
@@ -52,7 +52,7 @@ export default function NotificationSettingsPage() {
           onChange={setVacinas}
         />
         <ToggleRow
-          label="Novidades ColeiraPet"
+          label="Novidades Lyka"
           description="Dicas e atualizacoes do produto"
           checked={marketing}
           onChange={setMarketing}

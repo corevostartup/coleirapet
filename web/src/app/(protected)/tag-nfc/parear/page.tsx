@@ -6,13 +6,11 @@ import { useRouter } from "next/navigation";
 import { IconChevronLeft, IconCollar, IconShield } from "@/components/icons";
 import { AppShell, TopBar } from "@/components/shell";
 
-const NFC_PAIRED_COOKIE = "cp_nfc_paired";
-const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
 const PASSWORD_STEP_QUERY = "step=password";
 
 type NativeWindow = Window & {
-  __COLEIRAPET_IOS_APP__?: boolean;
-  ColeiraPetNativeNFC?: {
+  __LYKA_IOS_APP__?: boolean;
+  LykaNativeNFC?: {
     startPairing: () => void;
     writePairingPassword: (password: string, publicUrl: string) => void;
   };
@@ -26,7 +24,7 @@ function readInitialStep(): "scan" | "password" {
 function readIsIosNativeApp(): boolean {
   if (typeof window === "undefined") return false;
   const w = window as NativeWindow;
-  return Boolean(w.__COLEIRAPET_IOS_APP__ && w.ColeiraPetNativeNFC);
+  return Boolean(w.__LYKA_IOS_APP__ && w.LykaNativeNFC);
 }
 
 export default function TagNfcPairPage() {
@@ -79,8 +77,8 @@ export default function TagNfcPairPage() {
 
   function handleStartScan() {
     const w = typeof window !== "undefined" ? (window as NativeWindow) : undefined;
-    if (w?.__COLEIRAPET_IOS_APP__ && w.ColeiraPetNativeNFC?.startPairing) {
-      w.ColeiraPetNativeNFC.startPairing();
+    if (w?.__LYKA_IOS_APP__ && w.LykaNativeNFC?.startPairing) {
+      w.LykaNativeNFC.startPairing();
       return;
     }
     setStep("password");
@@ -100,13 +98,29 @@ export default function TagNfcPairPage() {
     if (!publicUrl || !canFinish) return;
     const nextPassword = password.trim();
     const w = typeof window !== "undefined" ? (window as NativeWindow) : undefined;
-    if (w?.__COLEIRAPET_IOS_APP__ && w.ColeiraPetNativeNFC?.writePairingPassword) {
+    if (w?.__LYKA_IOS_APP__ && w.LykaNativeNFC?.writePairingPassword) {
       setIsWriting(true);
-      w.ColeiraPetNativeNFC.writePairingPassword(nextPassword, publicUrl);
+      w.LykaNativeNFC.writePairingPassword(nextPassword, publicUrl);
       return;
     }
-    document.cookie = `${NFC_PAIRED_COOKIE}=1; Path=/; Max-Age=${ONE_YEAR_IN_SECONDS}; SameSite=Lax`;
-    router.replace("/home");
+    setIsWriting(true);
+    fetch("/api/pets/current/nfc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(payload?.error ?? "Falha ao concluir pareamento NFC.");
+        }
+        router.replace("/home");
+        router.refresh();
+      })
+      .catch((error) => {
+        setPublicUrlError(error instanceof Error ? error.message : "Falha ao concluir pareamento NFC.");
+        setIsWriting(false);
+      });
   }
 
   return (

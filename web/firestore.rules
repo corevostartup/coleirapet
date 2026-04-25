@@ -9,44 +9,41 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // Documento Petes/{petId} — `resource` e o documento do pet
     function isPetOwner() {
       return isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Leitura do dono a partir de qualquer subcaminho sob o pet
     function isPetOwnerById(petId) {
       return isSignedIn() &&
         get(/databases/$(database)/documents/Pets/$(petId)).data.ownerId == request.auth.uid;
     }
 
-    // Perfil do tutor
+    // Perfil do tutor e toda arvore sob User/{uid} (ex.: vacinas legado em User/{uid}/vaccines)
     match /User/{uid} {
       allow read, write: if isOwner(uid);
+      match /{path=**} {
+        allow read, write: if isOwner(uid);
+      }
     }
 
-    // Pet principal e subcoleções privadas do tutor
+    // Pet e todas as subcolecoes: vacinas, vaccines (legado), activityMinutes,
+    // medicationReminders, finderMessages, nfcAccessLogs, etc.
     match /Pets/{petId} {
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow read, update, delete: if isPetOwner();
+      allow read, delete: if isPetOwner();
+      // Impede transferir o pet para outro dono
+      allow update: if isPetOwner() && request.resource.data.ownerId == request.auth.uid;
 
-      // Vacinas do pet
-      match /vacinas/{docId} {
-        allow read, write: if isPetOwnerById(petId);
-      }
-
-      // Mensagens recebidas de quem encontrou o pet
-      match /finderMessages/{docId} {
-        allow read, write: if isPetOwnerById(petId);
-      }
-
-      // Histórico de acessos/localizações via NFC
-      match /nfcAccessLogs/{docId} {
+      match /{path=**} {
         allow read, write: if isPetOwnerById(petId);
       }
     }
 
-    // Dados de veterinários: negar no cliente por padrão.
-    match /Veterinarians/{docId} {
-      allow read, write: if false;
+    // Documento de veterinario: acesso somente ao proprio UID
+    match /Veterinarians/{uid} {
+      allow read, write: if isOwner(uid);
     }
   }
 }

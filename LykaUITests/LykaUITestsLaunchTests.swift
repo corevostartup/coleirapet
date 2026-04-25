@@ -1,13 +1,13 @@
 //
-//  ColeiraPetUITestsLaunchTests.swift
-//  ColeiraPetUITests
+//  LykaUITestsLaunchTests.swift
+//  LykaUITests
 //
 //  Created by Cássio on 03/04/26.
 //
 
 import XCTest
 
-final class ColeiraPetUITestsLaunchTests: XCTestCase {
+final class LykaUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

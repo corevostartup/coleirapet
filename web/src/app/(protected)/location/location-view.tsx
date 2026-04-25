@@ -8,8 +8,6 @@ import { AppShell, TopBar } from "@/components/shell";
 import { IconCollar, IconMessages, IconPin, IconShield } from "@/components/icons";
 import { location, locationPageDevices } from "@/lib/mock";
 
-const NFC_PAIRED_COOKIE = "cp_nfc_paired";
-
 type FinderMessageItem = {
   id: string;
   body: string;
@@ -74,8 +72,8 @@ export function LocationView() {
   const [petLocation, setPetLocation] = useState<CurrentPetLocation>({
     lat: location.lat,
     lng: location.lng,
-    addressLabel: location.address,
-    lastUpdateLabel: location.lastUpdate,
+    addressLabel: "Nenhuma localizacao registrada",
+    lastUpdateLabel: "Aguardando compartilhamento de localizacao via NFC",
   });
   const disconnectedDevices = locationPageDevices.map((device) => ({
     ...device,
@@ -83,13 +81,6 @@ export function LocationView() {
   }));
 
   useEffect(() => setMounted(true), []);
-  useEffect(() => {
-    const hasPairedCookie = document.cookie
-      .split(";")
-      .some((item) => item.trim().startsWith(`${NFC_PAIRED_COOKIE}=1`));
-    setIsNfcPaired(hasPairedCookie);
-  }, []);
-
   useEffect(() => {
     if (locationHistory.length === 0) return;
     const pending = locationHistory.filter((item) => !item.address && typeof item.lat === "number" && typeof item.lng === "number");
@@ -150,15 +141,26 @@ export function LocationView() {
         if (!res.ok) return;
         const data = (await res.json()) as {
           pet?: {
+            nfcId?: string | null;
             lastNfcAccessLat?: number | null;
             lastNfcAccessLng?: number | null;
             lastNfcAccessAt?: string | null;
             lastNfcAccessAddress?: string | null;
           };
         };
+        if (!cancelled) setIsNfcPaired(Boolean(data.pet?.nfcId?.trim()));
         const lat = data.pet?.lastNfcAccessLat;
         const lng = data.pet?.lastNfcAccessLng;
-        if (typeof lat !== "number" || typeof lng !== "number") return;
+        if (typeof lat !== "number" || typeof lng !== "number") {
+          if (!cancelled) {
+            setPetLocation((prev) => ({
+              ...prev,
+              addressLabel: "Nenhuma localizacao registrada",
+              lastUpdateLabel: "Aguardando compartilhamento de localizacao via NFC",
+            }));
+          }
+          return;
+        }
         const label = data.pet?.lastNfcAccessAt
           ? `Ultimo acesso NFC: ${formatPtBrDateTime(data.pet.lastNfcAccessAt)}`
           : "Ultimo acesso NFC registrado";

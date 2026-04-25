@@ -21,16 +21,16 @@ type IosNativeBridge = {
 };
 
 type NativeGoogleSignInWindow = Window & {
-  __coleiraGoogleSignInToken?: ((idToken: string) => void) | null;
-  __coleiraGoogleSignInError?: ((message?: string) => void) | null;
+  __lykaGoogleSignInToken?: ((idToken: string) => void) | null;
+  __lykaGoogleSignInError?: ((message?: string) => void) | null;
 };
 
 declare global {
   interface Window {
-    ColeiraPetNativeAuth?: IosNativeBridge;
-    __COLEIRAPET_IOS_APP__?: boolean;
-    __coleiraGoogleSignInToken?: ((idToken: string) => void) | null;
-    __coleiraGoogleSignInError?: ((message?: string) => void) | null;
+    LykaNativeAuth?: IosNativeBridge;
+    __LYKA_IOS_APP__?: boolean;
+    __lykaGoogleSignInToken?: ((idToken: string) => void) | null;
+    __lykaGoogleSignInError?: ((message?: string) => void) | null;
   }
 }
 
@@ -56,32 +56,32 @@ const LOGIN_BG_STARS = [
 function nativeGoogleSignIn(): Promise<{ idToken: string }> {
   return new Promise((resolve, reject) => {
     const browserWindow = window as NativeGoogleSignInWindow;
-    const nativeBridge = browserWindow.ColeiraPetNativeAuth;
+    const nativeBridge = browserWindow.LykaNativeAuth;
     if (!nativeBridge?.startGoogleSignIn) {
       reject(new Error("Native handler not available"));
       return;
     }
 
     const onToken = (idToken: string) => {
-      browserWindow.__coleiraGoogleSignInToken = null;
-      browserWindow.__coleiraGoogleSignInError = null;
+      browserWindow.__lykaGoogleSignInToken = null;
+      browserWindow.__lykaGoogleSignInError = null;
       resolve({ idToken });
     };
 
     const onError = (message?: string) => {
-      browserWindow.__coleiraGoogleSignInToken = null;
-      browserWindow.__coleiraGoogleSignInError = null;
+      browserWindow.__lykaGoogleSignInToken = null;
+      browserWindow.__lykaGoogleSignInError = null;
       reject(new Error(message || "Login cancelado"));
     };
 
-    browserWindow.__coleiraGoogleSignInToken = onToken;
-    browserWindow.__coleiraGoogleSignInError = onError;
+    browserWindow.__lykaGoogleSignInToken = onToken;
+    browserWindow.__lykaGoogleSignInError = onError;
 
     try {
       nativeBridge.startGoogleSignIn();
     } catch (error) {
-      browserWindow.__coleiraGoogleSignInToken = null;
-      browserWindow.__coleiraGoogleSignInError = null;
+      browserWindow.__lykaGoogleSignInToken = null;
+      browserWindow.__lykaGoogleSignInError = null;
       reject(error instanceof Error ? error : new Error("Falha ao iniciar login Google nativo."));
     }
   });
@@ -136,7 +136,7 @@ export function LoginScreen() {
     try {
       let idToken: string;
 
-      if (window.__COLEIRAPET_IOS_APP__ && window.ColeiraPetNativeAuth?.startGoogleSignIn) {
+      if (window.__LYKA_IOS_APP__ && window.LykaNativeAuth?.startGoogleSignIn) {
         setOauthHint("Abrindo login Google nativo do iOS...");
         const result = await nativeGoogleSignIn();
         idToken = await signInWithGoogleNativeIdToken(result.idToken);
@@ -194,7 +194,7 @@ export function LoginScreen() {
           <div className="relative h-[190px] w-full overflow-hidden rounded-[22px] border border-white/40 bg-zinc-100/80">
             <Image
               src="/login-space-hero.png"
-              alt="Dog astronauta ColeiraPet"
+              alt="Dog astronauta Lyka"
               fill
               priority
               className="object-cover"

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 const slides = [
   {
-    title: "Smart Coleira ColeiraPet",
+    title: "Coleira inteligente Lyka",
     description: "Monitoramento continuo de atividade, sono e seguranca em tempo real.",
     image: "/img/coleira.png",
     ctaLabel: "Saiba mais",

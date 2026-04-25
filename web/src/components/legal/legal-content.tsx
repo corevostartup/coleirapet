@@ -5,7 +5,7 @@ export function LegalContent({ type }: { type: LegalDocType }) {
     return (
       <div className="space-y-3 text-[12px] leading-relaxed text-zinc-700">
         <p>
-          Esta Politica de Privacidade descreve como a ColeiraPet coleta, usa e protege os dados pessoais e dados de uso
+          Esta Politica de Privacidade descreve como a Lyka coleta, usa e protege os dados pessoais e dados de uso
           relacionados ao aplicativo e aos dispositivos conectados.
         </p>
         <section>
@@ -43,7 +43,7 @@ export function LegalContent({ type }: { type: LegalDocType }) {
   return (
     <div className="space-y-3 text-[12px] leading-relaxed text-zinc-700">
       <p>
-        Estes Termos de Uso regulam o acesso e utilizacao da plataforma ColeiraPet, incluindo aplicativo, funcionalidades
+        Estes Termos de Uso regulam o acesso e utilizacao da plataforma Lyka, incluindo aplicativo, funcionalidades
         web e integracoes com dispositivos.
       </p>
       <section>
@@ -61,7 +61,7 @@ export function LegalContent({ type }: { type: LegalDocType }) {
       <section>
         <h3 className="text-[13px] font-semibold text-zinc-900">3. Limitacoes</h3>
         <p className="mt-1">
-          A ColeiraPet nao substitui atendimento veterinario presencial e nao garante disponibilidade continua sem
+          A Lyka nao substitui atendimento veterinario presencial e nao garante disponibilidade continua sem
           interrupcoes.
         </p>
       </section>

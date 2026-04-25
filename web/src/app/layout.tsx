@@ -5,7 +5,7 @@ import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 
-export const metadata: Metadata = { title: "ColeiraPet" };
+export const metadata: Metadata = { title: "Lyka" };
 
 export const viewport: Viewport = {
   width: "device-width",

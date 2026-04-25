@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
-import { listOwnedPets, setCurrentPet } from "@/lib/pets/current";
+import { createOwnedPet, listOwnedPets, setCurrentPet } from "@/lib/pets/current";
 
 type SwitchPetPayload = {
   petId?: string;
@@ -43,4 +43,13 @@ export async function PATCH(request: Request) {
 
   const data = await listOwnedPets(auth.uid);
   return NextResponse.json({ ok: true, ...data });
+}
+
+export async function POST() {
+  const auth = await requireAuthContext();
+  if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+
+  await createOwnedPet(auth.uid);
+  const data = await listOwnedPets(auth.uid);
+  return NextResponse.json({ ok: true, ...data }, { status: 201 });
 }

@@ -1,9 +1,14 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { AUTH_SESSION_COOKIE, AUTH_USER_NAME_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
+import {
+  AUTH_SESSION_COOKIE,
+  AUTH_USER_NAME_COOKIE,
+  AUTH_USER_PHOTO_COOKIE,
+  AUTH_USER_UID_COOKIE,
+} from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserNameCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
-import { COLLECTION_USER } from "@/lib/firebase/collections";
-import { getFirebaseAdminDb } from "@/lib/firebase/admin";
+import { COLLECTION_PETS, COLLECTION_USER, COLLECTION_VETERINARIANS } from "@/lib/firebase/collections";
+import { getFirebaseAdminAuth, getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile, upsertCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
 
@@ -27,6 +32,35 @@ async function requireAuthContext() {
   const fallbackName = parseAuthUserNameCookie(jar.get(AUTH_USER_NAME_COOKIE)?.value);
   if (!session || !uid) return null;
   return { session, uid, fallbackName: fallbackName ?? undefined };
+}
+
+async function deleteCollectionTree(collectionRef: FirebaseFirestore.CollectionReference): Promise<void> {
+  const snapshot = await collectionRef.get();
+  for (const doc of snapshot.docs) {
+    await deleteDocTree(doc.ref);
+  }
+}
+
+async function deleteDocTree(docRef: FirebaseFirestore.DocumentReference): Promise<void> {
+  const subcollections = await docRef.listCollections();
+  for (const subcollection of subcollections) {
+    await deleteCollectionTree(subcollection);
+  }
+  await docRef.delete();
+}
+
+function clearAuthCookies(response: NextResponse) {
+  const cookieOptions = {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 0,
+  };
+  response.cookies.set(AUTH_SESSION_COOKIE, "", cookieOptions);
+  response.cookies.set(AUTH_USER_NAME_COOKIE, "", cookieOptions);
+  response.cookies.set(AUTH_USER_PHOTO_COOKIE, "", cookieOptions);
+  response.cookies.set(AUTH_USER_UID_COOKIE, "", cookieOptions);
 }
 
 function parseOptionalText(value: unknown, maxLength: number) {
@@ -143,4 +177,29 @@ export async function PATCH(request: Request) {
       : null;
 
   return NextResponse.json({ ok: true, user, veterinarian: toPublicVeterinarian(veterinarian) });
+}
+
+export async function DELETE() {
+  const auth = await requireAuthContext();
+  if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+
+  const db = getFirebaseAdminDb();
+  const petsSnapshot = await db.collection(COLLECTION_PETS).where("ownerId", "==", auth.uid).get();
+
+  for (const petDoc of petsSnapshot.docs) {
+    await deleteDocTree(petDoc.ref);
+  }
+
+  await db.collection(COLLECTION_VETERINARIANS).doc(auth.uid).delete().catch(() => null);
+  await db.collection(COLLECTION_USER).doc(auth.uid).delete().catch(() => null);
+
+  try {
+    await getFirebaseAdminAuth().deleteUser(auth.uid);
+  } catch {
+    // Ignora quando o UID nao existir mais no Firebase Auth.
+  }
+
+  const response = NextResponse.json({ ok: true });
+  clearAuthCookies(response);
+  return response;
 }

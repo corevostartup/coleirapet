@@ -3,7 +3,7 @@
 import { consumeGoogleRedirectResult, signInWithGoogleRedirectOnly } from "@/lib/firebase/client";
 import { useEffect, useState } from "react";
 
-const CALLBACK_SCHEME = process.env.NEXT_PUBLIC_IOS_AUTH_CALLBACK_SCHEME ?? "coleirapet";
+const CALLBACK_SCHEME = process.env.NEXT_PUBLIC_IOS_AUTH_CALLBACK_SCHEME ?? "lyka";
 const IOS_GOOGLE_REDIRECT_MARKER = "cp-ios-google-redirect-started-at";
 const IOS_GOOGLE_REDIRECT_TTL_MS = 10 * 60 * 1000;
 const IOS_GOOGLE_REDIRECT_GUARD_QUERY = "cpGoogleRedirect";

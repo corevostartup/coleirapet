@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-const STORAGE_KEY = "coleirapet-splash-seen";
+const STORAGE_KEY = "lyka-splash-seen";
 
 /** Posicoes fixas para evitar diferencas de hidratacao e manter estrelas espalhadas. */
 const STARS = [
@@ -116,7 +116,7 @@ export function SplashScreen() {
         <div className="relative aspect-square w-full">
           <Image
             src="/coleira-splash-logo.png"
-            alt="ColeiraPet"
+            alt="Lyka"
             fill
             className="object-contain drop-shadow-[0_12px_40px_rgba(34,197,94,0.18)]"
             priority

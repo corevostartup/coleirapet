@@ -1,13 +1,13 @@
 //
-//  ColeiraPetUITests.swift
-//  ColeiraPetUITests
+//  LykaUITests.swift
+//  LykaUITests
 //
 //  Created by Cássio on 03/04/26.
 //
 
 import XCTest
 
-final class ColeiraPetUITests: XCTestCase {
+final class LykaUITests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

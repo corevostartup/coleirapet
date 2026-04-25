@@ -8,11 +8,12 @@ import { ProductCarousel } from "@/components/product-carousel";
 import { IconCollar, IconStethoscope, IconWave } from "@/components/icons";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
-import { events, metrics, pet, weeklyActivity } from "@/lib/mock";
+import type { DocumentReference } from "firebase-admin/firestore";
+import { SUBCOLLECTION_ACTIVITY_MINUTES } from "@/lib/firebase/collections";
+import { fetchHomeUpcomingEvents } from "@/lib/home/upcoming-events";
+import { metrics, pet, weeklyActivity } from "@/lib/mock";
 import { getOrCreateCurrentPet } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
-
-const NFC_PAIRED_COOKIE = "cp_nfc_paired";
 
 function formatPtBrDateTime(iso: string | null | undefined) {
   if (!iso) return null;
@@ -31,12 +32,32 @@ function isCoordinateLikeAddress(value: string | null | undefined) {
   return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(value.trim());
 }
 
+type ActivityMinutesDoc = {
+  date?: string;
+  minutes?: number;
+};
+
+function buildFallbackWeeklyActivity() {
+  return weeklyActivity.map((item) => ({ ...item }));
+}
+
+function startOfDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function toIsoDate(value: Date) {
+  const yyyy = value.getFullYear();
+  const mm = String(value.getMonth() + 1).padStart(2, "0");
+  const dd = String(value.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default async function Home() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
-  const isNfcPaired = jar.get(NFC_PAIRED_COOKIE)?.value === "1";
   let currentUser = null;
   let currentPet = null;
+  let petRef: DocumentReference | null = null;
   if (uid) {
     try {
       currentUser = await getOrCreateCurrentUserProfile(uid);
@@ -45,11 +66,15 @@ export default async function Home() {
       currentUser = null;
     }
     try {
-      currentPet = (await getOrCreateCurrentPet(uid)).pet;
+      const result = await getOrCreateCurrentPet(uid);
+      currentPet = result.pet;
+      petRef = result.petRef;
     } catch {
       currentPet = null;
+      petRef = null;
     }
   }
+  const isNfcPaired = Boolean(currentPet?.nfcId);
   const isVet = currentUser?.userType === "vet";
   const cardPet = {
     image: currentPet?.image ?? pet.image,
@@ -72,17 +97,61 @@ export default async function Home() {
     ? `Ultimo acesso NFC: ${formatPtBrDateTime(currentPet?.lastNfcAccessAt) ?? "agora"} · Zona segura ativa`
     : "Aguardando compartilhamento de localizacao via NFC";
 
-  const maxActivity = Math.max(...weeklyActivity.map((item) => item.activeMinutes));
+  let weeklyActivityData = buildFallbackWeeklyActivity();
+  let upcomingEvents: Awaited<ReturnType<typeof fetchHomeUpcomingEvents>> = [];
+  if (uid && petRef) {
+    try {
+      const activitySnapshot = await petRef
+        .collection(SUBCOLLECTION_ACTIVITY_MINUTES)
+        .orderBy("date", "desc")
+        .limit(90)
+        .get();
+
+      const activityByDate = new Map<string, number>();
+      for (const doc of activitySnapshot.docs) {
+        const data = doc.data() as ActivityMinutesDoc;
+        const date = typeof data.date === "string" ? data.date : "";
+        const minutes = typeof data.minutes === "number" ? Math.max(0, Math.round(data.minutes)) : 0;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        if (activityByDate.has(date)) continue;
+        activityByDate.set(date, minutes);
+      }
+
+      const labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"] as const;
+      const today = startOfDay(new Date());
+      const last7Days: Array<{ day: string; activeMinutes: number; steps: number }> = [];
+      for (let offset = 6; offset >= 0; offset--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - offset);
+        const jsDay = date.getDay();
+        const label = labels[(jsDay + 6) % 7];
+        const isoDate = toIsoDate(date);
+        const activeMinutes = activityByDate.get(isoDate) ?? 0;
+        last7Days.push({ day: label, activeMinutes, steps: 0 });
+      }
+      weeklyActivityData = last7Days;
+    } catch {
+      // Em caso de falha, mantém visual e dados mock como fallback.
+      weeklyActivityData = buildFallbackWeeklyActivity();
+    }
+    try {
+      upcomingEvents = await fetchHomeUpcomingEvents(petRef);
+    } catch {
+      upcomingEvents = [];
+    }
+  }
+
+  const maxActivity = Math.max(...weeklyActivityData.map((item) => item.activeMinutes), 1);
   const avgActivity = Math.round(
-    weeklyActivity.reduce((total, item) => total + item.activeMinutes, 0) / weeklyActivity.length,
+    weeklyActivityData.reduce((total, item) => total + item.activeMinutes, 0) / weeklyActivityData.length,
   );
   const avgSteps = Math.round(
-    weeklyActivity.reduce((total, item) => total + item.steps, 0) / weeklyActivity.length,
+    weeklyActivityData.reduce((total, item) => total + item.steps, 0) / weeklyActivityData.length,
   );
 
   return (
     <AppShell tab="home">
-      <TopBar title="Monitoramento em tempo real" subtitle="ColeiraPet">
+      <TopBar title="Monitoramento em tempo real" subtitle="Lyka">
         {isVet ? (
           <Link
             href="/vet/pets"
@@ -112,7 +181,7 @@ export default async function Home() {
               </span>
             </div>
             <p className="mb-3 text-[12px] leading-snug text-zinc-700">
-              Pareie agora para liberar dados publicos e contato de emergencia na coleira — leva menos de um minuto.
+              Pareie agora para liberar dados publicos e contato de emergencia na coleira deste pet — leva menos de um minuto.
             </p>
             <NFCPairLink
               href="/tag-nfc/parear"
@@ -179,7 +248,7 @@ export default async function Home() {
           </div>
           <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3">
             <div className="grid grid-cols-7 items-end gap-2">
-              {weeklyActivity.map((item) => (
+              {weeklyActivityData.map((item) => (
                 <div key={item.day} className="flex flex-col items-center gap-1">
                   <span className="text-[10px] font-semibold text-zinc-500">{item.activeMinutes}</span>
                   <div
@@ -209,15 +278,21 @@ export default async function Home() {
         <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "360ms" }}>
           <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Proximos eventos</h3>
           <div className="space-y-2">
-            {events.map((item) => (
-              <article key={item.label} className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
-                <div className="flex items-center gap-2.5">
-                  <span className={`h-2.5 w-2.5 rounded-full ${item.kind === "warning" ? "bg-amber-500" : "bg-blue-500"}`} />
-                  <p className="text-[13px] font-medium text-zinc-800">{item.label}</p>
-                </div>
-                <p className="text-[11px] text-zinc-500">{item.when}</p>
-              </article>
-            ))}
+            {upcomingEvents.length === 0 ? (
+              <p className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[12px] text-zinc-500">
+                Nenhum evento pendente (vacinas pendentes ou lembretes de medicação).
+              </p>
+            ) : (
+              upcomingEvents.map((item) => (
+                <article key={item.id} className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`h-2.5 w-2.5 rounded-full ${item.kind === "warning" ? "bg-amber-500" : "bg-blue-500"}`} />
+                    <p className="text-[13px] font-medium text-zinc-800">{item.label}</p>
+                  </div>
+                  <p className="text-[11px] text-zinc-500">{item.when}</p>
+                </article>
+              ))
+            )}
           </div>
         </section>
     </AppShell>

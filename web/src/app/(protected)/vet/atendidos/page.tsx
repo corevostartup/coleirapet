@@ -8,7 +8,7 @@ const attendedPets = [
 
 export default function VetAtendidosPage() {
   return (
-    <VetShell tab="atendidos" title="Pets atendidos" subtitle="Historico medico">
+    <VetShell title="Pets atendidos" subtitle="Historico medico">
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
         <h3 className="text-[14px] font-semibold text-zinc-900">Atendimentos recentes</h3>
         <p className="mt-1 text-[12px] text-zinc-500">Resumo dos ultimos casos finalizados.</p>

@@ -16,37 +16,37 @@
 			containerPortal = DFE18E4C2F80525D0025D5B2 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = DFE18E532F80525D0025D5B2;
-			remoteInfo = ColeiraPet;
+			remoteInfo = Lyka;
 		};
 		DFE18E6F2F8052650025D5B2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = DFE18E4C2F80525D0025D5B2 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = DFE18E532F80525D0025D5B2;
-			remoteInfo = ColeiraPet;
+			remoteInfo = Lyka;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		DFE18E542F80525D0025D5B2 /* ColeiraPet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ColeiraPet.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		DFE18E642F8052650025D5B2 /* ColeiraPetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ColeiraPetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		DFE18E6E2F8052650025D5B2 /* ColeiraPetUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ColeiraPetUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DFE18E542F80525D0025D5B2 /* Lyka.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lyka.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DFE18E642F8052650025D5B2 /* LykaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LykaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DFE18E6E2F8052650025D5B2 /* LykaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LykaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		DFE18E562F80525D0025D5B2 /* ColeiraPet */ = {
+		DFE18E562F80525D0025D5B2 /* Lyka */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = ColeiraPet;
+			path = Lyka;
 			sourceTree = "<group>";
 		};
-		DFE18E672F8052650025D5B2 /* ColeiraPetTests */ = {
+		DFE18E672F8052650025D5B2 /* LykaTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = ColeiraPetTests;
+			path = LykaTests;
 			sourceTree = "<group>";
 		};
-		DFE18E712F8052650025D5B2 /* ColeiraPetUITests */ = {
+		DFE18E712F8052650025D5B2 /* LykaUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = ColeiraPetUITests;
+			path = LykaUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -80,9 +80,9 @@
 		DFE18E4B2F80525D0025D5B2 = {
 			isa = PBXGroup;
 			children = (
-				DFE18E562F80525D0025D5B2 /* ColeiraPet */,
-				DFE18E672F8052650025D5B2 /* ColeiraPetTests */,
-				DFE18E712F8052650025D5B2 /* ColeiraPetUITests */,
+				DFE18E562F80525D0025D5B2 /* Lyka */,
+				DFE18E672F8052650025D5B2 /* LykaTests */,
+				DFE18E712F8052650025D5B2 /* LykaUITests */,
 				DFE18E552F80525D0025D5B2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,9 +90,9 @@
 		DFE18E552F80525D0025D5B2 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				DFE18E542F80525D0025D5B2 /* ColeiraPet.app */,
-				DFE18E642F8052650025D5B2 /* ColeiraPetTests.xctest */,
-				DFE18E6E2F8052650025D5B2 /* ColeiraPetUITests.xctest */,
+				DFE18E542F80525D0025D5B2 /* Lyka.app */,
+				DFE18E642F8052650025D5B2 /* LykaTests.xctest */,
+				DFE18E6E2F8052650025D5B2 /* LykaUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -100,9 +100,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		DFE18E532F80525D0025D5B2 /* ColeiraPet */ = {
+		DFE18E532F80525D0025D5B2 /* Lyka */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = DFE18E782F8052650025D5B2 /* Build configuration list for PBXNativeTarget "ColeiraPet" */;
+			buildConfigurationList = DFE18E782F8052650025D5B2 /* Build configuration list for PBXNativeTarget "Lyka" */;
 			buildPhases = (
 				DFE18E502F80525D0025D5B2 /* Sources */,
 				DFE18E512F80525D0025D5B2 /* Frameworks */,
@@ -113,19 +113,19 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				DFE18E562F80525D0025D5B2 /* ColeiraPet */,
+				DFE18E562F80525D0025D5B2 /* Lyka */,
 			);
-			name = ColeiraPet;
+			name = Lyka;
 			packageProductDependencies = (
 				A1B2C3D52F8052650025D5B2 /* GoogleSignIn */,
 			);
-			productName = ColeiraPet;
-			productReference = DFE18E542F80525D0025D5B2 /* ColeiraPet.app */;
+			productName = Lyka;
+			productReference = DFE18E542F80525D0025D5B2 /* Lyka.app */;
 			productType = "com.apple.product-type.application";
 		};
-		DFE18E632F8052650025D5B2 /* ColeiraPetTests */ = {
+		DFE18E632F8052650025D5B2 /* LykaTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = DFE18E7B2F8052650025D5B2 /* Build configuration list for PBXNativeTarget "ColeiraPetTests" */;
+			buildConfigurationList = DFE18E7B2F8052650025D5B2 /* Build configuration list for PBXNativeTarget "LykaTests" */;
 			buildPhases = (
 				DFE18E602F8052650025D5B2 /* Sources */,
 				DFE18E612F8052650025D5B2 /* Frameworks */,
@@ -137,18 +137,18 @@
 				DFE18E662F8052650025D5B2 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				DFE18E672F8052650025D5B2 /* ColeiraPetTests */,
+				DFE18E672F8052650025D5B2 /* LykaTests */,
 			);
-			name = ColeiraPetTests;
+			name = LykaTests;
 			packageProductDependencies = (
 			);
-			productName = ColeiraPetTests;
-			productReference = DFE18E642F8052650025D5B2 /* ColeiraPetTests.xctest */;
+			productName = LykaTests;
+			productReference = DFE18E642F8052650025D5B2 /* LykaTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		DFE18E6D2F8052650025D5B2 /* ColeiraPetUITests */ = {
+		DFE18E6D2F8052650025D5B2 /* LykaUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = DFE18E7E2F8052650025D5B2 /* Build configuration list for PBXNativeTarget "ColeiraPetUITests" */;
+			buildConfigurationList = DFE18E7E2F8052650025D5B2 /* Build configuration list for PBXNativeTarget "LykaUITests" */;
 			buildPhases = (
 				DFE18E6A2F8052650025D5B2 /* Sources */,
 				DFE18E6B2F8052650025D5B2 /* Frameworks */,
@@ -160,13 +160,13 @@
 				DFE18E702F8052650025D5B2 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				DFE18E712F8052650025D5B2 /* ColeiraPetUITests */,
+				DFE18E712F8052650025D5B2 /* LykaUITests */,
 			);
-			name = ColeiraPetUITests;
+			name = LykaUITests;
 			packageProductDependencies = (
 			);
-			productName = ColeiraPetUITests;
-			productReference = DFE18E6E2F8052650025D5B2 /* ColeiraPetUITests.xctest */;
+			productName = LykaUITests;
+			productReference = DFE18E6E2F8052650025D5B2 /* LykaUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -192,7 +192,7 @@
 					};
 				};
 			};
-			buildConfigurationList = DFE18E4F2F80525D0025D5B2 /* Build configuration list for PBXProject "ColeiraPet" */;
+			buildConfigurationList = DFE18E4F2F80525D0025D5B2 /* Build configuration list for PBXProject "Lyka" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -209,9 +209,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				DFE18E532F80525D0025D5B2 /* ColeiraPet */,
-				DFE18E632F8052650025D5B2 /* ColeiraPetTests */,
-				DFE18E6D2F8052650025D5B2 /* ColeiraPetUITests */,
+				DFE18E532F80525D0025D5B2 /* Lyka */,
+				DFE18E632F8052650025D5B2 /* LykaTests */,
+				DFE18E6D2F8052650025D5B2 /* LykaUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -267,12 +267,12 @@
 /* Begin PBXTargetDependency section */
 		DFE18E662F8052650025D5B2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = DFE18E532F80525D0025D5B2 /* ColeiraPet */;
+			target = DFE18E532F80525D0025D5B2 /* Lyka */;
 			targetProxy = DFE18E652F8052650025D5B2 /* PBXContainerItemProxy */;
 		};
 		DFE18E702F8052650025D5B2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = DFE18E532F80525D0025D5B2 /* ColeiraPet */;
+			target = DFE18E532F80525D0025D5B2 /* Lyka */;
 			targetProxy = DFE18E6F2F8052650025D5B2 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -402,10 +402,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = ColeiraPet/ColeiraPet.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Lyka/Lyka.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"ColeiraPet/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Lyka/Preview Content\"";
 				DEVELOPMENT_TEAM = 4Y6MWV9B36;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -428,10 +428,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = ColeiraPet/ColeiraPet.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Lyka/Lyka.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"ColeiraPet/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Lyka/Preview Content\"";
 				DEVELOPMENT_TEAM = 4Y6MWV9B36;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -464,7 +464,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ColeiraPet.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ColeiraPet";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Lyka.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Lyka";
 			};
 			name = Debug;
 		};
@@ -483,7 +483,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ColeiraPet.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ColeiraPet";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Lyka.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Lyka";
 			};
 			name = Release;
 		};
@@ -500,7 +500,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = ColeiraPet;
+				TEST_TARGET_NAME = Lyka;
 			};
 			name = Debug;
 		};
@@ -517,14 +517,14 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = ColeiraPet;
+				TEST_TARGET_NAME = Lyka;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		DFE18E4F2F80525D0025D5B2 /* Build configuration list for PBXProject "ColeiraPet" */ = {
+		DFE18E4F2F80525D0025D5B2 /* Build configuration list for PBXProject "Lyka" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				DFE18E762F8052650025D5B2 /* Debug */,
@@ -533,7 +533,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		DFE18E782F8052650025D5B2 /* Build configuration list for PBXNativeTarget "ColeiraPet" */ = {
+		DFE18E782F8052650025D5B2 /* Build configuration list for PBXNativeTarget "Lyka" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				DFE18E792F8052650025D5B2 /* Debug */,
@@ -542,7 +542,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		DFE18E7B2F8052650025D5B2 /* Build configuration list for PBXNativeTarget "ColeiraPetTests" */ = {
+		DFE18E7B2F8052650025D5B2 /* Build configuration list for PBXNativeTarget "LykaTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				DFE18E7C2F8052650025D5B2 /* Debug */,
@@ -551,7 +551,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		DFE18E7E2F8052650025D5B2 /* Build configuration list for PBXNativeTarget "ColeiraPetUITests" */ = {
+		DFE18E7E2F8052650025D5B2 /* Build configuration list for PBXNativeTarget "LykaUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				DFE18E7F2F8052650025D5B2 /* Debug */,

@@ -1,9 +1,32 @@
 import Image from "next/image";
+import Link from "next/link";
+import { cookies } from "next/headers";
 import { AppShell, TopBar } from "@/components/shell";
+import { HealthActivityMinutesPanel } from "@/components/health-activity-minutes-panel";
 import { IconHeart, IconMoon, IconTemp, IconWave } from "@/components/icons";
-import { heartTrend, metrics } from "@/lib/mock";
+import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
+import { parseAuthUserUidCookie } from "@/lib/auth/session";
+import { heartTrend, metrics, pet } from "@/lib/mock";
+import { getOrCreateCurrentPet, type PetProfile } from "@/lib/pets/current";
+import { getPetImageOrDefault } from "@/lib/pets/image";
 
-export default function HealthPage() {
+export default async function HealthPage() {
+  const jar = await cookies();
+  const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
+  let currentPet: PetProfile | null = null;
+  if (uid) {
+    try {
+      currentPet = (await getOrCreateCurrentPet(uid)).pet;
+    } catch {
+      currentPet = null;
+    }
+  }
+  const petName =
+    typeof currentPet?.name === "string" && currentPet.name.trim().length > 0
+      ? currentPet.name.trim()
+      : pet.name;
+  const petImageSrc = getPetImageOrDefault(currentPet?.image ?? pet.image);
+
   const maxBpm = Math.max(...heartTrend.map((item) => item.bpm));
   const avgBpm = Math.round(heartTrend.reduce((sum, item) => sum + item.bpm, 0) / heartTrend.length);
   const minBpm = Math.min(...heartTrend.map((item) => item.bpm));
@@ -11,7 +34,19 @@ export default function HealthPage() {
 
   return (
     <AppShell tab="health">
-      <TopBar title="Saude da Luna" subtitle="Dados em tempo real" />
+      <TopBar
+        title={`Saude de ${petName}`}
+        subtitle="Dados em tempo real"
+        action={
+          <Link
+            href="/profile"
+            className="relative flex h-11 w-11 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100"
+            aria-label="Perfil do pet"
+          >
+            <Image src={petImageSrc} alt={`Foto de ${petName}`} fill className="object-cover" sizes="44px" />
+          </Link>
+        }
+      />
 
       <section className="appear-up mt-3 grid grid-cols-2 gap-2.5" style={{ animationDelay: "80ms" }}>
         {metrics.map((item) => (
@@ -68,14 +103,14 @@ export default function HealthPage() {
             <div className="relative h-[150px] overflow-hidden rounded-2xl border border-zinc-200">
               <Image
                 src="/img/coleira.png"
-                alt="Coleira inteligente"
+                alt="Dispositivo inteligente Lyka"
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 50vw, 220px"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
               <div className="absolute bottom-2 left-2 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur">
-                Coleira Inteligente Ativa
+                Lyka ativa
               </div>
             </div>
           </article>
@@ -97,6 +132,8 @@ export default function HealthPage() {
           </article>
         </div>
       </section>
+
+      <HealthActivityMinutesPanel />
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "200ms" }}>
         <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Resumo clinico</h3>
