@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { getImgBbServerApiKey } from "@/lib/imgbb/server-api-key";
+import { getOrCreateCurrentPet, invalidateCurrentPetCache } from "@/lib/pets/current";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 
 const MAX_UPLOAD_SIZE_BYTES = 32 * 1024 * 1024;
@@ -16,9 +17,11 @@ async function requireAuthContext() {
 }
 
 async function uploadToImgBb(file: File) {
-  const apiKey = process.env.IMGBB_API_KEY;
+  const apiKey = getImgBbServerApiKey();
   if (!apiKey) {
-    throw new Error("IMGBB_API_KEY nao configurada no servidor.");
+    throw new Error(
+      "ImgBB nao configurado: defina IMGBB_API_KEY no .env.local (desenvolvimento) ou nas variaveis de ambiente do hospedeiro (producao). Veja web/.env.example.",
+    );
   }
 
   const bytes = await file.arrayBuffer();
@@ -34,6 +37,8 @@ async function uploadToImgBb(file: File) {
   const payload = (await response.json().catch(() => null)) as
     | {
         success?: boolean;
+        status?: number;
+        error?: { message?: string };
         data?: {
           url?: string;
           delete_url?: string;
@@ -42,7 +47,11 @@ async function uploadToImgBb(file: File) {
     | null;
 
   if (!response.ok || !payload?.success || !payload?.data?.url) {
-    throw new Error("Falha ao enviar imagem para o ImgBB.");
+    const hint =
+      typeof payload?.error?.message === "string" && payload.error.message.trim()
+        ? ` (${payload.error.message.trim()})`
+        : "";
+    throw new Error(`Falha ao enviar imagem para o ImgBB.${hint}`);
   }
 
   return {
@@ -79,15 +88,13 @@ export async function POST(request: Request) {
       },
       { merge: true },
     );
+    invalidateCurrentPetCache(auth.uid);
 
     return NextResponse.json({ ok: true, image: getPetImageOrDefault(uploaded.url) });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Falha ao processar upload da imagem.",
-      },
-      { status: 500 },
-    );
+    const message = error instanceof Error ? error.message : "Falha ao processar upload da imagem.";
+    const status = message.includes("ImgBB nao configurado") ? 503 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
@@ -103,6 +110,7 @@ export async function DELETE() {
     },
     { merge: true },
   );
+  invalidateCurrentPetCache(auth.uid);
 
   return NextResponse.json({ ok: true, image: getPetImageOrDefault("") });
 }

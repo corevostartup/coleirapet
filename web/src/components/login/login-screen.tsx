@@ -1,7 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { consumeGoogleRedirectResult, signInWithGoogleNativeIdToken, signInWithGoogleOnWeb } from "@/lib/firebase/client";
+import {
+  createAccountWithEmailPassword,
+  consumeGoogleRedirectResult,
+  signInWithAppleNativeIdToken,
+  signInWithAppleOnWeb,
+  signInWithEmailPassword,
+  signInWithGoogleNativeIdToken,
+  signInWithGoogleOnWeb,
+} from "@/lib/firebase/client";
 import { LegalContent } from "@/components/legal/legal-content";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -18,11 +26,14 @@ function formatAuthErrorMessage(payload: { error?: string; detail?: string } | n
 
 type IosNativeBridge = {
   startGoogleSignIn: () => void;
+  startAppleSignIn: () => void;
 };
 
 type NativeGoogleSignInWindow = Window & {
   __lykaGoogleSignInToken?: ((idToken: string) => void) | null;
   __lykaGoogleSignInError?: ((message?: string) => void) | null;
+  __lykaAppleSignInToken?: ((idToken: string) => void) | null;
+  __lykaAppleSignInError?: ((message?: string) => void) | null;
 };
 
 declare global {
@@ -31,6 +42,8 @@ declare global {
     __LYKA_IOS_APP__?: boolean;
     __lykaGoogleSignInToken?: ((idToken: string) => void) | null;
     __lykaGoogleSignInError?: ((message?: string) => void) | null;
+    __lykaAppleSignInToken?: ((idToken: string) => void) | null;
+    __lykaAppleSignInError?: ((message?: string) => void) | null;
   }
 }
 
@@ -87,11 +100,48 @@ function nativeGoogleSignIn(): Promise<{ idToken: string }> {
   });
 }
 
+function nativeAppleSignIn(): Promise<{ idToken: string }> {
+  return new Promise((resolve, reject) => {
+    const browserWindow = window as NativeGoogleSignInWindow;
+    const nativeBridge = browserWindow.LykaNativeAuth;
+    if (!nativeBridge?.startAppleSignIn) {
+      reject(new Error("Native handler not available"));
+      return;
+    }
+
+    const onToken = (idToken: string) => {
+      browserWindow.__lykaAppleSignInToken = null;
+      browserWindow.__lykaAppleSignInError = null;
+      resolve({ idToken });
+    };
+
+    const onError = (message?: string) => {
+      browserWindow.__lykaAppleSignInToken = null;
+      browserWindow.__lykaAppleSignInError = null;
+      reject(new Error(message || "Login cancelado"));
+    };
+
+    browserWindow.__lykaAppleSignInToken = onToken;
+    browserWindow.__lykaAppleSignInError = onError;
+
+    try {
+      nativeBridge.startAppleSignIn();
+    } catch (error) {
+      browserWindow.__lykaAppleSignInToken = null;
+      browserWindow.__lykaAppleSignInError = null;
+      reject(error instanceof Error ? error : new Error("Falha ao iniciar login Apple nativo."));
+    }
+  });
+}
+
 export function LoginScreen() {
   const router = useRouter();
   const [googleBusy, setGoogleBusy] = useState(false);
   const [oauthHint, setOauthHint] = useState<string | null>(null);
   const [legalDocOpen, setLegalDocOpen] = useState<"privacy" | "terms" | null>(null);
+  const [showEmailAuth, setShowEmailAuth] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -128,7 +178,7 @@ export function LoginScreen() {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- montagem única; incluir `router` pode repetir o efeito em dev (loop de refresh)
 
   async function enterGoogle() {
     setOauthHint(null);
@@ -170,6 +220,80 @@ export function LoginScreen() {
     }
   }
 
+  async function enterApple() {
+    setOauthHint(null);
+    setGoogleBusy(true);
+    try {
+      let idToken: string;
+
+      if (window.__LYKA_IOS_APP__ && window.LykaNativeAuth?.startAppleSignIn) {
+        setOauthHint("Abrindo login Apple nativo do iOS...");
+        const result = await nativeAppleSignIn();
+        idToken = await signInWithAppleNativeIdToken(result.idToken);
+      } else {
+        idToken = await signInWithAppleOnWeb();
+      }
+
+      const res = await fetch("/api/auth/firebase/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, provider: "apple" }),
+      });
+
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
+        setOauthHint(formatAuthErrorMessage(payload));
+        setGoogleBusy(false);
+        return;
+      }
+
+      router.replace("/home");
+      router.refresh();
+    } catch (error) {
+      setOauthHint(error instanceof Error ? error.message : "Erro ao autenticar com Apple.");
+      setGoogleBusy(false);
+    }
+  }
+
+  async function enterWithEmail(mode: "login" | "create") {
+    setOauthHint(null);
+    setGoogleBusy(true);
+    try {
+      if (!email.trim() || !password.trim()) {
+        setOauthHint("Informe email e senha.");
+        setGoogleBusy(false);
+        return;
+      }
+      if (password.trim().length < 6) {
+        setOauthHint("A senha precisa ter pelo menos 6 caracteres.");
+        setGoogleBusy(false);
+        return;
+      }
+
+      const idToken =
+        mode === "create" ? await createAccountWithEmailPassword(email, password) : await signInWithEmailPassword(email, password);
+
+      const res = await fetch("/api/auth/firebase/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, provider: "email" }),
+      });
+
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
+        setOauthHint(formatAuthErrorMessage(payload));
+        setGoogleBusy(false);
+        return;
+      }
+
+      router.replace("/home");
+      router.refresh();
+    } catch (error) {
+      setOauthHint(error instanceof Error ? error.message : "Erro ao autenticar com email.");
+      setGoogleBusy(false);
+    }
+  }
+
   return (
     <main className="ios-safe-top relative flex min-h-screen flex-col overflow-hidden bg-black px-3 py-10 pb-16 sm:px-6">
       <div className="splash-nebula pointer-events-none absolute inset-[-20%] opacity-70" />
@@ -207,27 +331,96 @@ export function LoginScreen() {
           className="appear-up mt-4 rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
           style={{ animationDelay: "80ms" }}
         >
-          <div className="space-y-2.5">
-            <button
-              type="button"
-              onClick={() => setOauthHint("Login com Apple em breve.")}
-              className="flex h-[52px] w-full items-center justify-center rounded-2xl bg-black text-[15px] font-semibold text-white transition hover:bg-zinc-900 active:scale-[0.99]"
-              aria-label="Entrar com Apple"
-            >
-              Entrar com Apple
-            </button>
+          {showEmailAuth ? (
+            <div className="space-y-2.5">
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={googleBusy}
+                autoComplete="email"
+                placeholder="Email"
+                className="h-[52px] w-full rounded-2xl border border-zinc-200 bg-white px-4 text-[14px] text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 disabled:opacity-70"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                disabled={googleBusy}
+                autoComplete="current-password"
+                placeholder="Senha"
+                className="h-[52px] w-full rounded-2xl border border-zinc-200 bg-white px-4 text-[14px] text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 disabled:opacity-70"
+              />
+              <button
+                type="button"
+                onClick={() => void enterWithEmail("login")}
+                disabled={googleBusy}
+                className="flex h-[52px] w-full items-center justify-center rounded-2xl bg-black text-[15px] font-semibold text-white transition hover:bg-zinc-900 active:scale-[0.99] disabled:opacity-70"
+                aria-label="Entrar com Email"
+              >
+                {googleBusy ? "Entrando..." : "Entrar com Email"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void enterWithEmail("create")}
+                disabled={googleBusy}
+                className="flex h-[52px] w-full items-center justify-center rounded-2xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-800 shadow-sm transition enabled:hover:bg-zinc-50 active:scale-[0.99] disabled:opacity-70"
+                aria-label="Criar conta com Email"
+              >
+                {googleBusy ? "Criando conta..." : "Criar conta"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOauthHint(null);
+                  setEmail("");
+                  setPassword("");
+                  setShowEmailAuth(false);
+                }}
+                disabled={googleBusy}
+                className="mx-auto mt-1 block text-[12px] font-medium text-zinc-500 underline decoration-zinc-300 underline-offset-2 transition enabled:hover:text-zinc-700 disabled:opacity-60"
+                aria-label="Voltar para login social"
+              >
+                Voltar
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={enterApple}
+                disabled={googleBusy}
+                className="flex h-[52px] w-full items-center justify-center rounded-2xl bg-black text-[15px] font-semibold text-white transition hover:bg-zinc-900 active:scale-[0.99]"
+                aria-label="Entrar com Apple"
+              >
+                {googleBusy ? "Entrando..." : "Entrar com Apple"}
+              </button>
 
-            <button
-              type="button"
-              onClick={enterGoogle}
-              disabled={googleBusy}
-              className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-800 shadow-sm transition enabled:hover:bg-zinc-50 active:scale-[0.99] disabled:opacity-70"
-              aria-label="Entrar com Google"
-            >
-              <GoogleSignInGlyph className="h-[22px] w-[22px] shrink-0" />
-              {googleBusy ? "Entrando com Google..." : "Entrar com Google"}
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={enterGoogle}
+                disabled={googleBusy}
+                className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-800 shadow-sm transition enabled:hover:bg-zinc-50 active:scale-[0.99] disabled:opacity-70"
+                aria-label="Entrar com Google"
+              >
+                <GoogleSignInGlyph className="h-[22px] w-[22px] shrink-0" />
+                {googleBusy ? "Entrando com Google..." : "Entrar com Google"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setOauthHint(null);
+                  setShowEmailAuth(true);
+                }}
+                disabled={googleBusy}
+                className="flex h-[52px] w-full items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 text-[15px] font-semibold text-zinc-800 transition enabled:hover:bg-zinc-100 active:scale-[0.99] disabled:opacity-70"
+                aria-label="Entrar com Email"
+              >
+                Entrar com Email
+              </button>
+            </div>
+          )}
 
           {oauthHint ? (
             <p className="mt-3 text-center text-[12px] font-medium text-zinc-600" role="status">

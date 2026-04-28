@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 
 type Props = {
@@ -85,6 +85,33 @@ export function ProfilePetDetailsEditor({
   const [isEditing, setIsEditing] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [identityCopied, setIdentityCopied] = useState(false);
+  const identityCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const canCopyPetIdentity =
+    Boolean(petIdentity?.trim()) && petIdentity.trim() !== "Nao disponivel";
+
+  useEffect(() => {
+    return () => {
+      if (identityCopyTimerRef.current) clearTimeout(identityCopyTimerRef.current);
+    };
+  }, []);
+
+  async function copyPetIdentity() {
+    if (!canCopyPetIdentity) return;
+    const text = petIdentity.trim();
+    try {
+      await navigator.clipboard.writeText(text);
+      setIdentityCopied(true);
+      if (identityCopyTimerRef.current) clearTimeout(identityCopyTimerRef.current);
+      identityCopyTimerRef.current = setTimeout(() => {
+        setIdentityCopied(false);
+        identityCopyTimerRef.current = null;
+      }, 1600);
+    } catch {
+      /* clipboard pode falhar em contexto inseguro */
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -188,7 +215,25 @@ export function ProfilePetDetailsEditor({
         <section className="grid grid-cols-2 gap-2.5">
           <article className="elev-card col-span-2 rounded-2xl p-3.5">
             <p className="text-[11px] uppercase tracking-wide text-zinc-500">Identidade do pet</p>
-            <p className="mt-1.5 text-[16px] font-semibold tracking-[0.08em] text-zinc-900">{petIdentity}</p>
+            <button
+              type="button"
+              onClick={() => void copyPetIdentity()}
+              disabled={!canCopyPetIdentity}
+              title={canCopyPetIdentity ? "Toque para copiar o ID" : undefined}
+              className={`mt-1.5 w-full rounded-xl px-1 py-1 text-left transition outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/80 focus-visible:ring-offset-2 ${
+                canCopyPetIdentity
+                  ? "cursor-pointer active:bg-zinc-100/80 hover:bg-zinc-50"
+                  : "cursor-default opacity-80"
+              } disabled:cursor-not-allowed`}
+            >
+              <span
+                className={`block text-[16px] font-semibold tracking-[0.08em] ${
+                  identityCopied ? "text-emerald-600" : "text-zinc-900"
+                }`}
+              >
+                {identityCopied ? "Copiado" : petIdentity}
+              </span>
+            </button>
           </article>
           <article className="elev-card rounded-2xl p-3.5">
             <p className="text-[11px] uppercase tracking-wide text-zinc-500">Idade</p>

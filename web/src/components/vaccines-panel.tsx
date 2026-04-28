@@ -23,10 +23,15 @@ type CreateVaccineResponse = {
   vaccine: VaccineItem;
 };
 
+type UpdateVaccineStatusResponse = {
+  vaccine: VaccineItem;
+};
+
 export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: string }) {
   const [vaccines, setVaccines] = useState<VaccineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -129,6 +134,34 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
     }
   }
 
+  async function handleToggleStatus(vaccine: VaccineItem) {
+    const confirmed = window.confirm("deseja trocar status");
+    if (!confirmed) return;
+    setError(null);
+    setTogglingId(vaccine.id);
+    try {
+      const nextStatus: VaccineStatus = vaccine.status === "applied" ? "pending" : "applied";
+      const res = await fetch("/api/vaccines", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: vaccine.id, status: nextStatus }),
+      });
+
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Falha ao trocar status da vacina.");
+      }
+
+      const payload = (await res.json()) as UpdateVaccineStatusResponse;
+      const updated = payload.vaccine;
+      setVaccines((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao trocar status da vacina.");
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
   return (
     <section
       className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
@@ -162,7 +195,12 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
       ) : (
         <div className="mt-3 space-y-2">
           {vaccines.map((vaccine) => (
-            <VaccineCard key={vaccine.id} vaccine={vaccine} />
+            <VaccineCard
+              key={vaccine.id}
+              vaccine={vaccine}
+              onToggleStatus={() => handleToggleStatus(vaccine)}
+              toggling={togglingId === vaccine.id}
+            />
           ))}
         </div>
       )}
@@ -181,19 +219,19 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                 className="absolute inset-0 cursor-default"
                 onClick={() => !saving && closeModal()}
               />
-              <section className="relative z-[1] mx-auto w-[min(420px,calc(100vw-1.5rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <div>
+              <section className="relative z-[1] mx-auto w-[min(420px,calc(100vw-1rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-3 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)] sm:p-4">
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <div className="min-w-0 flex-1 pr-0 sm:pr-2">
                     <h3 id="vaccine-modal-title" className="text-[15px] font-semibold text-zinc-900">
                       Nova vacina
                     </h3>
-                    <p className="mt-1 text-[12px] text-zinc-600">Cadastre nome, status e data da vacina.</p>
+                    <p className="mt-1 text-[12px] leading-snug text-zinc-600">Cadastre nome, status e data da vacina.</p>
                   </div>
                   <button
                     type="button"
                     disabled={saving}
                     onClick={closeModal}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50"
+                    className="flex h-9 w-9 shrink-0 self-end items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50 sm:self-start"
                     aria-label="Fechar"
                   >
                     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -202,8 +240,8 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                   </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="grid gap-3">
-                  <div>
+                <form onSubmit={handleSubmit} className="grid min-w-0 gap-3">
+                  <div className="min-w-0">
                     <label htmlFor="vaccine-name" className="text-[12px] font-semibold text-zinc-700">
                       Nome da vacina
                     </label>
@@ -212,15 +250,15 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                       placeholder="Nome da vacina"
-                      className="mt-2 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                      className="mt-2 box-border w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
                       required
                       minLength={2}
                       maxLength={80}
                       autoFocus
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
+                    <div className="min-w-0">
                       <label htmlFor="vaccine-status" className="text-[12px] font-semibold text-zinc-700">
                         Status
                       </label>
@@ -228,13 +266,13 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                         id="vaccine-status"
                         value={status}
                         onChange={(event) => setStatus(event.target.value as VaccineStatus)}
-                        className="mt-2 h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                        className="mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:px-3"
                       >
                         <option value="pending">Pendente</option>
                         <option value="applied">Aplicada</option>
                       </select>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label htmlFor="vaccine-date" className="text-[12px] font-semibold text-zinc-700">
                         Data
                       </label>
@@ -243,7 +281,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                         type="date"
                         value={date}
                         onChange={(event) => setDate(event.target.value)}
-                        className="mt-2 h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                        className="mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:px-3"
                         required
                       />
                     </div>
@@ -276,18 +314,30 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
   );
 }
 
-function VaccineCard({ vaccine }: { vaccine: VaccineItem }) {
+function VaccineCard({
+  vaccine,
+  onToggleStatus,
+  toggling,
+}: {
+  vaccine: VaccineItem;
+  onToggleStatus: () => void;
+  toggling: boolean;
+}) {
   return (
     <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
       <div className="flex items-center justify-between">
         <p className="text-[12px] font-medium text-zinc-800">{vaccine.name}</p>
-        <span
+        <button
+          type="button"
+          onClick={onToggleStatus}
+          disabled={toggling}
+          title="Trocar status da vacina"
           className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
             vaccine.status === "applied" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-          }`}
+          } disabled:opacity-60`}
         >
-          {vaccine.stateLabel}
-        </span>
+          {toggling ? "Alterando..." : vaccine.stateLabel}
+        </button>
       </div>
       <p className="mt-0.5 text-[11px] text-zinc-500">Data: {vaccine.dateLabel}</p>
     </article>

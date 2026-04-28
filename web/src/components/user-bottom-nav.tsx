@@ -18,6 +18,7 @@ function resolveTab(pathname: string): Tab {
 export function UserBottomNav() {
   const pathname = usePathname() ?? "";
   if (pathname.startsWith("/vet")) return null;
+  if (pathname.startsWith("/lyka-admin-x7k9m2p4q8r1")) return null;
 
   const tab = resolveTab(pathname);
   const items = [
@@ -38,7 +39,7 @@ export function UserBottomNav() {
           const active = tab === item.key;
           return (
             <li key={item.key}>
-              <Link href={item.href} className={`block w-full rounded-[16px] px-1 py-2 text-center ${active ? "bg-emerald-50 text-emerald-700" : "text-zinc-500"}`}>
+              <Link prefetch href={item.href} className={`block w-full rounded-[16px] px-1 py-2 text-center ${active ? "bg-emerald-50 text-emerald-700" : "text-zinc-500"}`}>
                 <item.Icon className="mx-auto h-[18px] w-[18px]" />
                 <span className="mt-1 block text-[10px] font-medium">{item.label}</span>
               </Link>

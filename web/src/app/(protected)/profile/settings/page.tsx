@@ -92,6 +92,7 @@ export default function ProfileSettingsPage() {
       <section className="appear-up mt-5" style={{ animationDelay: "160ms" }}>
         <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Aplicativo</h2>
         <div className="space-y-2">
+          <SettingsRow href="/profile/settings?option=language" label="Linguagem" description="Selecionar idioma do app" />
           <SettingsRow href="/profile/settings/about" label="Sobre o app" description="Versao e informacoes" />
         </div>
       </section>

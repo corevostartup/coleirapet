@@ -2,6 +2,7 @@ import { COLLECTION_USER } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 
 type UserType = "Tutor" | "vet";
+type UserPlan = "free" | "pro";
 
 type UserDoc = {
   uid?: string;
@@ -15,6 +16,7 @@ type UserDoc = {
   phone?: string;
   birthDate?: string;
   userType?: UserType;
+  plan?: UserPlan;
 };
 
 export type UserProfile = {
@@ -25,7 +27,40 @@ export type UserProfile = {
   phone: string;
   birthDate: string;
   userType: UserType;
+  plan: UserPlan;
 };
+
+const CURRENT_USER_CACHE_TTL_MS = 45_000;
+const currentUserProfileCache = new Map<string, { expiresAt: number; value: UserProfile }>();
+
+function cloneUserProfile(profile: UserProfile): UserProfile {
+  return { ...profile };
+}
+
+function readCachedUserProfile(uid: string): UserProfile | null {
+  const hit = currentUserProfileCache.get(uid);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    currentUserProfileCache.delete(uid);
+    return null;
+  }
+  return cloneUserProfile(hit.value);
+}
+
+function writeCachedUserProfile(uid: string, profile: UserProfile) {
+  currentUserProfileCache.set(uid, {
+    expiresAt: Date.now() + CURRENT_USER_CACHE_TTL_MS,
+    value: cloneUserProfile(profile),
+  });
+}
+
+export function invalidateCurrentUserProfileCache(uid?: string) {
+  if (uid) {
+    currentUserProfileCache.delete(uid);
+    return;
+  }
+  currentUserProfileCache.clear();
+}
 
 function parseText(value: unknown, fallback = "") {
   if (typeof value !== "string") return fallback;
@@ -39,6 +74,12 @@ function parseUserType(value: unknown): UserType {
   return normalized === "vet" ? "vet" : "Tutor";
 }
 
+function parseUserPlan(value: unknown): UserPlan {
+  if (typeof value !== "string") return "free";
+  const normalized = value.trim().toLowerCase();
+  return normalized === "pro" ? "pro" : "free";
+}
+
 function toUserProfile(uid: string, data: UserDoc): UserProfile {
   const createdAt = parseText(data.createdAt) || parseText(data.CreatedAt) || new Date().toISOString();
   return {
@@ -49,6 +90,7 @@ function toUserProfile(uid: string, data: UserDoc): UserProfile {
     phone: parseText(data.phone),
     birthDate: parseText(data.birthDate),
     userType: parseUserType(data.userType),
+    plan: parseUserPlan(data.plan),
   };
 }
 
@@ -58,6 +100,9 @@ type EnsureUserOptions = {
 };
 
 export async function getOrCreateCurrentUserProfile(uid: string, options?: EnsureUserOptions): Promise<UserProfile> {
+  const cached = readCachedUserProfile(uid);
+  if (cached) return cached;
+
   const db = getFirebaseAdminDb();
   const userRef = db.collection(COLLECTION_USER).doc(uid);
   const userSnap = await userRef.get();
@@ -76,9 +121,12 @@ export async function getOrCreateCurrentUserProfile(uid: string, options?: Ensur
       phone: "",
       birthDate: "",
       userType: "Tutor",
+      plan: "free",
     };
     await userRef.set(created, { merge: true });
-    return toUserProfile(uid, created);
+    const next = toUserProfile(uid, created);
+    writeCachedUserProfile(uid, next);
+    return next;
   }
 
   const raw = (userSnap.data() ?? {}) as UserDoc;
@@ -103,10 +151,16 @@ export async function getOrCreateCurrentUserProfile(uid: string, options?: Ensur
   if (!parseText(raw.name) && parseText(options?.fallbackName)) patch.name = parseText(options?.fallbackName);
   if (!parseText(raw.email) && parseText(options?.fallbackEmail)) patch.email = parseText(options?.fallbackEmail);
   const normalizedType = parseUserType(raw.userType);
+  const normalizedPlan = parseUserPlan(raw.plan);
   if (!parseText(raw.userType)) {
     patch.userType = "Tutor";
   } else if (raw.userType !== normalizedType) {
     patch.userType = normalizedType;
+  }
+  if (!parseText(raw.plan)) {
+    patch.plan = "free";
+  } else if (raw.plan !== normalizedPlan) {
+    patch.plan = normalizedPlan;
   }
 
   if (Object.keys(patch).length > 0) {
@@ -114,5 +168,7 @@ export async function getOrCreateCurrentUserProfile(uid: string, options?: Ensur
     await userRef.set(patch, { merge: true });
   }
 
-  return toUserProfile(uid, { ...raw, ...patch });
+  const next = toUserProfile(uid, { ...raw, ...patch });
+  writeCachedUserProfile(uid, next);
+  return next;
 }

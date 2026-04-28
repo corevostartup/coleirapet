@@ -5,7 +5,7 @@ import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants"
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_PETS } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { getOrCreateCurrentPet, invalidateCurrentPetCache } from "@/lib/pets/current";
 
 type PairPayload = {
   nfcId?: string;
@@ -71,6 +71,7 @@ export async function POST(request: Request) {
 
   const nowIso = new Date().toISOString();
   await petRef.set({ nfcId: chosenNfcId, nfcPairedAt: nowIso, updatedAt: nowIso }, { merge: true });
+  invalidateCurrentPetCache(auth.uid);
 
   return NextResponse.json({ ok: true, nfcId: chosenNfcId, nfcPairedAt: nowIso });
 }

@@ -6,9 +6,38 @@
 //
 
 import CoreNFC
+import AuthenticationServices
 import GoogleSignIn
 import SwiftUI
 import WebKit
+
+private final class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private weak var anchorWindow: ASPresentationAnchor?
+    private let completion: (Result<String, Error>) -> Void
+
+    init(anchorWindow: ASPresentationAnchor, completion: @escaping (Result<String, Error>) -> Void) {
+        self.anchorWindow = anchorWindow
+        self.completion = completion
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = credential.identityToken,
+              let idToken = String(data: tokenData, encoding: .utf8) else {
+            completion(.failure(NSError(domain: "AppleSignIn", code: -1, userInfo: [NSLocalizedDescriptionKey: "Token nao disponivel"])))
+            return
+        }
+        completion(.success(idToken))
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        completion(.failure(error))
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        anchorWindow ?? ASPresentationAnchor()
+    }
+}
 
 struct WebView: UIViewRepresentable {
     let url: URL
@@ -49,6 +78,9 @@ struct WebView: UIViewRepresentable {
             window.LykaNativeAuth = {
                 startGoogleSignIn: () => {
                     window.webkit.messageHandlers.lykaNativeAuth.postMessage({ action: 'googleSignIn' });
+                },
+                startAppleSignIn: () => {
+                    window.webkit.messageHandlers.lykaNativeAuth.postMessage({ action: 'appleSignIn' });
                 }
             };
             window.LykaNativeNFC = {
@@ -95,6 +127,7 @@ struct WebView: UIViewRepresentable {
         private var nfcSession: NFCNDEFReaderSession?
         private var nfcPairingMode: NFCPairingMode?
         private var didHandleNfcSessionResult = false
+        private var appleSignInDelegate: AppleSignInDelegate?
 
         private enum NFCPairingMode {
             case scanToPair
@@ -119,18 +152,26 @@ struct WebView: UIViewRepresentable {
         private func handleAuthMessage(_ message: WKScriptMessage) {
             guard
                 let body = message.body as? [String: Any],
-                let action = body["action"] as? String,
-                action == "googleSignIn"
+                let action = body["action"] as? String
             else {
                 return
             }
 
-            guard let clientId = googleClientIdFromFirebasePlist() else {
-                sendNativeGoogleSignInError("CLIENT_ID ausente em GoogleService-Info.plist.")
-                return
-            }
-            Task { @MainActor in
-                await startNativeGoogleSignIn(clientId: clientId)
+            switch action {
+            case "googleSignIn":
+                guard let clientId = googleClientIdFromFirebasePlist() else {
+                    sendNativeGoogleSignInError("CLIENT_ID ausente em GoogleService-Info.plist.")
+                    return
+                }
+                Task { @MainActor in
+                    await startNativeGoogleSignIn(clientId: clientId)
+                }
+            case "appleSignIn":
+                Task { @MainActor in
+                    await startNativeAppleSignIn()
+                }
+            default:
+                break
             }
         }
 
@@ -214,6 +255,48 @@ struct WebView: UIViewRepresentable {
             }
         }
 
+        @MainActor
+        private func startNativeAppleSignIn() async {
+            guard let webView else { return }
+            guard
+                let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first
+            else {
+                sendNativeAppleSignInError("Janela indisponivel para login Apple.")
+                return
+            }
+
+            let provider = ASAuthorizationAppleIDProvider()
+            let request = provider.createRequest()
+            request.requestedScopes = [.fullName, .email]
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            let delegate = AppleSignInDelegate(anchorWindow: window) { [weak self, weak webView] result in
+                self?.appleSignInDelegate = nil
+                guard let webView else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self, weak webView] in
+                    guard let webView else { return }
+                    switch result {
+                    case .success(let idToken):
+                        self?.sendNativeAppleSignInToken(idToken, to: webView)
+                    case .failure(let error):
+                        let nsError = error as NSError
+                        let message: String
+                        if nsError.domain == ASAuthorizationError.errorDomain,
+                           nsError.code == ASAuthorizationError.canceled.rawValue {
+                            message = "Login cancelado"
+                        } else {
+                            message = error.localizedDescription
+                        }
+                        self?.sendNativeAppleSignInError(message)
+                    }
+                }
+            }
+            appleSignInDelegate = delegate
+            controller.delegate = delegate
+            controller.presentationContextProvider = delegate
+            controller.performRequests()
+        }
+
         private func sendNativeGoogleSignInToken(_ idToken: String, to webView: WKWebView) {
             let escaped = escapeForJavaScriptLiteral(idToken)
             let script = "if(typeof window.__lykaGoogleSignInToken==='function'){window.__lykaGoogleSignInToken('\(escaped)');}"
@@ -224,6 +307,19 @@ struct WebView: UIViewRepresentable {
             guard let webView else { return }
             let escaped = escapeForJavaScriptLiteral(message)
             let script = "if(typeof window.__lykaGoogleSignInError==='function'){window.__lykaGoogleSignInError('\(escaped)');}"
+            webView.evaluateJavaScript(script)
+        }
+
+        private func sendNativeAppleSignInToken(_ idToken: String, to webView: WKWebView) {
+            let escaped = escapeForJavaScriptLiteral(idToken)
+            let script = "(function(){if(typeof window.__lykaAppleSignInToken==='function'){window.__lykaAppleSignInToken('\(escaped)');}return 1;})()"
+            webView.evaluateJavaScript(script)
+        }
+
+        private func sendNativeAppleSignInError(_ message: String) {
+            guard let webView else { return }
+            let escaped = escapeForJavaScriptLiteral(message)
+            let script = "(function(){if(typeof window.__lykaAppleSignInError==='function'){window.__lykaAppleSignInError('\(escaped)');}return 1;})()"
             webView.evaluateJavaScript(script)
         }
 

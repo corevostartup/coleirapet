@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { getOrCreateCurrentPet, invalidateCurrentPetCache } from "@/lib/pets/current";
 
 type UpdateCurrentPetPayload = {
   name?: string;
@@ -157,6 +157,7 @@ export async function PATCH(request: Request) {
   updates.publicFields = nextPublicFields;
 
   await petRef.set(updates, { merge: true });
+  invalidateCurrentPetCache(auth.uid);
   const refreshed = await petRef.get();
   return NextResponse.json({
     ok: true,

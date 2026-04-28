@@ -2,13 +2,13 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IconWave } from "@/components/icons";
+import { HealthWeightSevenDayChart } from "@/components/health-weight-seven-day-chart";
 
 type Entry = {
   id: string;
   date: string;
   dateLabel: string;
-  minutes: number;
+  weightKg: number;
 };
 
 function todayIso() {
@@ -19,7 +19,11 @@ function todayIso() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export function HealthActivityMinutesPanel() {
+function formatKgKg(value: number) {
+  return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg`;
+}
+
+export function HealthWeightPanel() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,17 +32,14 @@ export function HealthActivityMinutesPanel() {
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [date, setDate] = useState(todayIso());
-  const [minutes, setMinutes] = useState<number>(30);
+  const [weightKg, setWeightKg] = useState<string>("5,0");
   const [editingId, setEditingId] = useState<string | null>(null);
   const savingRef = useRef(saving);
   useEffect(() => {
     savingRef.current = saving;
   }, [saving]);
 
-  const avgMinutes = useMemo(() => {
-    if (!entries.length) return 0;
-    return Math.round(entries.reduce((sum, item) => sum + item.minutes, 0) / entries.length);
-  }, [entries]);
+  const latestWeight = useMemo(() => (entries.length ? entries[0]?.weightKg ?? null : null), [entries]);
 
   useEffect(() => {
     setMounted(true);
@@ -51,15 +52,15 @@ export function HealthActivityMinutesPanel() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/pets/activity-minutes");
+        const res = await fetch("/api/pets/weight-entries");
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(payload?.error ?? "Falha ao carregar minutos ativos.");
+          throw new Error(payload?.error ?? "Falha ao carregar registros de peso.");
         }
         const data = (await res.json()) as { entries?: Entry[] };
         if (!cancelled) setEntries(data.entries ?? []);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Falha ao carregar minutos ativos.");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Falha ao carregar registros de peso.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -89,11 +90,19 @@ export function HealthActivityMinutesPanel() {
     return () => window.removeEventListener("keydown", onKey);
   }, [modalOpen]);
 
+  function parseWeightInput(raw: string): number | null {
+    const normalized = raw.replace(",", ".").trim();
+    if (!normalized) return null;
+    const n = Number.parseFloat(normalized);
+    if (!Number.isFinite(n) || n <= 0 || n > 500) return null;
+    return n;
+  }
+
   function openModalNew() {
     setModalError(null);
     setEditingId(null);
     setDate(todayIso());
-    setMinutes(30);
+    setWeightKg("");
     setModalOpen(true);
   }
 
@@ -101,7 +110,7 @@ export function HealthActivityMinutesPanel() {
     setModalError(null);
     setEditingId(entry.id);
     setDate(entry.date);
-    setMinutes(entry.minutes);
+    setWeightKg(String(entry.weightKg).replace(".", ","));
     setModalOpen(true);
   }
 
@@ -114,18 +123,21 @@ export function HealthActivityMinutesPanel() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!date) return;
+    const parsed = parseWeightInput(weightKg);
+    if (parsed == null) {
+      setModalError("Informe um peso valido em kg (ex.: 12,5).");
+      return;
+    }
     setSaving(true);
     setModalError(null);
     try {
-      const res = await fetch("/api/pets/activity-minutes", {
+      const res = await fetch("/api/pets/weight-entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, minutes }),
+        body: JSON.stringify({ date, weightKg: parsed }),
       });
-      const payload = (await res.json().catch(() => null)) as
-        | { error?: string; entry?: Entry }
-        | null;
-      if (!res.ok) throw new Error(payload?.error ?? "Falha ao salvar minutos ativos.");
+      const payload = (await res.json().catch(() => null)) as { error?: string; entry?: Entry } | null;
+      if (!res.ok) throw new Error(payload?.error ?? "Falha ao salvar peso.");
       const entry = payload?.entry;
       if (entry) {
         setEntries((prev) => {
@@ -135,7 +147,7 @@ export function HealthActivityMinutesPanel() {
       }
       closeModal();
     } catch (err) {
-      setModalError(err instanceof Error ? err.message : "Falha ao salvar minutos ativos.");
+      setModalError(err instanceof Error ? err.message : "Falha ao salvar peso.");
     } finally {
       setSaving(false);
     }
@@ -143,28 +155,41 @@ export function HealthActivityMinutesPanel() {
 
   return (
     <section
-      className="appear-up mt-3 min-w-0 overflow-x-clip rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
-      style={{ animationDelay: "155ms" }}
+      className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
+      style={{ animationDelay: "162ms" }}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Minutos ativos por dia</h3>
-          <p className="mt-0.5 text-[12px] text-zinc-500">Media: {avgMinutes} min/dia</p>
+          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Peso</h3>
+          <p className="mt-0.5 text-[12px] text-zinc-500">
+            {latestWeight != null ? `Ultimo: ${formatKgKg(latestWeight)}` : "Registre o peso do pet por data."}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={openModalNew}
-            aria-label="Adicionar registro de minutos"
+            aria-label="Adicionar registro de peso"
             className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200/90 bg-zinc-50/80 text-zinc-500 transition hover:border-zinc-300 hover:bg-white hover:text-zinc-800 active:scale-[0.97]"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
               <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
-          <IconWave className="h-5 w-5 text-zinc-600" aria-hidden />
+          <span className="flex h-9 w-9 items-center justify-center text-zinc-600" aria-hidden>
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v18" />
+              <path d="M5 10h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z" />
+            </svg>
+          </span>
         </div>
       </div>
+
+      {!loading ? (
+        <HealthWeightSevenDayChart
+          entries={entries.map((e) => ({ date: e.date, weightKg: e.weightKg }))}
+        />
+      ) : null}
 
       {error ? <p className="mt-1 text-[12px] font-medium text-red-600">{error}</p> : null}
 
@@ -177,11 +202,7 @@ export function HealthActivityMinutesPanel() {
       ) : (
         <div className="mt-3 space-y-2">
           {entries.slice(0, 7).map((item) => (
-            <ActivityMinutesCard
-              key={item.id}
-              item={item}
-              onEdit={() => openModalEdit(item)}
-            />
+            <WeightEntryCard key={item.id} item={item} onEdit={() => openModalEdit(item)} />
           ))}
         </div>
       )}
@@ -189,10 +210,10 @@ export function HealthActivityMinutesPanel() {
       {mounted && modalOpen
         ? createPortal(
             <div
-              className="fixed inset-0 z-[3000] flex min-h-[100dvh] items-center justify-center overflow-x-hidden bg-black/40 px-2 py-6 pb-28 sm:px-6"
+              className="fixed inset-0 z-[3000] flex min-h-[100dvh] items-center justify-center bg-black/40 px-3 py-6 pb-28 sm:px-6"
               role="dialog"
               aria-modal="true"
-              aria-labelledby="activity-minutes-modal-title"
+              aria-labelledby="weight-modal-title"
             >
               <button
                 type="button"
@@ -200,14 +221,14 @@ export function HealthActivityMinutesPanel() {
                 className="absolute inset-0 cursor-default"
                 onClick={() => !saving && closeModal()}
               />
-              <section className="relative z-[1] mx-auto min-w-0 w-[min(420px,calc(100vw-1rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-3 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)] sm:p-4">
+              <section className="relative z-[1] mx-auto w-[min(420px,calc(100vw-1rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-3 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)] sm:p-4">
                 <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <div className="min-w-0 flex-1 pr-0 sm:pr-2">
-                    <h3 id="activity-minutes-modal-title" className="text-[15px] font-semibold text-zinc-900">
-                      {editingId ? "Atualizar minutos" : "Novo registro"}
+                    <h3 id="weight-modal-title" className="text-[15px] font-semibold text-zinc-900">
+                      {editingId ? "Alterar peso" : "Novo registro de peso"}
                     </h3>
                     <p className="mt-1 text-[12px] leading-snug text-zinc-600">
-                      Registre quantos minutos seu pet se manteve ativo no dia.
+                      O campo data ja vem com a data de hoje; altere somente se o registro for de outro dia.
                     </p>
                   </div>
                   <button
@@ -223,14 +244,14 @@ export function HealthActivityMinutesPanel() {
                   </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="grid min-w-0 gap-3">
-                  <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
+                <form onSubmit={handleSubmit} className="grid gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
                     <div className="min-w-0">
-                      <label htmlFor="act-minutes-date" className="text-[12px] font-semibold text-zinc-700">
+                      <label htmlFor="weight-date" className="text-[12px] font-semibold text-zinc-700">
                         Data
                       </label>
                       <input
-                        id="act-minutes-date"
+                        id="weight-date"
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
@@ -240,18 +261,17 @@ export function HealthActivityMinutesPanel() {
                       />
                     </div>
                     <div className="min-w-0">
-                      <label htmlFor="act-minutes-value" className="text-[12px] font-semibold text-zinc-700">
-                        Minutos
+                      <label htmlFor="weight-value" className="text-[12px] font-semibold text-zinc-700">
+                        Peso (kg)
                       </label>
                       <input
-                        id="act-minutes-value"
-                        type="number"
-                        min={0}
-                        max={1440}
-                        step={1}
-                        value={minutes}
-                        onChange={(e) => setMinutes(Number(e.target.value))}
-                        className="no-number-spinner mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] tabular-nums text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:px-3"
+                        id="weight-value"
+                        type="text"
+                        inputMode="decimal"
+                        value={weightKg}
+                        onChange={(e) => setWeightKg(e.target.value)}
+                        placeholder="Ex: 12,5"
+                        className="mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:px-3"
                         required
                       />
                     </div>
@@ -263,7 +283,7 @@ export function HealthActivityMinutesPanel() {
                     disabled={saving}
                     className="mt-1 w-full rounded-2xl bg-emerald-600 px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
                   >
-                    {saving ? "Salvando..." : "Salvar minutos"}
+                    {saving ? "Salvando..." : editingId ? "Salvar alteracoes" : "Salvar peso"}
                   </button>
                   <button
                     type="button"
@@ -283,12 +303,12 @@ export function HealthActivityMinutesPanel() {
   );
 }
 
-function ActivityMinutesCard({ item, onEdit }: { item: Entry; onEdit: () => void }) {
+function WeightEntryCard({ item, onEdit }: { item: Entry; onEdit: () => void }) {
   return (
     <article className="flex items-center justify-between gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
       <div className="min-w-0">
         <p className="text-[12px] font-medium text-zinc-800">{item.dateLabel}</p>
-        <p className="mt-0.5 text-[12px] font-semibold text-zinc-900">{item.minutes} min</p>
+        <p className="mt-0.5 text-[12px] font-semibold text-zinc-900">{formatKgKg(item.weightKg)}</p>
       </div>
       <button
         type="button"

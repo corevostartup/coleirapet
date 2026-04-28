@@ -29,7 +29,7 @@ service cloud.firestore {
     }
 
     // Pet e todas as subcolecoes: vacinas, vaccines (legado), activityMinutes,
-    // medicationReminders, finderMessages, nfcAccessLogs, etc.
+    // weightEntries, medicationReminders, finderMessages, nfcAccessLogs, etc.
     match /Pets/{petId} {
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow read, delete: if isPetOwner();

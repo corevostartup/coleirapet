@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { createOwnedPet, listOwnedPets, setCurrentPet } from "@/lib/pets/current";
+import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 type SwitchPetPayload = {
   petId?: string;
@@ -48,6 +49,17 @@ export async function PATCH(request: Request) {
 export async function POST() {
   const auth = await requireAuthContext();
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+
+  const user = await getOrCreateCurrentUserProfile(auth.uid);
+  if (user.plan !== "pro") {
+    return NextResponse.json(
+      {
+        error: "Plano Free permite apenas 1 pet. Assine o Premium para liberar pets ilimitados.",
+        requiresUpgrade: true,
+      },
+      { status: 403 },
+    );
+  }
 
   await createOwnedPet(auth.uid);
   const data = await listOwnedPets(auth.uid);

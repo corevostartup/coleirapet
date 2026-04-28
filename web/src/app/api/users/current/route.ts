@@ -9,7 +9,8 @@ import {
 import { parseAuthSessionCookie, parseAuthUserNameCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_PETS, COLLECTION_USER, COLLECTION_VETERINARIANS } from "@/lib/firebase/collections";
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
+import { invalidateCurrentPetCache } from "@/lib/pets/current";
+import { getOrCreateCurrentUserProfile, invalidateCurrentUserProfileCache } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile, upsertCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
 
 type UpdateCurrentUserPayload = {
@@ -18,6 +19,7 @@ type UpdateCurrentUserPayload = {
   phone?: string;
   birthDate?: string;
   userType?: "Tutor" | "vet";
+  plan?: "free" | "pro";
   veterinarian?: {
     crmv?: string;
     specialty?: string;
@@ -91,6 +93,13 @@ function parseUserType(value: unknown) {
   return null;
 }
 
+function parsePlan(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === "free") return "free";
+  if (value === "pro") return "pro";
+  return null;
+}
+
 function parseVetPayload(value: unknown) {
   if (value === undefined) return { crmv: undefined, specialty: undefined, bio: undefined } as const;
   const data = (value ?? {}) as { crmv?: unknown; specialty?: unknown; bio?: unknown };
@@ -136,6 +145,7 @@ export async function PATCH(request: Request) {
   const phone = parseOptionalText(body.phone, 30);
   const birthDate = parseBirthDate(body.birthDate);
   const userType = parseUserType(body.userType);
+  const plan = parsePlan(body.plan);
   const vet = parseVetPayload(body.veterinarian);
 
   if (name === null) return NextResponse.json({ error: "Nome invalido" }, { status: 400 });
@@ -143,6 +153,7 @@ export async function PATCH(request: Request) {
   if (phone === null) return NextResponse.json({ error: "Telefone invalido" }, { status: 400 });
   if (birthDate === null) return NextResponse.json({ error: "Data de nascimento invalida" }, { status: 400 });
   if (userType === null) return NextResponse.json({ error: "Tipo de usuario invalido" }, { status: 400 });
+  if (plan === null) return NextResponse.json({ error: "Plano invalido" }, { status: 400 });
   if (vet.crmv === null) return NextResponse.json({ error: "CRMV invalido" }, { status: 400 });
   if (vet.specialty === null) return NextResponse.json({ error: "Especialidade invalida" }, { status: 400 });
   if (vet.bio === null) return NextResponse.json({ error: "Bio invalida" }, { status: 400 });
@@ -160,10 +171,12 @@ export async function PATCH(request: Request) {
   if (phone !== undefined) updates.phone = phone;
   if (birthDate !== undefined) updates.birthDate = birthDate;
   if (userType !== undefined) updates.userType = userType;
+  if (plan !== undefined) updates.plan = plan;
 
   const db = getFirebaseAdminDb();
   const ref = db.collection(COLLECTION_USER).doc(auth.uid);
   await ref.set(updates, { merge: true });
+  invalidateCurrentUserProfileCache(auth.uid);
 
   const user = await getOrCreateCurrentUserProfile(auth.uid, { fallbackName: auth.fallbackName });
   const nextType = userType ?? user.userType;
@@ -192,6 +205,8 @@ export async function DELETE() {
 
   await db.collection(COLLECTION_VETERINARIANS).doc(auth.uid).delete().catch(() => null);
   await db.collection(COLLECTION_USER).doc(auth.uid).delete().catch(() => null);
+  invalidateCurrentUserProfileCache(auth.uid);
+  invalidateCurrentPetCache(auth.uid);
 
   try {
     await getFirebaseAdminAuth().deleteUser(auth.uid);

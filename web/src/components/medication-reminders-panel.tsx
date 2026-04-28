@@ -24,6 +24,7 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
   const [dose, setDose] = useState("");
   const [time, setTime] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -76,12 +77,26 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
 
   function openModal() {
     setModalError(null);
+    setEditingId(null);
+    setName("");
+    setDose("");
+    setTime("");
+    setModalOpen(true);
+  }
+
+  function openModalEdit(item: ReminderItem) {
+    setModalError(null);
+    setEditingId(item.id);
+    setName(item.name);
+    setDose(item.dose);
+    setTime(item.time);
     setModalOpen(true);
   }
 
   function closeModal() {
     setModalOpen(false);
     setModalError(null);
+    setEditingId(null);
     setName("");
     setDose("");
     setTime("");
@@ -92,20 +107,27 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
     setSaving(true);
     setModalError(null);
     try {
+      const isEdit = Boolean(editingId);
       const res = await fetch("/api/pets/medication-reminders", {
-        method: "POST",
+        method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, dose, time }),
+        body: JSON.stringify(isEdit ? { id: editingId, name, dose, time } : { name, dose, time }),
       });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(payload?.error ?? "Falha ao cadastrar lembrete.");
+        throw new Error(payload?.error ?? (isEdit ? "Falha ao atualizar lembrete." : "Falha ao cadastrar lembrete."));
       }
       const payload = (await res.json()) as { reminder: ReminderItem };
-      setReminders((prev) => [payload.reminder, ...prev]);
+      if (isEdit) {
+        setReminders((prev) =>
+          prev.map((r) => (r.id === payload.reminder.id ? payload.reminder : r)),
+        );
+      } else {
+        setReminders((prev) => [payload.reminder, ...prev]);
+      }
       closeModal();
     } catch (err) {
-      setModalError(err instanceof Error ? err.message : "Falha ao cadastrar lembrete.");
+      setModalError(err instanceof Error ? err.message : "Falha ao salvar lembrete.");
     } finally {
       setSaving(false);
     }
@@ -141,12 +163,21 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
       ) : (
         <div className="mt-3 space-y-2">
           {reminders.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[12px] font-semibold text-zinc-800">{item.name}</p>
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">{item.timeLabel}</span>
+            <article key={item.id} className="flex items-center justify-between gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-[12px] font-semibold text-zinc-800">{item.name}</p>
+                  <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">{item.timeLabel}</span>
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-600">Dose: {item.dose}</p>
               </div>
-              <p className="mt-1 text-[11px] text-zinc-600">Dose: {item.dose}</p>
+              <button
+                type="button"
+                onClick={() => openModalEdit(item)}
+                className="shrink-0 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Editar
+              </button>
             </article>
           ))}
         </div>
@@ -166,19 +197,23 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
                 className="absolute inset-0 cursor-default"
                 onClick={() => !saving && closeModal()}
               />
-              <section className="relative z-[1] mx-auto w-[min(420px,calc(100vw-1.5rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <div>
+              <section className="relative z-[1] mx-auto w-[min(420px,calc(100vw-1rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-3 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)] sm:p-4">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="min-w-0 flex-1 pr-0 sm:pr-2">
                 <h3 id="medication-modal-title" className="text-[15px] font-semibold text-zinc-900">
-                  Novo lembrete
+                  {editingId ? "Editar lembrete" : "Novo lembrete"}
                 </h3>
-                <p className="mt-1 text-[12px] text-zinc-600">Cadastre medicacao, dose e horario do lembrete.</p>
+                <p className="mt-1 text-[12px] leading-snug text-zinc-600">
+                  {editingId
+                    ? "Altere medicacao, dose ou horario e salve."
+                    : "Cadastre medicacao, dose e horario do lembrete."}
+                </p>
               </div>
               <button
                 type="button"
                 disabled={saving}
                 onClick={closeModal}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50"
+                className="flex h-9 w-9 shrink-0 self-end items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50 sm:self-start"
                 aria-label="Fechar"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -187,8 +222,8 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
               </button>
             </div>
 
-            <form onSubmit={onSubmit} className="grid gap-3">
-              <div>
+            <form onSubmit={onSubmit} className="grid min-w-0 gap-3">
+              <div className="min-w-0">
                 <label htmlFor="med-reminder-name" className="text-[12px] font-semibold text-zinc-700">
                   Medicacao
                 </label>
@@ -197,40 +232,42 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Nome da medicacao"
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                  className="mt-2 box-border w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
                   required
                   minLength={2}
                   maxLength={80}
-                  autoFocus
+                  autoFocus={!editingId}
                 />
               </div>
-              <div>
-                <label htmlFor="med-reminder-dose" className="text-[12px] font-semibold text-zinc-700">
-                  Dose
-                </label>
-                <input
-                  id="med-reminder-dose"
-                  value={dose}
-                  onChange={(e) => setDose(e.target.value)}
-                  placeholder="Ex.: 1 comprimido"
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
-                  required
-                  minLength={2}
-                  maxLength={80}
-                />
-              </div>
-              <div>
-                <label htmlFor="med-reminder-time" className="text-[12px] font-semibold text-zinc-700">
-                  Horario
-                </label>
-                <input
-                  id="med-reminder-time"
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
-                  required
-                />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
+                <div className="min-w-0">
+                  <label htmlFor="med-reminder-dose" className="text-[12px] font-semibold text-zinc-700">
+                    Dose
+                  </label>
+                  <input
+                    id="med-reminder-dose"
+                    value={dose}
+                    onChange={(e) => setDose(e.target.value)}
+                    placeholder="Ex.: 1 comprimido"
+                    className="mt-2 box-border w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                    required
+                    minLength={2}
+                    maxLength={80}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <label htmlFor="med-reminder-time" className="text-[12px] font-semibold text-zinc-700">
+                    Horario
+                  </label>
+                  <input
+                    id="med-reminder-time"
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:px-3"
+                    required
+                  />
+                </div>
               </div>
 
               {modalError ? <p className="text-[11px] font-medium text-rose-600">{modalError}</p> : null}
@@ -240,7 +277,7 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
                 disabled={saving}
                 className="mt-1 w-full rounded-2xl bg-emerald-600 px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
               >
-                {saving ? "Salvando..." : "Salvar lembrete"}
+                {saving ? "Salvando..." : editingId ? "Salvar alteracoes" : "Salvar lembrete"}
               </button>
               <button
                 type="button"

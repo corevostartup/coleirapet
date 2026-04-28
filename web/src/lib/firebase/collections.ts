@@ -12,6 +12,9 @@ export const SUBCOLLECTION_NFC_ACCESS_LOGS = "nfcAccessLogs";
 /** Subcoleção em `Pets/{petId}`: minutos ativos cadastrados por dia. */
 export const SUBCOLLECTION_ACTIVITY_MINUTES = "activityMinutes";
 
+/** Subcoleção em `Pets/{petId}`: registros de peso por data (doc id = YYYY-MM-DD). */
+export const SUBCOLLECTION_WEIGHT_ENTRIES = "weightEntries";
+
 /** Subcoleção em `Pets/{petId}`: lembretes de medicação. */
 export const SUBCOLLECTION_MEDICATION_REMINDERS = "medicationReminders";
 

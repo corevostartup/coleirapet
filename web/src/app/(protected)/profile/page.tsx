@@ -15,6 +15,8 @@ import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
 import { devices, pet } from "@/lib/mock";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProfilePage({
   searchParams,
 }: {
@@ -127,6 +129,7 @@ export default async function ProfilePage({
                   breed: currentPet.breed,
                   image: currentPet.image,
                 }}
+                userPlan={currentUser?.plan ?? "free"}
                 initialPets={filterLegacyUiDemoPetsFromSwitcherList(
                   petList.pets.map((item) => ({
                     id: item.id,
@@ -142,6 +145,7 @@ export default async function ProfilePage({
       />
 
       <ProfilePetDetailsEditor
+        key={currentPet?.id ?? `pet-${petData.petIdentity}`}
         petName={petData.name}
         petIdentity={petData.petIdentity}
         petBreed={petData.breed}

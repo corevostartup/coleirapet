@@ -77,6 +77,21 @@ export default async function TagNfcPage() {
           <h3 className="text-[14px] font-semibold text-zinc-900">Acoes</h3>
           <IconShield className="h-5 w-5 text-emerald-600" aria-hidden />
         </div>
+        <div className="mb-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+          <p className="text-[11px] uppercase tracking-wide text-zinc-500">PIN da Tag NFC</p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              value="4829"
+              readOnly
+              aria-label="PIN da Tag NFC em modo mock"
+              className="w-24 rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-center text-[14px] font-semibold tracking-[0.22em] text-zinc-900"
+            />
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">Mock</span>
+          </div>
+          <p className="mt-1 text-[10px] text-zinc-500">Campo visual temporario (4 digitos). Integracao real sera feita depois.</p>
+        </div>
         <div className="space-y-2">
           <Link
             href="/tag-nfc/parear"

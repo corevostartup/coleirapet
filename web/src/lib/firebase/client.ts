@@ -1,7 +1,10 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
 import {
+  createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  OAuthProvider,
   browserLocalPersistence,
+  signInWithEmailAndPassword,
   getAuth,
   getRedirectResult,
   inMemoryPersistence,
@@ -111,6 +114,43 @@ export async function signInWithGoogleNativeIdToken(googleIdToken: string): Prom
   await ensureAuthPersistence();
   const credential = GoogleAuthProvider.credential(googleIdToken);
   const result = await signInWithCredential(auth, credential);
+  return result.user.getIdToken();
+}
+
+/**
+ * Troca um Apple ID token (vindo do Sign in with Apple nativo iOS) por sessao Firebase Auth.
+ * Retorna o Firebase ID token para envio ao backend.
+ */
+export async function signInWithAppleNativeIdToken(appleIdToken: string): Promise<string> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  const provider = new OAuthProvider("apple.com");
+  const credential = provider.credential({ idToken: appleIdToken });
+  const result = await signInWithCredential(auth, credential);
+  return result.user.getIdToken();
+}
+
+export async function signInWithAppleOnWeb(): Promise<string> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  const provider = new OAuthProvider("apple.com");
+  provider.addScope("email");
+  provider.addScope("name");
+  const result = await signInWithPopup(auth, provider);
+  return result.user.getIdToken();
+}
+
+export async function signInWithEmailPassword(email: string, password: string): Promise<string> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  const result = await signInWithEmailAndPassword(auth, email.trim(), password);
+  return result.user.getIdToken();
+}
+
+export async function createAccountWithEmailPassword(email: string, password: string): Promise<string> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
   return result.user.getIdToken();
 }
 

@@ -73,7 +73,7 @@ export default function TagNfcPairPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- carga única na montagem; `router` nas deps pode repetir em loop
 
   function handleStartScan() {
     const w = typeof window !== "undefined" ? (window as NativeWindow) : undefined;

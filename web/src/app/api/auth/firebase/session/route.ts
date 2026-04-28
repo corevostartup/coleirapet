@@ -12,7 +12,7 @@ import { getOrCreateCurrentPet } from "@/lib/pets/current";
 
 type Payload = {
   idToken?: string;
-  provider?: "google" | "apple";
+  provider?: "google" | "apple" | "email";
 };
 
 type VerifiedIdentity = {
@@ -101,7 +101,7 @@ async function upsertUserProfileSafe(input: UserProfileUpsertInput): Promise<str
         photoURL: input.userPhotoUrl,
         provider: input.provider,
         lastLoginAt: nowIso,
-        ...(userSnapshot.exists ? {} : { createdAt: nowIso, CreatedAt: nowIso }),
+        ...(userSnapshot.exists ? {} : { createdAt: nowIso, CreatedAt: nowIso, plan: "free" }),
       },
       { merge: true },
     );
@@ -138,6 +138,12 @@ export async function POST(request: Request) {
 
     if (provider === "google" && verified.firebaseProvider !== "google.com") {
       return NextResponse.json({ error: "Token nao pertence ao Google" }, { status: 403 });
+    }
+    if (provider === "apple" && verified.firebaseProvider !== "apple.com") {
+      return NextResponse.json({ error: "Token nao pertence a Apple" }, { status: 403 });
+    }
+    if (provider === "email" && !["password", "email"].includes(verified.firebaseProvider)) {
+      return NextResponse.json({ error: "Token nao pertence ao login por email" }, { status: 403 });
     }
 
     const userName = (verified.name ?? verified.email ?? "Tutor(a)").trim();

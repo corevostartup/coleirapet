@@ -102,6 +102,41 @@ export type PetProfile = {
   publicPagePath: string;
 };
 
+const CURRENT_PET_CACHE_TTL_MS = 45_000;
+const currentPetCache = new Map<string, { expiresAt: number; value: PetProfile }>();
+
+function clonePetProfile(pet: PetProfile): PetProfile {
+  return {
+    ...pet,
+    publicFields: { ...pet.publicFields },
+  };
+}
+
+function readCachedCurrentPet(uid: string): PetProfile | null {
+  const hit = currentPetCache.get(uid);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    currentPetCache.delete(uid);
+    return null;
+  }
+  return clonePetProfile(hit.value);
+}
+
+function writeCachedCurrentPet(uid: string, pet: PetProfile) {
+  currentPetCache.set(uid, {
+    expiresAt: Date.now() + CURRENT_PET_CACHE_TTL_MS,
+    value: clonePetProfile(pet),
+  });
+}
+
+export function invalidateCurrentPetCache(uid?: string) {
+  if (uid) {
+    currentPetCache.delete(uid);
+    return;
+  }
+  currentPetCache.clear();
+}
+
 function parseNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -336,6 +371,15 @@ async function finalizePetProfile(petRef: DocumentReference, petId: string, raw:
 }
 
 export async function getOrCreateCurrentPet(uid: string) {
+  const cached = readCachedCurrentPet(uid);
+  if (cached) {
+    const db = getFirebaseAdminDb();
+    return {
+      petRef: db.collection(COLLECTION_PETS).doc(cached.id),
+      pet: cached,
+    };
+  }
+
   const db = getFirebaseAdminDb();
   await migrateLegacyPetsSubcollection(db, uid);
 
@@ -352,7 +396,9 @@ export async function getOrCreateCurrentPet(uid: string) {
     const petSnap = await petRef.get();
     const data = petSnap.data() as PetDoc | undefined;
     if (petSnap.exists && data?.ownerId === uid) {
-      return finalizePetProfile(petRef, petSnap.id, data);
+      const result = await finalizePetProfile(petRef, petSnap.id, data);
+      writeCachedCurrentPet(uid, result.pet);
+      return result;
     }
   }
 
@@ -363,13 +409,17 @@ export async function getOrCreateCurrentPet(uid: string) {
   if (firstReal) {
     const doc = firstReal;
     await userRef.set({ defaultPetId: doc.id }, { merge: true });
-    return finalizePetProfile(doc.ref, doc.id, doc.data() as PetDoc);
+    const result = await finalizePetProfile(doc.ref, doc.id, doc.data() as PetDoc);
+    writeCachedCurrentPet(uid, result.pet);
+    return result;
   }
 
   const created = await petsRoot.add(defaultPetDoc(uid));
   await userRef.set({ defaultPetId: created.id }, { merge: true });
   const createdSnap = await created.get();
-  return finalizePetProfile(created, createdSnap.id, createdSnap.data() as PetDoc);
+  const result = await finalizePetProfile(created, createdSnap.id, createdSnap.data() as PetDoc);
+  writeCachedCurrentPet(uid, result.pet);
+  return result;
 }
 
 export async function listOwnedPets(uid: string) {
@@ -427,7 +477,9 @@ export async function setCurrentPet(uid: string, petId: string) {
   const normalized = await ensureFinderShareToken(petRef, petData);
   const withPublicPage = await ensurePublicPageSlug(petRef, normalized);
   const withIdentity = await ensurePetIdentity(petRef, withPublicPage);
-  return toPetProfile(normalizedPetId, withIdentity);
+  const next = toPetProfile(normalizedPetId, withIdentity);
+  writeCachedCurrentPet(uid, next);
+  return next;
 }
 
 export async function createOwnedPet(uid: string) {
@@ -438,7 +490,9 @@ export async function createOwnedPet(uid: string) {
   await db.collection(COLLECTION_USER).doc(uid).set({ defaultPetId: createdRef.id }, { merge: true });
 
   const createdSnap = await createdRef.get();
-  return finalizePetProfile(createdRef, createdSnap.id, (createdSnap.data() ?? {}) as PetDoc);
+  const result = await finalizePetProfile(createdRef, createdSnap.id, (createdSnap.data() ?? {}) as PetDoc);
+  writeCachedCurrentPet(uid, result.pet);
+  return result;
 }
 
 export async function getPublicPetBySlug(publicSlug: string) {

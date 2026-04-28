@@ -19,6 +19,11 @@ type CreateVaccinePayload = {
   date?: string;
 };
 
+type UpdateVaccineStatusPayload = {
+  id?: string;
+  status?: VaccineStatus;
+};
+
 function toPtBrDate(isoDate: string) {
   const [year, month, day] = isoDate.split("-");
   if (!year || !month || !day) return isoDate;
@@ -178,6 +183,82 @@ export async function POST(request: Request) {
       {
         error: "Falha ao cadastrar vacina",
         detail: error instanceof Error ? error.message : "Erro desconhecido ao cadastrar vacina.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  const auth = await requireAuthContext();
+  if (!auth) {
+    return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+  }
+
+  let body: UpdateVaccineStatusPayload;
+  try {
+    body = (await request.json()) as UpdateVaccineStatusPayload;
+  } catch {
+    return NextResponse.json({ error: "Body invalido" }, { status: 400 });
+  }
+
+  const id = typeof body.id === "string" ? body.id.trim() : "";
+  const status = body.status;
+  if (!id) {
+    return NextResponse.json({ error: "Id da vacina invalido" }, { status: 400 });
+  }
+  if (!status || !["applied", "pending"].includes(status)) {
+    return NextResponse.json({ error: "Status invalido" }, { status: 400 });
+  }
+
+  try {
+    const nowIso = new Date().toISOString();
+    const { petRef } = await getOrCreateCurrentPet(auth.uid);
+    const canonicalRef = petRef.collection(SUBCOLLECTION_VACCINES).doc(id);
+    const legacyRef = petRef.collection(SUBCOLLECTION_VACCINES_LEGACY).doc(id);
+
+    const canonicalSnap = await canonicalRef.get();
+    const legacySnap = canonicalSnap.exists ? null : await legacyRef.get();
+    const sourceData = (canonicalSnap.exists ? canonicalSnap.data() : legacySnap?.data()) as
+      | { name?: string; date?: string; createdAt?: string }
+      | undefined;
+
+    if (!sourceData) {
+      return NextResponse.json({ error: "Vacina nao encontrada" }, { status: 404 });
+    }
+
+    await canonicalRef.set(
+      {
+        ...(typeof sourceData.name === "string" ? { name: sourceData.name } : {}),
+        ...(typeof sourceData.date === "string" ? { date: sourceData.date } : {}),
+        ...(typeof sourceData.createdAt === "string" ? { createdAt: sourceData.createdAt } : { createdAt: nowIso }),
+        status,
+        updatedAt: nowIso,
+      },
+      { merge: true },
+    );
+
+    const refreshed = await canonicalRef.get();
+    const data = (refreshed.data() ?? sourceData) as { name?: string; date?: string; status?: VaccineStatus };
+    const date = typeof data.date === "string" ? data.date : "";
+    const normalizedStatus = data.status === "applied" ? "applied" : "pending";
+
+    return NextResponse.json({
+      ok: true,
+      vaccine: {
+        id,
+        name: typeof data.name === "string" && data.name.trim() ? data.name : "Vacina",
+        status: normalizedStatus,
+        stateLabel: normalizedStatus === "applied" ? "Aplicada" : "Pendente",
+        date,
+        dateLabel: toPtBrDate(date),
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Falha ao atualizar status da vacina",
+        detail: error instanceof Error ? error.message : "Erro desconhecido ao atualizar vacina.",
       },
       { status: 500 },
     );

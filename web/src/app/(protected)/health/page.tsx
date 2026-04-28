@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { AppShell, TopBar } from "@/components/shell";
 import { HealthActivityMinutesPanel } from "@/components/health-activity-minutes-panel";
+import { HealthWeightPanel } from "@/components/health-weight-panel";
 import { IconHeart, IconMoon, IconTemp, IconWave } from "@/components/icons";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
@@ -134,6 +135,8 @@ export default async function HealthPage() {
       </section>
 
       <HealthActivityMinutesPanel />
+
+      <HealthWeightPanel />
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "200ms" }}>
         <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Resumo clinico</h3>
