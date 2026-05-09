@@ -354,17 +354,18 @@ export default function VetProntuarioPage() {
           throw new Error(data.error ?? "Falha ao adicionar vacina.");
         }
 
+        const created = data.vaccine;
         setVaccines((prev) => [
           {
-            id: data.vaccine.id,
-            petId: data.vaccine.petId,
+            id: created.id,
+            petId: created.petId,
             petName: selectedPet.name,
-            vaccine: data.vaccine.name,
-            date: data.vaccine.date,
-            nextDose: data.vaccine.nextDose,
-            observation: data.vaccine.observation || "",
-            prescribedByName: data.vaccine.prescribedByName,
-            prescribedByCrmv: data.vaccine.prescribedByCrmv,
+            vaccine: created.name,
+            date: created.date,
+            nextDose: created.nextDose,
+            observation: created.observation || "",
+            prescribedByName: created.prescribedByName,
+            prescribedByCrmv: created.prescribedByCrmv,
           },
           ...prev,
         ]);
@@ -415,17 +416,18 @@ export default function VetProntuarioPage() {
         };
         if (!response.ok || !data.medication) throw new Error(data.error ?? "Falha ao adicionar medicacao.");
 
+        const created = data.medication;
         setMedications((prev) => [
           {
-            id: data.medication.id,
-            petId: data.medication.petId,
+            id: created.id,
+            petId: created.petId,
             petName: selectedPet.name,
-            medication: data.medication.name,
-            dosage: data.medication.dosage,
-            duration: data.medication.duration,
-            observation: data.medication.observation || "",
-            prescribedByName: data.medication.prescribedByName || "Veterinario",
-            prescribedByCrmv: data.medication.prescribedByCrmv || "Nao informado",
+            medication: created.name,
+            dosage: created.dosage,
+            duration: created.duration,
+            observation: created.observation || "",
+            prescribedByName: created.prescribedByName || "Veterinario",
+            prescribedByCrmv: created.prescribedByCrmv || "Nao informado",
           },
           ...prev,
         ]);

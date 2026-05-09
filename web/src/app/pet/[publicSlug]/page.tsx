@@ -15,10 +15,10 @@ export async function generateMetadata(props: PublicPetPageProps): Promise<Metad
   const pet = await getPublicPetBySlug(publicSlug);
   if (!pet) return { title: "Pet · Lyka" };
 
-  const pageUrl = absolutePublicUrl(`/pet/${publicSlug}`);
+  const pageUrl = await absolutePublicUrl(`/pet/${publicSlug}`);
   const displayName = pet.publicFields.name ? pet.name : "Pet Lyka";
   const description = `ID: ${pet.petIdentity} · Perfil publico na Lyka`;
-  const imageUrl = absoluteOgImageUrl(getPetImageOrDefault(pet.image));
+  const imageUrl = await absoluteOgImageUrl(getPetImageOrDefault(pet.image));
 
   return {
     title: `${displayName} · Lyka`,

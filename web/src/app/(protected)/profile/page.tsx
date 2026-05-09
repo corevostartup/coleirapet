@@ -109,6 +109,8 @@ export default async function ProfilePage({
     status: device.name === "Tag NFC" && Boolean(currentPet?.nfcId) ? "Conectado" : "Desconectado",
   }));
 
+  const sharePublicUrl = currentPet ? await absolutePublicUrl(currentPet.publicPagePath) : null;
+
   return (
     <AppShell tab="profile">
       <TopBar
@@ -162,7 +164,7 @@ export default async function ProfilePage({
         initialMicrochipId={petData.microchipId}
         initialNotes={petData.notes}
         initialPublicFields={petData.publicFields}
-        sharePublicUrl={currentPet ? absolutePublicUrl(currentPet.publicPagePath) : null}
+        sharePublicUrl={sharePublicUrl}
       />
 
       <section className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "170ms" }}>
