@@ -258,6 +258,7 @@ export function LocationView() {
             lat={petLocation.lat}
             lng={petLocation.lng}
             zoom={17}
+            zoomControl={false}
             className="h-full min-h-[100dvh] w-full"
           />
         </div>
@@ -331,6 +332,43 @@ export function LocationView() {
           </section>
 
           <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "170ms" }}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-[14px] font-semibold text-zinc-900">Dispositivos conectados</h3>
+              <IconShield className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div className="space-y-2">
+              {disconnectedDevices.map((device) => {
+                const connected = device.status === "Conectado";
+                const isTagNfc = device.name === "Tag NFC";
+                return (
+                  <article
+                    key={device.name}
+                    className={`rounded-2xl border px-3 py-2.5 ${
+                      connected ? "border-zinc-200 bg-zinc-50" : "border-zinc-200/90 bg-zinc-50/80 opacity-95"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-[12px] font-medium text-zinc-800">{device.name}</p>
+                      <p className="text-[11px] text-zinc-500">{device.battery ?? "—"}</p>
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <p className={`text-[11px] ${connected ? "text-emerald-600" : "text-zinc-500"}`}>{device.status}</p>
+                      {isTagNfc ? (
+                        <Link
+                          href="/tag-nfc"
+                          className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100"
+                        >
+                          Gerenciar
+                        </Link>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "185ms" }}>
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="text-[14px] font-semibold text-zinc-900">Mensagens</h3>
@@ -372,7 +410,7 @@ export function LocationView() {
             )}
           </section>
 
-          <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "185ms" }}>
+          <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "200ms" }}>
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="text-[14px] font-semibold text-zinc-900">Historico de localizacao</h3>
@@ -405,43 +443,6 @@ export function LocationView() {
                 ))}
               </ul>
             )}
-          </section>
-
-          <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "200ms" }}>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-[14px] font-semibold text-zinc-900">Dispositivos conectados</h3>
-              <IconShield className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div className="space-y-2">
-              {disconnectedDevices.map((device) => {
-                const connected = device.status === "Conectado";
-                const isTagNfc = device.name === "Tag NFC";
-                return (
-                  <article
-                    key={device.name}
-                    className={`rounded-2xl border px-3 py-2.5 ${
-                      connected ? "border-zinc-200 bg-zinc-50" : "border-zinc-200/90 bg-zinc-50/80 opacity-95"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-[12px] font-medium text-zinc-800">{device.name}</p>
-                      <p className="text-[11px] text-zinc-500">{device.battery ?? "—"}</p>
-                    </div>
-                    <div className="mt-0.5 flex items-center justify-between gap-2">
-                      <p className={`text-[11px] ${connected ? "text-emerald-600" : "text-zinc-500"}`}>{device.status}</p>
-                      {isTagNfc ? (
-                        <Link
-                          href="/tag-nfc"
-                          className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100"
-                        >
-                          Gerenciar
-                        </Link>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
           </section>
         </>
       ) : null}

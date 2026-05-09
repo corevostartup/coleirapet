@@ -198,29 +198,27 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
                 onClick={() => !saving && closeModal()}
               />
               <section className="relative z-[1] mx-auto w-[min(420px,calc(100vw-1rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-3 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)] sm:p-4">
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-              <div className="min-w-0 flex-1 pr-0 sm:pr-2">
-                <h3 id="medication-modal-title" className="text-[15px] font-semibold text-zinc-900">
-                  {editingId ? "Editar lembrete" : "Novo lembrete"}
-                </h3>
-                <p className="mt-1 text-[12px] leading-snug text-zinc-600">
-                  {editingId
-                    ? "Altere medicacao, dose ou horario e salve."
-                    : "Cadastre medicacao, dose e horario do lembrete."}
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={closeModal}
-                className="flex h-9 w-9 shrink-0 self-end items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50 sm:self-start"
-                aria-label="Fechar"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={closeModal}
+                  className="absolute right-3 top-3 z-[2] flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50 sm:right-4 sm:top-4"
+                  aria-label="Fechar"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+                <div className="mb-3 min-w-0 pr-11 sm:pr-12">
+                  <h3 id="medication-modal-title" className="text-[15px] font-semibold leading-snug text-zinc-900">
+                    {editingId ? "Editar lembrete" : "Novo lembrete"}
+                  </h3>
+                  <p className="mt-1 text-[12px] leading-snug text-zinc-600">
+                    {editingId
+                      ? "Altere medicacao, dose ou horario e salve."
+                      : "Cadastre medicacao, dose e horario do lembrete."}
+                  </p>
+                </div>
 
             <form onSubmit={onSubmit} className="grid min-w-0 gap-3">
               <div className="min-w-0">

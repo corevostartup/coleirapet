@@ -13,6 +13,7 @@ export function NFCPairLink(props: Omit<ComponentProps<typeof Link>, "href"> & {
 
   return (
     <Link
+      prefetch
       href={href}
       {...rest}
       onClick={(e) => {

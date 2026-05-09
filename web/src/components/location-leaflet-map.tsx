@@ -16,6 +16,8 @@ type Props = {
   lng: number;
   zoom?: number;
   className?: string;
+  /** Quando false, oculta os controles +/- do Leaflet (recomendado em tela cheia no mobile/iOS). */
+  zoomControl?: boolean;
   /** Disparado ao clicar no mapa (ex.: abrir modo expandido). Drag/pinar não dispara como clique único. */
   onMapClick?: () => void;
 };
@@ -24,7 +26,7 @@ type Props = {
  * Mapa Leaflet com tema alinhado ao app (tiles Carto Light + CSS em globals).
  * @see https://leafletjs.com/
  */
-export function LocationLeafletMap({ lat, lng, zoom = 15, className, onMapClick }: Props) {
+export function LocationLeafletMap({ lat, lng, zoom = 15, className, zoomControl = true, onMapClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const onMapClickRef = useLatest(onMapClick);
@@ -41,7 +43,7 @@ export function LocationLeafletMap({ lat, lng, zoom = 15, className, onMapClick 
       if (cancelled || !containerRef.current) return;
 
       const map = L.map(container, {
-        zoomControl: true,
+        zoomControl,
         attributionControl: false,
       }).setView([lat, lng], zoom);
 
@@ -83,7 +85,7 @@ export function LocationLeafletMap({ lat, lng, zoom = 15, className, onMapClick 
         mapRef.current = null;
       }
     };
-  }, [lat, lng, zoom]);
+  }, [lat, lng, zoom, zoomControl]);
 
   return (
     <div

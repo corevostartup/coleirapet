@@ -208,8 +208,16 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
         ? createPortal(
         <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/35 px-3 py-5">
           <section className="w-full max-w-[440px] rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
-            <div className="relative mb-2 h-[190px] w-full">
-              <Image src="/premium-dog-astronaut.png" alt="Cachorro astronauta Lyka Premium" fill className="object-contain" sizes="440px" />
+            <div className="relative mb-2 flex h-[200px] w-full items-center justify-center overflow-hidden rounded-2xl bg-zinc-50">
+              <div className="premium-plan-hero-float relative h-[168px] w-full max-w-[320px]">
+                <Image
+                  src="/coleira-splash-logo.png"
+                  alt="Cachorro astronauta Lyka Premium"
+                  fill
+                  className="object-contain drop-shadow-[0_8px_28px_rgba(34,197,94,0.14)]"
+                  sizes="440px"
+                />
+              </div>
             </div>
             <h3 className="text-[16px] font-semibold text-zinc-900">Assinatura Lyka</h3>
             <p className="mt-1 text-[12px] text-zinc-600">Para cadastrar novo pet, escolha um plano:</p>

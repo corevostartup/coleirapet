@@ -52,6 +52,11 @@ function toIsoDate(value: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** Cookie definido pelo app iOS apos gravar a tag; cobre cache stale do pet em outra instancia. */
+const NFC_PAIRED_COOKIE = "cp_nfc_paired";
+
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
@@ -74,7 +79,9 @@ export default async function Home() {
       petRef = null;
     }
   }
-  const isNfcPaired = Boolean(currentPet?.nfcId);
+  const nfcIdTrimmed = (currentPet?.nfcId ?? "").trim();
+  const nfcPairedCookie = jar.get(NFC_PAIRED_COOKIE)?.value === "1";
+  const isNfcPaired = Boolean(nfcIdTrimmed) || nfcPairedCookie;
   const isVet = currentUser?.userType === "vet";
   const cardPet = {
     image: currentPet?.image ?? pet.image,

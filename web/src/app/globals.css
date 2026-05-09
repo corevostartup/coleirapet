@@ -155,6 +155,12 @@ a {
 	animation: splash-zero-g 3.4s ease-in-out infinite;
 }
 
+/* Modal Assinatura / Premium: mesma deriva de zero-G da splash (loop suave e constante) */
+.premium-plan-hero-float {
+	animation: splash-zero-g 4.5s ease-in-out infinite;
+	will-change: transform;
+}
+
 .splash-orbit-ring {
 	animation: splash-orbit-spin 48s linear infinite;
 }
@@ -172,12 +178,17 @@ a {
 	.splash-nebula,
 	.splash-star,
 	.splash-logo-float,
+	.premium-plan-hero-float,
 	.splash-orbit-ring,
 	.splash-hud-dot {
 		animation: none !important;
 	}
 
 	.splash-logo-float {
+		transform: none;
+	}
+
+	.premium-plan-hero-float {
 		transform: none;
 	}
 

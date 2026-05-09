@@ -45,6 +45,10 @@
 	<true/>
 	<key>NFCReaderUsageDescription</key>
 	<string>Lyka usa NFC para ler a tag na coleira e parear com o perfil.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Lyka precisa da camera para tirar foto do perfil do pet.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Lyka precisa acessar suas fotos para escolher uma imagem do perfil do pet.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -1,10 +1,14 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
 import {
+  ActionCodeSettings,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   OAuthProvider,
   browserLocalPersistence,
+  isSignInWithEmailLink,
+  sendSignInLinkToEmail,
   signInWithEmailAndPassword,
+  signInWithEmailLink,
   getAuth,
   getRedirectResult,
   inMemoryPersistence,
@@ -19,6 +23,7 @@ type GoogleSignInResult =
   | { type: "redirect" };
 
 let persistenceReady: Promise<void> | null = null;
+const EMAIL_LINK_STORAGE_KEY = "lyka_email_link_signin_email";
 
 function getFirebaseConfig() {
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -151,6 +156,47 @@ export async function createAccountWithEmailPassword(email: string, password: st
   const auth = getAuth(getFirebaseApp());
   await ensureAuthPersistence();
   const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  return result.user.getIdToken();
+}
+
+function buildEmailLinkActionCodeSettings(): ActionCodeSettings {
+  if (typeof window === "undefined") {
+    throw new Error("Email link precisa ser iniciado no navegador.");
+  }
+  return {
+    url: `${window.location.origin}/login?mode=email-link`,
+    handleCodeInApp: true,
+  };
+}
+
+export async function sendEmailLinkToSignIn(email: string): Promise<void> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  const normalizedEmail = email.trim();
+  await sendSignInLinkToEmail(auth, normalizedEmail, buildEmailLinkActionCodeSettings());
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, normalizedEmail);
+  }
+}
+
+export function getEmailForStoredLinkSignIn(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(EMAIL_LINK_STORAGE_KEY)?.trim() ?? "";
+}
+
+export function isEmailLinkSignInUrl(url: string): boolean {
+  const auth = getAuth(getFirebaseApp());
+  return isSignInWithEmailLink(auth, url);
+}
+
+export async function completeEmailLinkSignIn(email: string, url?: string): Promise<string> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  const currentUrl = url ?? (typeof window !== "undefined" ? window.location.href : "");
+  const result = await signInWithEmailLink(auth, email.trim(), currentUrl);
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
+  }
   return result.user.getIdToken();
 }
 

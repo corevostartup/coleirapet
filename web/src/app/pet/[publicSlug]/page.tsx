@@ -1,12 +1,45 @@
 import Image from "next/image";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublicNfcLocationShare } from "@/components/public-nfc-location-share";
 import { getPublicPetBySlug } from "@/lib/pets/current";
 import { getPetImageOrDefault } from "@/lib/pets/image";
+import { absoluteOgImageUrl, absolutePublicUrl } from "@/lib/site/public-url";
 
 type PublicPetPageProps = {
   params: Promise<{ publicSlug: string }>;
 };
+
+export async function generateMetadata(props: PublicPetPageProps): Promise<Metadata> {
+  const { publicSlug } = await props.params;
+  const pet = await getPublicPetBySlug(publicSlug);
+  if (!pet) return { title: "Pet · Lyka" };
+
+  const pageUrl = absolutePublicUrl(`/pet/${publicSlug}`);
+  const displayName = pet.publicFields.name ? pet.name : "Pet Lyka";
+  const description = `ID: ${pet.petIdentity} · Perfil publico na Lyka`;
+  const imageUrl = absoluteOgImageUrl(getPetImageOrDefault(pet.image));
+
+  return {
+    title: `${displayName} · Lyka`,
+    description,
+    openGraph: {
+      type: "website",
+      url: pageUrl,
+      title: `${displayName} · Lyka`,
+      description,
+      siteName: "Lyka",
+      locale: "pt_BR",
+      images: [{ url: imageUrl, alt: `Foto de ${pet.name}` }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${displayName} · Lyka`,
+      description,
+      images: [imageUrl],
+    },
+  };
+}
 
 export default async function PublicPetPage(props: PublicPetPageProps) {
   const { publicSlug } = await props.params;

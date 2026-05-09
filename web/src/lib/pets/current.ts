@@ -16,6 +16,7 @@ type PetDoc = {
   petIdentity?: string;
   nfcId?: string;
   nfcPairedAt?: string;
+  nfcPin?: string;
   /** Segredo para URL pública de contato em situação de pet perdido (quem escaneia a tag). */
   finderShareToken?: string;
   /** Endereço público estável para exibir somente dados públicos do pet. */
@@ -73,6 +74,7 @@ export type PetProfile = {
   petIdentity: string;
   nfcId: string | null;
   nfcPairedAt: string | null;
+  nfcPin: string | null;
   name: string;
   breed: string;
   image: string;
@@ -197,6 +199,7 @@ function toPetProfile(petId: string, data: PetDoc): PetProfile {
     petIdentity: parsePetIdentity(data.petIdentity) ?? generatePetIdentity(),
     nfcId: parseString(data.nfcId),
     nfcPairedAt: parseString(data.nfcPairedAt),
+    nfcPin: parseNfcPin(data.nfcPin),
     name: parseString(data.name) ?? mockPet.name,
     breed: parseString(data.breed) ?? mockPet.breed,
     image: getPetImageOrDefault(parseString(data.image) ?? mockPet.image),
@@ -218,6 +221,18 @@ function toPetProfile(petId: string, data: PetDoc): PetProfile {
     publicPageSlug,
     publicPagePath: `/pet/${publicPageSlug}`,
   };
+}
+
+function parseNfcPin(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!/^\d{4}$/.test(normalized) && !/^\d{6}$/.test(normalized)) return null;
+  return normalized;
+}
+
+function generateNfcPin() {
+  const n = Math.floor(Math.random() * 10000);
+  return String(n).padStart(4, "0");
 }
 
 async function ensureFinderShareToken<T extends PetDoc>(
@@ -268,6 +283,22 @@ async function ensurePetIdentity<T extends PetDoc>(
   const nowIso = new Date().toISOString();
   await petRef.set({ petIdentity, updatedAt: nowIso }, { merge: true });
   return { ...data, petIdentity };
+}
+
+export async function regenerateNfcPinForCurrentPet(uid: string): Promise<{ petRef: DocumentReference; petId: string; nfcPin: string }> {
+  const { petRef, pet } = await getOrCreateCurrentPet(uid);
+  const nfcPin = generateNfcPin();
+  const nowIso = new Date().toISOString();
+  await petRef.set({ nfcPin, updatedAt: nowIso }, { merge: true });
+  invalidateCurrentPetCache(uid);
+  return { petRef, petId: pet.id, nfcPin };
+}
+
+/** PIN armazenado no Firestore, se existir e for valido (nao gera novo ao ler). */
+export async function getCurrentPetStoredNfcPin(uid: string): Promise<{ petId: string; nfcPin: string }> {
+  const { pet } = await getOrCreateCurrentPet(uid);
+  const nfcPin = parseNfcPin(pet.nfcPin ?? "") ?? "";
+  return { petId: pet.id, nfcPin };
 }
 
 function defaultPetDoc(ownerId: string) {
@@ -508,3 +539,4 @@ export async function getPublicPetBySlug(publicSlug: string) {
   const withIdentity = await ensurePetIdentity(doc.ref, normalized);
   return toPetProfile(doc.id, withIdentity);
 }
+

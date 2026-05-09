@@ -41,9 +41,11 @@ private final class AppleSignInDelegate: NSObject, ASAuthorizationControllerDele
 
 struct WebView: UIViewRepresentable {
     let url: URL
+    /// 0...1 durante cargas de documento no WebKit (util na primeira carga e navegacoes completas).
+    var onProgressChange: ((Double) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(parent: self)
+        Coordinator()
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -103,12 +105,22 @@ struct WebView: UIViewRepresentable {
         configuration.userContentController = contentController
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.isOpaque = false
+        webView.backgroundColor = .black
+        webView.scrollView.backgroundColor = .black
+        if #available(iOS 15.0, *) {
+            webView.underPageBackgroundColor = .black
+        }
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.showsVerticalScrollIndicator = false
         webView.scrollView.showsHorizontalScrollIndicator = false
         webView.scrollView.pinchGestureRecognizer?.isEnabled = false
+        webView.navigationDelegate = context.coordinator
 
         context.coordinator.webView = webView
+        context.coordinator.baseURL = url
+        context.coordinator.onProgressChange = onProgressChange
+        context.coordinator.startProgressObservation(webView: webView)
 
         let request = URLRequest(url: url)
         webView.load(request)
@@ -116,14 +128,22 @@ struct WebView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
+        context.coordinator.baseURL = url
+        context.coordinator.onProgressChange = onProgressChange
         if uiView.url != url {
             uiView.load(URLRequest(url: url))
         }
     }
 
+    static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
+        coordinator.stopProgressObservation()
+    }
+
     final class Coordinator: NSObject, WKScriptMessageHandler {
-        private let parent: WebView
+        var baseURL: URL = URL(string: "about:blank")!
+        var onProgressChange: ((Double) -> Void)?
         weak var webView: WKWebView?
+        private var progressObservation: NSKeyValueObservation?
         private var nfcSession: NFCNDEFReaderSession?
         private var nfcPairingMode: NFCPairingMode?
         private var didHandleNfcSessionResult = false
@@ -134,8 +154,18 @@ struct WebView: UIViewRepresentable {
             case writePassword(password: String, publicUrl: URL)
         }
 
-        init(parent: WebView) {
-            self.parent = parent
+        func startProgressObservation(webView: WKWebView) {
+            stopProgressObservation()
+            progressObservation = webView.observe(\.estimatedProgress, options: [.new]) { [weak self] webView, _ in
+                DispatchQueue.main.async {
+                    self?.onProgressChange?(webView.estimatedProgress)
+                }
+            }
+        }
+
+        func stopProgressObservation() {
+            progressObservation?.invalidate()
+            progressObservation = nil
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -188,7 +218,7 @@ struct WebView: UIViewRepresentable {
                 startNFCPairingSession(mode: .scanToPair)
             case "writePairingPassword":
                 guard let password = body["password"] as? String, !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    showJSAlert("Senha da Tag NFC invalida.")
+                    showJSAlert("PIN da Tag NFC invalido.")
                     return
                 }
                 guard let rawPublicUrl = body["publicUrl"] as? String,
@@ -208,7 +238,7 @@ struct WebView: UIViewRepresentable {
             if let absolute = URL(string: trimmed), let scheme = absolute.scheme, scheme == "https" || scheme == "http" {
                 return absolute
             }
-            guard let origin = parent.url.originURL else { return nil }
+            guard let origin = baseURL.originURL else { return nil }
             return URL(string: trimmed, relativeTo: origin)?.absoluteURL
         }
 
@@ -225,7 +255,7 @@ struct WebView: UIViewRepresentable {
             case .scanToPair:
                 session.alertMessage = "Aproxime a tag NFC da parte superior traseira do iPhone."
             case .writePassword(_, _):
-                session.alertMessage = "Aproxime novamente a Tag NFC para gravar a senha de pareamento."
+                session.alertMessage = "Aproxime novamente a Tag NFC para gravar o PIN e o endereco publico."
             }
             nfcSession = session
             session.begin()
@@ -352,17 +382,43 @@ struct WebView: UIViewRepresentable {
 
         private func goToPairingPasswordStep() {
             DispatchQueue.main.async { [weak self] in
-                self?.webView?.evaluateJavaScript("window.location.replace('/tag-nfc/parear?step=password')")
+                self?.webView?.evaluateJavaScript("window.location.replace('/tag-nfc/parear?step=write')")
             }
         }
 
-        private func finalizePairingAndGoHome() {
+        private func finalizePairingOnServerThenGoHome() {
             let maxAgeSeconds = 60 * 60 * 24 * 365
-            let script = "document.cookie='cp_nfc_paired=1; Path=/; Max-Age=\(maxAgeSeconds); SameSite=Lax'; window.location.replace('/home');"
+            let js = """
+            (function(){
+              fetch('/api/pets/current/nfc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: '{}'
+              })
+              .then(function(r) {
+                if (!r.ok) return r.json().then(function(j){ throw new Error(j && j.error ? j.error : 'HTTP'); });
+                return r.json();
+              })
+              .then(function() {
+                document.cookie='cp_nfc_paired=1; Path=/; Max-Age=\(maxAgeSeconds); SameSite=Lax';
+                window.location.replace('/home');
+              })
+              .catch(function() {
+                alert('Falha ao salvar pareamento no servidor. Verifique a conexao.');
+              });
+            })();
+            """
             DispatchQueue.main.async { [weak self] in
-                self?.webView?.evaluateJavaScript(script)
+                self?.webView?.evaluateJavaScript(js)
             }
         }
+    }
+}
+
+extension WebView.Coordinator: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        onProgressChange?(1.0)
     }
 }
 
@@ -372,7 +428,7 @@ extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
         guard case .scanToPair = nfcPairingMode else { return }
         didHandleNfcSessionResult = true
         session.invalidate()
-        showJSAlert("Tag lida com sucesso. Agora cadastre a senha para finalizar o pareamento.")
+        showJSAlert("Tag lida com sucesso. Agora grave o PIN na tag para finalizar o pareamento.")
         goToPairingPasswordStep()
     }
 
@@ -388,7 +444,7 @@ extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
         case .scanToPair:
             didHandleNfcSessionResult = true
             session.invalidate()
-            showJSAlert("Tag lida com sucesso. Agora cadastre a senha para finalizar o pareamento.")
+            showJSAlert("Tag lida com sucesso. Agora grave o PIN na tag para finalizar o pareamento.")
             goToPairingPasswordStep()
 
         case let .writePassword(password, publicUrl):
@@ -417,7 +473,7 @@ extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
                             locale: Locale(identifier: "pt_BR")
                         )
                     else {
-                        session.invalidate(errorMessage: "Falha ao preparar os dados da senha.")
+                        session.invalidate(errorMessage: "Falha ao preparar o PIN da Tag NFC.")
                         return
                     }
 
@@ -438,14 +494,14 @@ extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
                     let message = NFCNDEFMessage(records: records)
                     tag.writeNDEF(message) { error in
                         if let error {
-                            session.invalidate(errorMessage: "Falha ao gravar senha na Tag NFC: \(error.localizedDescription)")
+                            session.invalidate(errorMessage: "Falha ao gravar PIN na Tag NFC: \(error.localizedDescription)")
                             return
                         }
 
-                        session.alertMessage = "Pareamento concluido. Endereco publico e senha gravados na Tag NFC."
+                        session.alertMessage = "Tag gravada. Salvando pareamento no servidor..."
                         session.invalidate()
-                        self.showJSAlert("Pareamento concluido. Endereco publico e senha gravados na Tag NFC.")
-                        self.finalizePairingAndGoHome()
+                        self.showJSAlert("Tag gravada. Concluindo pareamento...")
+                        self.finalizePairingOnServerThenGoHome()
                     }
                 }
             }

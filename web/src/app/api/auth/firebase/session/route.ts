@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     if (provider === "apple" && verified.firebaseProvider !== "apple.com") {
       return NextResponse.json({ error: "Token nao pertence a Apple" }, { status: 403 });
     }
-    if (provider === "email" && !["password", "email"].includes(verified.firebaseProvider)) {
+    if (provider === "email" && !["password", "email", "emailLink"].includes(verified.firebaseProvider)) {
       return NextResponse.json({ error: "Token nao pertence ao login por email" }, { status: 403 });
     }
 

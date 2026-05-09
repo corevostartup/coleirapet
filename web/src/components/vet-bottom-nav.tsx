@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { IconCollar, IconFile, IconPin, IconUser } from "@/components/icons";
 
@@ -14,20 +15,27 @@ function resolveVetTab(pathname: string): VetTab {
 }
 
 export function VetBottomNav() {
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname() ?? "";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
   if (!pathname.startsWith("/vet")) return null;
 
   const tab = resolveVetTab(pathname);
   const items = [
     { key: "pets", label: "Pets", href: "/vet/pets", Icon: IconCollar },
     { key: "prontuario", label: "Prontuario", href: "/vet/prontuario", Icon: IconFile },
-    { key: "atendidos", label: "Atendidos", href: "/vet/atendidos", Icon: IconUser },
+    { key: "atendidos", label: "Atendimentos", href: "/vet/atendidos", Icon: IconUser },
     { key: "clinicas", label: "Clinicas", href: "/vet/clinicas", Icon: IconPin },
   ] as const;
 
   return (
     <nav
-      className="appear-up fixed bottom-3 left-1/2 z-50 w-[calc(100%-1.5rem)] max-w-[428px] -translate-x-1/2 rounded-[24px] border border-zinc-200 bg-white/92 px-1.5 py-1.5 shadow-[0_18px_35px_-25px_rgba(15,23,42,0.5)] backdrop-blur"
+      className="appear-up fixed bottom-3 left-1/2 z-50 w-[calc(100%-1.5rem)] max-w-[428px] -translate-x-1/2 rounded-[24px] border border-zinc-200 bg-white/92 px-1.5 py-1.5 shadow-[0_18px_35px_-25px_rgba(15,23,42,0.5)] backdrop-blur lg:hidden"
       style={{ animationDelay: "420ms" }}
     >
       <ul className="grid grid-cols-4">

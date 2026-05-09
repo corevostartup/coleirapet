@@ -30,6 +30,7 @@ export function TopBar({
 }) {
   const defaultBell = (
     <Link
+      prefetch
       href="/notifications"
       className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:text-zinc-900"
       aria-label="Notificacoes"

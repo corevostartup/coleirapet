@@ -10,25 +10,40 @@ import {
 } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { getOrCreateCurrentPet } from "@/lib/pets/current";
-
-type VaccineStatus = "applied" | "pending";
+import type { VaccineStatus } from "@/lib/vaccines/vaccine-item";
+import { vaccineFromDoc } from "@/lib/vaccines/vaccine-item";
 
 type CreateVaccinePayload = {
   name?: string;
   status?: VaccineStatus;
   date?: string;
+  veterinarian?: string;
+  clinic?: string;
+  notes?: string;
 };
 
-type UpdateVaccineStatusPayload = {
+type UpdateVaccinePayload = {
   id?: string;
   status?: VaccineStatus;
+  veterinarian?: string;
+  clinic?: string;
+  notes?: string;
 };
 
-function toPtBrDate(isoDate: string) {
-  const [year, month, day] = isoDate.split("-");
-  if (!year || !month || !day) return isoDate;
-  return `${day}/${month}/${year}`;
+function sliceText(value: unknown, max: number) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, max);
 }
+
+type VaccineSourceDoc = {
+  name?: string;
+  date?: string;
+  status?: VaccineStatus;
+  createdAt?: string;
+  veterinarian?: string;
+  clinic?: string;
+  notes?: string;
+};
 
 async function requireAuthContext() {
   const jar = await cookies();
@@ -95,24 +110,7 @@ export async function GET() {
       docs = await readAndSortVaccineDocs(petRef);
     }
 
-    const vaccines = docs.map((doc) => {
-      const data = doc.data() as {
-        name?: string;
-        status?: VaccineStatus;
-        date?: string;
-      };
-      const status = data.status === "applied" ? "applied" : "pending";
-      const date = typeof data.date === "string" ? data.date : "";
-
-      return {
-        id: doc.id,
-        name: data.name ?? "Vacina",
-        status,
-        stateLabel: status === "applied" ? "Aplicada" : "Pendente",
-        date,
-        dateLabel: toPtBrDate(date),
-      };
-    });
+    const vaccines = docs.map((doc) => vaccineFromDoc(doc.id, doc.data() as VaccineSourceDoc));
 
     return NextResponse.json({ vaccines });
   } catch (error) {
@@ -142,6 +140,9 @@ export async function POST(request: Request) {
   const name = body.name?.trim();
   const status = body.status;
   const date = body.date?.trim();
+  const veterinarian = sliceText(body.veterinarian, 120);
+  const clinic = sliceText(body.clinic, 120);
+  const notes = sliceText(body.notes, 800);
 
   if (!name || name.length < 2) {
     return NextResponse.json({ error: "Nome da vacina invalido" }, { status: 400 });
@@ -156,25 +157,24 @@ export async function POST(request: Request) {
   try {
     const nowIso = new Date().toISOString();
     const { petRef } = await getOrCreateCurrentPet(auth.uid);
-    const ref = await petRef.collection(SUBCOLLECTION_VACCINES).add({
+    const payload: Record<string, unknown> = {
       name: name.slice(0, 80),
       status,
       date,
       createdAt: nowIso,
       updatedAt: nowIso,
-    });
+    };
+    if (veterinarian) payload.veterinarian = veterinarian;
+    if (clinic) payload.clinic = clinic;
+    if (notes) payload.notes = notes;
+
+    const ref = await petRef.collection(SUBCOLLECTION_VACCINES).add(payload);
+    const snap = await ref.get();
 
     return NextResponse.json(
       {
         ok: true,
-        vaccine: {
-          id: ref.id,
-          name: name.slice(0, 80),
-          status,
-          stateLabel: status === "applied" ? "Aplicada" : "Pendente",
-          date,
-          dateLabel: toPtBrDate(date),
-        },
+        vaccine: vaccineFromDoc(ref.id, snap.data() as VaccineSourceDoc),
       },
       { status: 201 },
     );
@@ -195,19 +195,28 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  let body: UpdateVaccineStatusPayload;
+  let body: UpdateVaccinePayload;
   try {
-    body = (await request.json()) as UpdateVaccineStatusPayload;
+    body = (await request.json()) as UpdateVaccinePayload;
   } catch {
     return NextResponse.json({ error: "Body invalido" }, { status: 400 });
   }
 
   const id = typeof body.id === "string" ? body.id.trim() : "";
-  const status = body.status;
   if (!id) {
     return NextResponse.json({ error: "Id da vacina invalido" }, { status: 400 });
   }
-  if (!status || !["applied", "pending"].includes(status)) {
+
+  const hasStatus = body.status !== undefined;
+  const hasVet = body.veterinarian !== undefined;
+  const hasClinic = body.clinic !== undefined;
+  const hasNotes = body.notes !== undefined;
+
+  if (!hasStatus && !hasVet && !hasClinic && !hasNotes) {
+    return NextResponse.json({ error: "Nenhum campo para atualizar" }, { status: 400 });
+  }
+
+  if (hasStatus && body.status !== "applied" && body.status !== "pending") {
     return NextResponse.json({ error: "Status invalido" }, { status: 400 });
   }
 
@@ -219,45 +228,47 @@ export async function PATCH(request: Request) {
 
     const canonicalSnap = await canonicalRef.get();
     const legacySnap = canonicalSnap.exists ? null : await legacyRef.get();
-    const sourceData = (canonicalSnap.exists ? canonicalSnap.data() : legacySnap?.data()) as
-      | { name?: string; date?: string; createdAt?: string }
-      | undefined;
+    const sourceData = (canonicalSnap.exists ? canonicalSnap.data() : legacySnap?.data()) as VaccineSourceDoc | undefined;
 
     if (!sourceData) {
       return NextResponse.json({ error: "Vacina nao encontrada" }, { status: 404 });
     }
 
-    await canonicalRef.set(
-      {
-        ...(typeof sourceData.name === "string" ? { name: sourceData.name } : {}),
-        ...(typeof sourceData.date === "string" ? { date: sourceData.date } : {}),
-        ...(typeof sourceData.createdAt === "string" ? { createdAt: sourceData.createdAt } : { createdAt: nowIso }),
-        status,
-        updatedAt: nowIso,
-      },
-      { merge: true },
-    );
+    const nextStatus: VaccineStatus =
+      hasStatus && (body.status === "applied" || body.status === "pending")
+        ? body.status
+        : sourceData.status === "applied"
+          ? "applied"
+          : "pending";
+
+    const merged: Record<string, unknown> = {
+      name: typeof sourceData.name === "string" ? sourceData.name : "Vacina",
+      date: typeof sourceData.date === "string" ? sourceData.date : "",
+      createdAt: typeof sourceData.createdAt === "string" ? sourceData.createdAt : nowIso,
+      status: nextStatus,
+      updatedAt: nowIso,
+    };
+
+    if (hasVet) merged.veterinarian = sliceText(body.veterinarian, 120);
+    else if (typeof sourceData.veterinarian === "string") merged.veterinarian = sourceData.veterinarian;
+
+    if (hasClinic) merged.clinic = sliceText(body.clinic, 120);
+    else if (typeof sourceData.clinic === "string") merged.clinic = sourceData.clinic;
+
+    if (hasNotes) merged.notes = sliceText(body.notes, 800);
+    else if (typeof sourceData.notes === "string") merged.notes = sourceData.notes;
+
+    await canonicalRef.set(merged, { merge: true });
 
     const refreshed = await canonicalRef.get();
-    const data = (refreshed.data() ?? sourceData) as { name?: string; date?: string; status?: VaccineStatus };
-    const date = typeof data.date === "string" ? data.date : "";
-    const normalizedStatus = data.status === "applied" ? "applied" : "pending";
-
     return NextResponse.json({
       ok: true,
-      vaccine: {
-        id,
-        name: typeof data.name === "string" && data.name.trim() ? data.name : "Vacina",
-        status: normalizedStatus,
-        stateLabel: normalizedStatus === "applied" ? "Aplicada" : "Pendente",
-        date,
-        dateLabel: toPtBrDate(date),
-      },
+      vaccine: vaccineFromDoc(id, refreshed.data() as VaccineSourceDoc),
     });
   } catch (error) {
     return NextResponse.json(
       {
-        error: "Falha ao atualizar status da vacina",
+        error: "Falha ao atualizar vacina",
         detail: error instanceof Error ? error.message : "Erro desconhecido ao atualizar vacina.",
       },
       { status: 500 },

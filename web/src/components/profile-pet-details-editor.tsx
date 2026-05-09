@@ -2,13 +2,17 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { IconShare } from "@/components/icons";
 import { getPetImageOrDefault } from "@/lib/pets/image";
+import { PET_PROFILE_PHOTO_INPUT_ID } from "@/lib/pets/profile-photo-input-id";
 
 type Props = {
   petName: string;
   petIdentity: string;
   petBreed: string;
   petImage: string;
+  /** URL absoluta da pagina publica do pet; ausente em modo demo / sem conta. */
+  sharePublicUrl?: string | null;
   initialAge: number | null;
   initialWeightKg: number | null;
   initialSex: string | null;
@@ -30,6 +34,7 @@ type Props = {
 
 type SaveState = "idle" | "saving" | "success" | "error";
 type PhotoState = "idle" | "uploading" | "error";
+
 const DEFAULT_PUBLIC_FIELDS = {
   name: true,
   breed: false,
@@ -59,6 +64,7 @@ export function ProfilePetDetailsEditor({
   initialMicrochipId,
   initialNotes,
   initialPublicFields,
+  sharePublicUrl = null,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(petName ?? "");
@@ -87,6 +93,8 @@ export function ProfilePetDetailsEditor({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [identityCopied, setIdentityCopied] = useState(false);
   const identityCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [shareCopiedHint, setShareCopiedHint] = useState(false);
+  const shareHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canCopyPetIdentity =
     Boolean(petIdentity?.trim()) && petIdentity.trim() !== "Nao disponivel";
@@ -94,6 +102,7 @@ export function ProfilePetDetailsEditor({
   useEffect(() => {
     return () => {
       if (identityCopyTimerRef.current) clearTimeout(identityCopyTimerRef.current);
+      if (shareHintTimerRef.current) clearTimeout(shareHintTimerRef.current);
     };
   }, []);
 
@@ -110,6 +119,40 @@ export function ProfilePetDetailsEditor({
       }, 1600);
     } catch {
       /* clipboard pode falhar em contexto inseguro */
+    }
+  }
+
+  async function sharePublicProfile() {
+    if (!sharePublicUrl?.trim()) return;
+    const display = (name.trim() || petName).trim() || "Pet";
+    const idRaw = petIdentity?.trim() ?? "";
+    const idLine = idRaw && idRaw !== "Nao disponivel" ? `ID: ${idRaw}` : "";
+    const url = sharePublicUrl.trim();
+    const textLines = [display];
+    if (idLine) textLines.push(idLine);
+    textLines.push("", url);
+    const text = textLines.join("\n");
+    const title = `Perfil de ${display}`;
+
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({ title, text, url });
+        return;
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareCopiedHint(true);
+      if (shareHintTimerRef.current) clearTimeout(shareHintTimerRef.current);
+      shareHintTimerRef.current = setTimeout(() => {
+        setShareCopiedHint(false);
+        shareHintTimerRef.current = null;
+      }, 2000);
+    } catch {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -197,8 +240,26 @@ export function ProfilePetDetailsEditor({
             <h2 className="text-[28px] font-semibold text-white">{name.trim() || "Pet"}</h2>
             <p className="text-[12px] text-white/80">{petBreed}</p>
           </div>
-          <div className="absolute bottom-4 right-4 flex items-center gap-2">
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleChoosePhoto} />
+          <div className="absolute bottom-4 right-4 flex max-w-[calc(100%-2rem)] flex-wrap items-center justify-end gap-2">
+            <input
+              ref={fileInputRef}
+              id={PET_PROFILE_PHOTO_INPUT_ID}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleChoosePhoto}
+            />
+            {sharePublicUrl ? (
+              <button
+                type="button"
+                onClick={() => void sharePublicProfile()}
+                className="flex items-center gap-1.5 rounded-xl bg-white/92 px-3 py-1.5 text-[12px] font-semibold text-zinc-700 shadow-sm transition hover:bg-white"
+                aria-label="Compartilhar perfil publico do pet"
+              >
+                <IconShare className="h-4 w-4 shrink-0" />
+                {shareCopiedHint ? "Copiado!" : "Compartilhar"}
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={isPhotoBusy}

@@ -3,8 +3,6 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-const STORAGE_KEY = "lyka-splash-seen";
-
 /** Posicoes fixas para evitar diferencas de hidratacao e manter estrelas espalhadas. */
 const STARS = [
   { t: 6, l: 10, d: 0.1, s: 2 },
@@ -42,18 +40,9 @@ const STARS = [
 const DISPLAY_MS = 2600;
 const FADE_MS = 520;
 
-function readInitialPhase(): "show" | "gone" {
-  if (typeof window === "undefined") return "show";
-  try {
-    if (sessionStorage.getItem(STORAGE_KEY) === "1") return "gone";
-  } catch {
-    // ignore
-  }
-  return "show";
-}
-
 export function SplashScreen() {
-  const [phase, setPhase] = useState<"show" | "exit" | "gone">(readInitialPhase);
+  /** Sempre inicia em "show" (SSR + cliente alinhados) — cada carga completa do documento mostra a splash primeiro. */
+  const [phase, setPhase] = useState<"show" | "exit" | "gone">("show");
 
   useEffect(() => {
     if (phase !== "show") return;
@@ -73,11 +62,6 @@ export function SplashScreen() {
 
   useEffect(() => {
     if (phase !== "exit") return;
-    try {
-      sessionStorage.setItem(STORAGE_KEY, "1");
-    } catch {
-      /* ignore */
-    }
     const id = window.setTimeout(() => setPhase("gone"), FADE_MS);
     return () => window.clearTimeout(id);
   }, [phase]);

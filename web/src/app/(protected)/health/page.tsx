@@ -49,15 +49,15 @@ export default async function HealthPage() {
         }
       />
 
-      <section className="appear-up mt-3 grid grid-cols-2 gap-2.5" style={{ animationDelay: "80ms" }}>
+      <section className="appear-up mt-3 grid grid-cols-4 gap-2" style={{ animationDelay: "80ms" }}>
         {metrics.map((item) => (
-          <article key={item.label} className="elev-card rounded-2xl p-3.5">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">{item.label}</p>
-            <p className="mt-2 text-[24px] font-semibold leading-none text-zinc-900">
+          <article key={item.label} className="elev-card rounded-xl p-2">
+            <p className="truncate text-[9px] uppercase tracking-wide text-zinc-500">{item.label}</p>
+            <p className="mt-1.5 text-[15px] font-semibold leading-none text-zinc-900">
               {item.value}
-              <span className="ml-1 text-[12px] font-medium text-zinc-500">{item.unit}</span>
+              <span className="ml-1 text-[9px] font-medium text-zinc-500">{item.unit}</span>
             </p>
-            <p className={`mt-2 text-[11px] font-medium ${item.tone}`}>{item.status}</p>
+            <p className={`mt-1 truncate text-[9px] font-medium ${item.tone}`}>{item.status}</p>
           </article>
         ))}
       </section>

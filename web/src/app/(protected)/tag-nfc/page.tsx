@@ -13,11 +13,14 @@ export default async function TagNfcPage() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
   let currentPet = null;
+  let nfcPin = "";
   if (uid) {
     try {
       currentPet = (await getOrCreateCurrentPet(uid)).pet;
+      nfcPin = currentPet.nfcPin?.trim() ?? "";
     } catch {
       currentPet = null;
+      nfcPin = "";
     }
   }
   const publicFields = currentPet?.publicFields ?? {
@@ -83,14 +86,15 @@ export default async function TagNfcPage() {
             <input
               type="text"
               inputMode="numeric"
-              value="4829"
+              value={nfcPin || "— — — —"}
               readOnly
-              aria-label="PIN da Tag NFC em modo mock"
-              className="w-24 rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-center text-[14px] font-semibold tracking-[0.22em] text-zinc-900"
+              aria-label="PIN da Tag NFC"
+              className="min-w-[5.5rem] rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-center text-[14px] font-semibold tracking-[0.2em] text-zinc-900"
             />
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">Mock</span>
           </div>
-          <p className="mt-1 text-[10px] text-zinc-500">Campo visual temporario (4 digitos). Integracao real sera feita depois.</p>
+          <p className="mt-1 text-[10px] text-zinc-500">
+            PIN de 4 digitos gravado na tag ao parear. Use para alterar dados da tag quando o app solicitar.
+          </p>
         </div>
         <div className="space-y-2">
           <Link

@@ -3,6 +3,9 @@ export const COLLECTION_USER = "User";
 export const COLLECTION_PETS = "Pets";
 export const COLLECTION_VETERINARIANS = "Veterinarians";
 
+/** Produtos exibidos no carrossel da Home (painel admin). */
+export const COLLECTION_CAROUSEL_PRODUCTS = "carouselProducts";
+
 /** Subcoleção em `Pets/{petId}`: mensagens de quem encontrou o pet (NFC / pet perdido). */
 export const SUBCOLLECTION_FINDER_MESSAGES = "finderMessages";
 
@@ -23,3 +26,6 @@ export const SUBCOLLECTION_VACCINES = "vacinas";
 
 /** Nome legado em inglês mantido para migração retrocompatível. */
 export const SUBCOLLECTION_VACCINES_LEGACY = "vaccines";
+
+/** Subcoleção em `Veterinarians/{uid}`: registros de prontuário por pet. */
+export const SUBCOLLECTION_VET_MEDICAL_RECORDS = "medicalRecords";

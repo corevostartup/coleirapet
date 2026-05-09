@@ -2,17 +2,19 @@ import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { ProfilePetDetailsEditor } from "@/components/profile-pet-details-editor";
+import { ProfileQuickActions } from "@/components/profile-quick-actions";
 import { ProfilePetSwitcher } from "@/components/profile-pet-switcher";
 import { ProfileUserDetailsEditor } from "@/components/profile-user-details-editor";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AppShell, TopBar } from "@/components/shell";
-import { IconCamera, IconCollar, IconHeart, IconSettings, IconShield } from "@/components/icons";
+import { IconSettings, IconShield } from "@/components/icons";
 import { AUTH_USER_NAME_COOKIE, AUTH_USER_PHOTO_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserNameCookie, parseAuthUserPhotoCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
 import { filterLegacyUiDemoPetsFromSwitcherList } from "@/lib/pets/legacy-ui-demo-pets";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
+import { absolutePublicUrl } from "@/lib/site/public-url";
 import { devices, pet } from "@/lib/mock";
 
 export const dynamic = "force-dynamic";
@@ -160,6 +162,7 @@ export default async function ProfilePage({
         initialMicrochipId={petData.microchipId}
         initialNotes={petData.notes}
         initialPublicFields={petData.publicFields}
+        sharePublicUrl={currentPet ? absolutePublicUrl(currentPet.publicPagePath) : null}
       />
 
       <section className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "170ms" }}>
@@ -226,23 +229,7 @@ export default async function ProfilePage({
         </div>
       </section>
 
-      <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "260ms" }}>
-        <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Acoes rapidas</h3>
-        <div className="grid grid-cols-3 gap-2.5">
-          <button className="chip rounded-2xl px-2 py-3 text-center transition hover:bg-zinc-100">
-            <IconHeart className="mx-auto h-5 w-5 text-zinc-700" />
-            <span className="mt-1.5 block text-[11px] font-medium text-zinc-600">Saude</span>
-          </button>
-          <button className="chip rounded-2xl px-2 py-3 text-center transition hover:bg-zinc-100">
-            <IconCollar className="mx-auto h-5 w-5 text-zinc-700" />
-            <span className="mt-1.5 block text-[11px] font-medium text-zinc-600">Lyka</span>
-          </button>
-          <button className="chip rounded-2xl px-2 py-3 text-center transition hover:bg-zinc-100">
-            <IconCamera className="mx-auto h-5 w-5 text-zinc-700" />
-            <span className="mt-1.5 block text-[11px] font-medium text-zinc-600">Camera</span>
-          </button>
-        </div>
-      </section>
+      <ProfileQuickActions />
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "320ms" }}>
         <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Conta</h3>

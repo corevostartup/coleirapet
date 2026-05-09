@@ -5,9 +5,14 @@ import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants"
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_PETS } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { getOrCreateCurrentPet, invalidateCurrentPetCache } from "@/lib/pets/current";
+import {
+  getOrCreateCurrentPet,
+  invalidateCurrentPetCache,
+  regenerateNfcPinForCurrentPet,
+} from "@/lib/pets/current";
 
 type PairPayload = {
+  prepareWrite?: boolean;
   nfcId?: string;
 };
 
@@ -48,8 +53,19 @@ export async function POST(request: Request) {
     body = {};
   }
 
+  if (body.prepareWrite === true) {
+    const { nfcPin } = await regenerateNfcPinForCurrentPet(auth.uid);
+    return NextResponse.json({ ok: true, nfcPin });
+  }
+
   const db = getFirebaseAdminDb();
   const { petRef, pet } = await getOrCreateCurrentPet(auth.uid);
+  let nfcPin = pet.nfcPin ?? "";
+  if (!nfcPin) {
+    const regen = await regenerateNfcPinForCurrentPet(auth.uid);
+    nfcPin = regen.nfcPin;
+  }
+
   const preferredNfcId = parseNfcId(body.nfcId);
 
   let chosenNfcId = "";
@@ -73,6 +89,12 @@ export async function POST(request: Request) {
   await petRef.set({ nfcId: chosenNfcId, nfcPairedAt: nowIso, updatedAt: nowIso }, { merge: true });
   invalidateCurrentPetCache(auth.uid);
 
-  return NextResponse.json({ ok: true, nfcId: chosenNfcId, nfcPairedAt: nowIso });
+  return NextResponse.json({ ok: true, nfcId: chosenNfcId, nfcPairedAt: nowIso, nfcPin });
 }
 
+export async function GET() {
+  const auth = await requireAuthContext();
+  if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+  const { pet } = await getOrCreateCurrentPet(auth.uid);
+  return NextResponse.json({ ok: true, petId: pet.id, nfcPin: pet.nfcPin ?? "" });
+}

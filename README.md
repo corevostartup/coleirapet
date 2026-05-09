@@ -11,7 +11,7 @@ Aplicativo de monitoramento e cuidado de pets (marca **Lyka**; repositório e pa
 
 ### iOS + WebKit Integration
 
-O aplicativo iOS agora usa WebKit para carregar a interface web do Next.js. Por padrão, está configurado para carregar de `http://localhost:3000`.
+O aplicativo iOS usa WebKit para carregar o Next.js. A URL de carga está em `Lyka/ContentView.swift` (produção: site publicado no Netlify; para desenvolvimento local, use `http://localhost:3000`).
 
 #### Passos para executar:
 
@@ -40,7 +40,7 @@ O aplicativo iOS agora usa WebKit para carregar a interface web do Next.js. Por 
    - No Xcode, selecione um simulador ou dispositivo
    - Aperte Cmd+R para executar
 
-> **Nota**: Para produção, atualize a URL em `ContentView.swift` para apontar para o servidor web publicado (ex: sua URL do Netlify).
+> **Nota**: Em produção, o app iOS usa `https://uselyka.netlify.app` em `ContentView.swift`. No Netlify, defina também `NEXT_PUBLIC_SITE_URL=https://uselyka.netlify.app` para links absolutos e meta tags.
 
 ## Tech Stack
 

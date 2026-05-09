@@ -19,6 +19,77 @@ function todayIso() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** Converte minutos salvos em sequencia de digitos para edicao (ex.: 90 → "130", 45 → "45"). */
+function minutesToDigitBuffer(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return String(m);
+  if (h < 10) return `${h}${String(m).padStart(2, "0")}`;
+  return `${String(h).padStart(2, "0")}${String(m).padStart(2, "0")}`.slice(0, 4);
+}
+
+/**
+ * Formata digitos (0–4) como H:MM enquanto o usuario digita.
+ * Os dois ultimos digitos sao sempre minutos (00–59); o restante sao horas.
+ */
+function formatDurationDigitBuffer(rawDigits: string): string {
+  const d = rawDigits.replace(/\D/g, "").slice(0, 4);
+  if (!d) return "";
+
+  if (d.length === 1) {
+    return `0:0${d}`;
+  }
+
+  if (d.length === 2) {
+    const n = Number.parseInt(d, 10);
+    if (Number.isNaN(n)) return "";
+    if (n <= 59) return `0:${String(n).padStart(2, "0")}`;
+    const h = Math.floor(n / 60);
+    const m = n % 60;
+    const total = h * 60 + m;
+    if (total > 1440) return "24:00";
+    return `${h}:${String(m).padStart(2, "0")}`;
+  }
+
+  const mm = Number.parseInt(d.slice(-2), 10);
+  let hh = Number.parseInt(d.slice(0, -2), 10) || 0;
+  if (Number.isNaN(mm)) return "0:00";
+  if (mm > 59) {
+    const n = Number.parseInt(d, 10);
+    const total = Math.min(n, 1440);
+    hh = Math.floor(total / 60);
+    const m = total % 60;
+    return `${hh}:${String(m).padStart(2, "0")}`;
+  }
+  if (hh > 24) hh = 24;
+  if (hh === 24 && mm > 0) return "24:00";
+  const total = hh * 60 + mm;
+  if (total > 1440) return "24:00";
+  return `${hh}:${String(mm).padStart(2, "0")}`;
+}
+
+function totalMinutesFromDigitBuffer(digits: string): number | null {
+  const d = digits.replace(/\D/g, "");
+  if (!d) return null;
+  const formatted = formatDurationDigitBuffer(d);
+  return parseDurationToTotalMinutes(formatted);
+}
+
+/** Converte string H:MM canonica para total de minutos (0–1440). */
+function parseDurationToTotalMinutes(s: string): number | null {
+  const t = s.trim();
+  if (!t) return null;
+  const hm = /^(\d{1,2}):(\d{2})$/.exec(t);
+  if (!hm) return null;
+  const h = Number.parseInt(hm[1], 10);
+  const m = Number.parseInt(hm[2], 10);
+  if (m > 59 || h < 0 || h > 24) return null;
+  if (h === 24 && m !== 0) return null;
+  const total = h * 60 + m;
+  if (total > 1440) return null;
+  return total;
+}
+
 export function HealthActivityMinutesPanel() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +99,7 @@ export function HealthActivityMinutesPanel() {
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [date, setDate] = useState(todayIso());
-  const [minutes, setMinutes] = useState<number>(30);
+  const [durationDigits, setDurationDigits] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const savingRef = useRef(saving);
   useEffect(() => {
@@ -93,7 +164,7 @@ export function HealthActivityMinutesPanel() {
     setModalError(null);
     setEditingId(null);
     setDate(todayIso());
-    setMinutes(30);
+    setDurationDigits("");
     setModalOpen(true);
   }
 
@@ -101,7 +172,7 @@ export function HealthActivityMinutesPanel() {
     setModalError(null);
     setEditingId(entry.id);
     setDate(entry.date);
-    setMinutes(entry.minutes);
+    setDurationDigits(minutesToDigitBuffer(entry.minutes));
     setModalOpen(true);
   }
 
@@ -114,13 +185,22 @@ export function HealthActivityMinutesPanel() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!date) return;
+    const minutesParsed = totalMinutesFromDigitBuffer(durationDigits);
+    if (minutesParsed === null) {
+      setModalError("Informe o tempo no formato horas:minutos (ex.: 0:30 ou 1:15), ate 24:00.");
+      return;
+    }
+    if (minutesParsed < 0 || minutesParsed > 1440) {
+      setModalError("O tempo total nao pode passar de 24 horas (24:00).");
+      return;
+    }
     setSaving(true);
     setModalError(null);
     try {
       const res = await fetch("/api/pets/activity-minutes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, minutes }),
+        body: JSON.stringify({ date, minutes: minutesParsed }),
       });
       const payload = (await res.json().catch(() => null)) as
         | { error?: string; entry?: Entry }
@@ -201,20 +281,21 @@ export function HealthActivityMinutesPanel() {
                 onClick={() => !saving && closeModal()}
               />
               <section className="relative z-[1] mx-auto min-w-0 w-[min(420px,calc(100vw-1rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-3 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)] sm:p-4">
-                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                  <div className="min-w-0 flex-1 pr-0 sm:pr-2">
-                    <h3 id="activity-minutes-modal-title" className="text-[15px] font-semibold text-zinc-900">
+                <div className="mb-3 flex items-start justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0 flex-1 pr-1 sm:pr-2">
+                    <h3 id="activity-minutes-modal-title" className="text-[15px] font-semibold leading-snug text-zinc-900">
                       {editingId ? "Atualizar minutos" : "Novo registro"}
                     </h3>
-                    <p className="mt-1 text-[12px] leading-snug text-zinc-600">
-                      Registre quantos minutos seu pet se manteve ativo no dia.
+                    <p className="mt-1 break-words text-[12px] leading-snug text-zinc-600">
+                      Registre quanto tempo seu pet ficou ativo no dia. No campo tempo use horas e minutos (ex.:{" "}
+                      <span className="tabular-nums">0:45</span> ou <span className="tabular-nums">1:30</span>).
                     </p>
                   </div>
                   <button
                     type="button"
                     disabled={saving}
                     onClick={closeModal}
-                    className="flex h-9 w-9 shrink-0 self-end items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50 sm:self-start"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50"
                     aria-label="Fechar"
                   >
                     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -224,8 +305,8 @@ export function HealthActivityMinutesPanel() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="grid min-w-0 gap-3">
-                  <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
-                    <div className="min-w-0">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div className="shrink-0">
                       <label htmlFor="act-minutes-date" className="text-[12px] font-semibold text-zinc-700">
                         Data
                       </label>
@@ -236,23 +317,26 @@ export function HealthActivityMinutesPanel() {
                         onChange={(e) => setDate(e.target.value)}
                         readOnly={Boolean(editingId)}
                         required
-                        className="mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition read-only:opacity-90 focus:border-emerald-400 focus:bg-white sm:px-3"
+                        className="mt-2 box-border h-11 min-h-11 w-[min(100%,11.5rem)] min-w-[10.5rem] max-w-[12rem] rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition read-only:opacity-90 focus:border-emerald-400 focus:bg-white sm:px-3"
                       />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-[6.25rem] shrink-0 sm:w-28">
                       <label htmlFor="act-minutes-value" className="text-[12px] font-semibold text-zinc-700">
-                        Minutos
+                        Tempo <span className="font-normal text-zinc-500">(h:mm)</span>
                       </label>
                       <input
                         id="act-minutes-value"
-                        type="number"
-                        min={0}
-                        max={1440}
-                        step={1}
-                        value={minutes}
-                        onChange={(e) => setMinutes(Number(e.target.value))}
-                        className="no-number-spinner mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] tabular-nums text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:px-3"
-                        required
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        spellCheck={false}
+                        value={formatDurationDigitBuffer(durationDigits)}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+                          setDurationDigits(digits);
+                        }}
+                        placeholder="0:30"
+                        className="no-number-spinner mt-2 box-border h-11 min-h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] tabular-nums text-zinc-900 outline-none transition placeholder:text-zinc-400 placeholder:font-normal focus:border-emerald-400 focus:bg-white focus:text-zinc-900 sm:px-3"
                       />
                     </div>
                   </div>

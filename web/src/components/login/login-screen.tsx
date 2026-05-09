@@ -2,8 +2,12 @@
 
 import Image from "next/image";
 import {
+  completeEmailLinkSignIn,
   createAccountWithEmailPassword,
   consumeGoogleRedirectResult,
+  getEmailForStoredLinkSignIn,
+  isEmailLinkSignInUrl,
+  sendEmailLinkToSignIn,
   signInWithAppleNativeIdToken,
   signInWithAppleOnWeb,
   signInWithEmailPassword,
@@ -65,6 +69,8 @@ const LOGIN_BG_STARS = [
   { t: 46, l: 3, d: 1.45, s: 2 },
   { t: 69, l: 84, d: 1.0, s: 1 },
 ] as const;
+
+type LoginAuthBusy = "google" | "apple" | "email-login" | "email-create" | "email-link";
 
 function nativeGoogleSignIn(): Promise<{ idToken: string }> {
   return new Promise((resolve, reject) => {
@@ -136,7 +142,8 @@ function nativeAppleSignIn(): Promise<{ idToken: string }> {
 
 export function LoginScreen() {
   const router = useRouter();
-  const [googleBusy, setGoogleBusy] = useState(false);
+  const [authBusy, setAuthBusy] = useState<LoginAuthBusy | null>(null);
+  const authInProgress = authBusy !== null;
   const [oauthHint, setOauthHint] = useState<string | null>(null);
   const [legalDocOpen, setLegalDocOpen] = useState<"privacy" | "terms" | null>(null);
   const [showEmailAuth, setShowEmailAuth] = useState(false);
@@ -146,12 +153,49 @@ export function LoginScreen() {
   useEffect(() => {
     let active = true;
 
+    async function finishEmailLinkFlow() {
+      try {
+        if (!isEmailLinkSignInUrl(window.location.href)) return false;
+        const knownEmail = getEmailForStoredLinkSignIn();
+        const emailForLink = knownEmail || window.prompt("Confirme seu email para entrar com link:")?.trim() || "";
+        if (!emailForLink) {
+          setOauthHint("Nao foi possivel confirmar o email para o link de acesso.");
+          return true;
+        }
+
+        setAuthBusy("email-link");
+        const idToken = await completeEmailLinkSignIn(emailForLink, window.location.href);
+        const res = await fetch("/api/auth/firebase/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken, provider: "email" }),
+        });
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
+          setOauthHint(formatAuthErrorMessage(payload));
+          setAuthBusy(null);
+          return true;
+        }
+        if (!active) return true;
+        router.replace("/home");
+        router.refresh();
+        return true;
+      } catch (error) {
+        if (!active) return true;
+        setOauthHint(error instanceof Error ? error.message : "Erro ao concluir login por link de email.");
+        setAuthBusy(null);
+        return true;
+      }
+    }
+
     async function finishRedirectFlow() {
       try {
+        const consumedEmailLink = await finishEmailLinkFlow();
+        if (consumedEmailLink) return;
         const idToken = await consumeGoogleRedirectResult();
         if (!active || !idToken) return;
 
-        setGoogleBusy(true);
+        setAuthBusy("google");
         const res = await fetch("/api/auth/firebase/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -161,7 +205,7 @@ export function LoginScreen() {
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
           setOauthHint(formatAuthErrorMessage(payload));
-          setGoogleBusy(false);
+          setAuthBusy(null);
           return;
         }
 
@@ -170,7 +214,7 @@ export function LoginScreen() {
       } catch (error) {
         if (!active) return;
         setOauthHint(error instanceof Error ? error.message : "Erro ao concluir login Google.");
-        setGoogleBusy(false);
+        setAuthBusy(null);
       }
     }
 
@@ -182,7 +226,7 @@ export function LoginScreen() {
 
   async function enterGoogle() {
     setOauthHint(null);
-    setGoogleBusy(true);
+    setAuthBusy("google");
     try {
       let idToken: string;
 
@@ -208,7 +252,7 @@ export function LoginScreen() {
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
         setOauthHint(formatAuthErrorMessage(payload));
-        setGoogleBusy(false);
+        setAuthBusy(null);
         return;
       }
 
@@ -216,13 +260,13 @@ export function LoginScreen() {
       router.refresh();
     } catch (error) {
       setOauthHint(error instanceof Error ? error.message : "Erro ao autenticar com Google.");
-      setGoogleBusy(false);
+      setAuthBusy(null);
     }
   }
 
   async function enterApple() {
     setOauthHint(null);
-    setGoogleBusy(true);
+    setAuthBusy("apple");
     try {
       let idToken: string;
 
@@ -243,7 +287,7 @@ export function LoginScreen() {
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
         setOauthHint(formatAuthErrorMessage(payload));
-        setGoogleBusy(false);
+        setAuthBusy(null);
         return;
       }
 
@@ -251,22 +295,22 @@ export function LoginScreen() {
       router.refresh();
     } catch (error) {
       setOauthHint(error instanceof Error ? error.message : "Erro ao autenticar com Apple.");
-      setGoogleBusy(false);
+      setAuthBusy(null);
     }
   }
 
   async function enterWithEmail(mode: "login" | "create") {
     setOauthHint(null);
-    setGoogleBusy(true);
+    setAuthBusy(mode === "create" ? "email-create" : "email-login");
     try {
       if (!email.trim() || !password.trim()) {
         setOauthHint("Informe email e senha.");
-        setGoogleBusy(false);
+        setAuthBusy(null);
         return;
       }
       if (password.trim().length < 6) {
         setOauthHint("A senha precisa ter pelo menos 6 caracteres.");
-        setGoogleBusy(false);
+        setAuthBusy(null);
         return;
       }
 
@@ -282,7 +326,7 @@ export function LoginScreen() {
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string; detail?: string } | null;
         setOauthHint(formatAuthErrorMessage(payload));
-        setGoogleBusy(false);
+        setAuthBusy(null);
         return;
       }
 
@@ -290,7 +334,26 @@ export function LoginScreen() {
       router.refresh();
     } catch (error) {
       setOauthHint(error instanceof Error ? error.message : "Erro ao autenticar com email.");
-      setGoogleBusy(false);
+      setAuthBusy(null);
+    }
+  }
+
+  async function enterWithEmailLink() {
+    setOauthHint(null);
+    setAuthBusy("email-link");
+    try {
+      const normalizedEmail = email.trim();
+      if (!normalizedEmail) {
+        setOauthHint("Informe um email para receber o link de acesso.");
+        setAuthBusy(null);
+        return;
+      }
+      await sendEmailLinkToSignIn(normalizedEmail);
+      setOauthHint("Link enviado. Verifique seu email para concluir o login.");
+      setAuthBusy(null);
+    } catch (error) {
+      setOauthHint(error instanceof Error ? error.message : "Erro ao enviar link de acesso.");
+      setAuthBusy(null);
     }
   }
 
@@ -337,7 +400,7 @@ export function LoginScreen() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                disabled={googleBusy}
+                disabled={authInProgress}
                 autoComplete="email"
                 placeholder="Email"
                 className="h-[52px] w-full rounded-2xl border border-zinc-200 bg-white px-4 text-[14px] text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 disabled:opacity-70"
@@ -346,7 +409,7 @@ export function LoginScreen() {
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                disabled={googleBusy}
+                disabled={authInProgress}
                 autoComplete="current-password"
                 placeholder="Senha"
                 className="h-[52px] w-full rounded-2xl border border-zinc-200 bg-white px-4 text-[14px] text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 disabled:opacity-70"
@@ -354,20 +417,29 @@ export function LoginScreen() {
               <button
                 type="button"
                 onClick={() => void enterWithEmail("login")}
-                disabled={googleBusy}
+                disabled={authInProgress}
                 className="flex h-[52px] w-full items-center justify-center rounded-2xl bg-black text-[15px] font-semibold text-white transition hover:bg-zinc-900 active:scale-[0.99] disabled:opacity-70"
                 aria-label="Entrar com Email"
               >
-                {googleBusy ? "Entrando..." : "Entrar com Email"}
+                {authBusy === "email-login" ? "Entrando..." : "Entrar com Email"}
               </button>
               <button
                 type="button"
                 onClick={() => void enterWithEmail("create")}
-                disabled={googleBusy}
+                disabled={authInProgress}
                 className="flex h-[52px] w-full items-center justify-center rounded-2xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-800 shadow-sm transition enabled:hover:bg-zinc-50 active:scale-[0.99] disabled:opacity-70"
                 aria-label="Criar conta com Email"
               >
-                {googleBusy ? "Criando conta..." : "Criar conta"}
+                {authBusy === "email-create" ? "Criando conta..." : "Criar conta"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void enterWithEmailLink()}
+                disabled={authInProgress}
+                className="flex h-[52px] w-full items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 text-[15px] font-semibold text-zinc-800 transition enabled:hover:bg-zinc-100 active:scale-[0.99] disabled:opacity-70"
+                aria-label="Receber link de acesso por email"
+              >
+                {authBusy === "email-link" ? "Enviando link..." : "Entrar com link por Email"}
               </button>
               <button
                 type="button"
@@ -377,7 +449,7 @@ export function LoginScreen() {
                   setPassword("");
                   setShowEmailAuth(false);
                 }}
-                disabled={googleBusy}
+                disabled={authInProgress}
                 className="mx-auto mt-1 block text-[12px] font-medium text-zinc-500 underline decoration-zinc-300 underline-offset-2 transition enabled:hover:text-zinc-700 disabled:opacity-60"
                 aria-label="Voltar para login social"
               >
@@ -388,23 +460,23 @@ export function LoginScreen() {
             <div className="space-y-2.5">
               <button
                 type="button"
-                onClick={enterApple}
-                disabled={googleBusy}
-                className="flex h-[52px] w-full items-center justify-center rounded-2xl bg-black text-[15px] font-semibold text-white transition hover:bg-zinc-900 active:scale-[0.99]"
+                onClick={() => void enterApple()}
+                disabled={authInProgress}
+                className="flex h-[52px] w-full items-center justify-center rounded-2xl bg-black text-[15px] font-semibold text-white transition hover:bg-zinc-900 active:scale-[0.99] disabled:opacity-70"
                 aria-label="Entrar com Apple"
               >
-                {googleBusy ? "Entrando..." : "Entrar com Apple"}
+                {authBusy === "apple" ? "Entrando..." : "Entrar com Apple"}
               </button>
 
               <button
                 type="button"
-                onClick={enterGoogle}
-                disabled={googleBusy}
+                onClick={() => void enterGoogle()}
+                disabled={authInProgress}
                 className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-800 shadow-sm transition enabled:hover:bg-zinc-50 active:scale-[0.99] disabled:opacity-70"
                 aria-label="Entrar com Google"
               >
                 <GoogleSignInGlyph className="h-[22px] w-[22px] shrink-0" />
-                {googleBusy ? "Entrando com Google..." : "Entrar com Google"}
+                {authBusy === "google" ? "Entrando com Google..." : "Entrar com Google"}
               </button>
 
               <button
@@ -413,7 +485,7 @@ export function LoginScreen() {
                   setOauthHint(null);
                   setShowEmailAuth(true);
                 }}
-                disabled={googleBusy}
+                disabled={authInProgress}
                 className="flex h-[52px] w-full items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 text-[15px] font-semibold text-zinc-800 transition enabled:hover:bg-zinc-100 active:scale-[0.99] disabled:opacity-70"
                 aria-label="Entrar com Email"
               >

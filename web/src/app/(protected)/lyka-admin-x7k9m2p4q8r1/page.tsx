@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { TopBar } from "@/components/shell";
+import { AdminSidebar } from "@/components/admin-sidebar";
 
 const kpiCards = [
   { label: "Usuarios ativos (24h)", value: "1.284", trend: "+8.4%", tone: "text-emerald-700", chip: "Saudavel" },
@@ -44,15 +45,34 @@ const regionHealth = [
   { region: "Norte", users: "50", incidents: 3, color: "bg-amber-500" },
 ] as const;
 
-const adminMenu = [
-  { label: "Visao geral", href: "#admin-overview" },
-  { label: "Usuarios", href: "#admin-usuarios" },
-  { label: "Moderacao", href: "#admin-moderacao" },
-  { label: "Suporte", href: "#admin-suporte" },
-  { label: "Financeiro", href: "#admin-financeiro" },
-  { label: "Regioes", href: "#admin-regioes" },
-  { label: "Auditoria", href: "#admin-auditoria" },
-  { label: "Acoes rapidas", href: "#admin-acoes" },
+const mockTermsSections = [
+  {
+    title: "Uso permitido",
+    text: "Esta secao mock define que a plataforma deve ser usada apenas para acompanhamento de pets, sem violar leis locais ou direitos de terceiros.",
+  },
+  {
+    title: "Conta e seguranca",
+    text: "O usuario e responsavel por manter credenciais seguras. Em caso de suspeita de acesso indevido, a conta deve ser atualizada imediatamente.",
+  },
+  {
+    title: "Suspensao e encerramento",
+    text: "A Lyka pode suspender recursos em caso de abuso, fraude ou atividade maliciosa. Este texto e apenas ilustrativo para ambiente administrativo.",
+  },
+] as const;
+
+const mockPrivacySections = [
+  {
+    title: "Dados coletados",
+    text: "Coletamos dados de cadastro, informacoes de pet e eventos de uso do app para melhorar funcionalidades e suporte, em carater demonstrativo.",
+  },
+  {
+    title: "Finalidade do tratamento",
+    text: "Os dados sao usados para operacao da conta, envio de notificacoes e melhoria de produto. Nao representam politica oficial publicada.",
+  },
+  {
+    title: "Compartilhamento e retencao",
+    text: "Compartilhamento ocorre apenas quando necessario para prestacao do servico. O periodo de retencao deve seguir regras internas e legais.",
+  },
 ] as const;
 
 type AdminUserPlan = "free" | "pro";
@@ -138,21 +158,7 @@ export default function LykaAdminPage() {
 
         <div className="mt-3 grid gap-3 lg:grid-cols-12">
           <aside className="appear-up lg:col-span-3 xl:col-span-2" style={{ animationDelay: "20ms" }}>
-            <nav className="sticky top-4 rounded-[24px] border border-zinc-200 bg-white p-3 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.45)]">
-              <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Menu administrativo</p>
-              <ul className="space-y-1">
-                {adminMenu.map((item) => (
-                  <li key={item.href}>
-                    <a
-                      href={item.href}
-                      className="block rounded-xl px-2.5 py-2 text-[12px] font-medium text-zinc-700 transition hover:bg-emerald-50 hover:text-emerald-800"
-                    >
-                      {item.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
+            <AdminSidebar />
           </aside>
 
           <div className="lg:col-span-9 xl:col-span-10">
@@ -293,6 +299,36 @@ export default function LykaAdminPage() {
                   </article>
                 ))}
               </div>
+                </section>
+
+                <section id="admin-termos" className="appear-up rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "140ms" }}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h2 className="text-[14px] font-semibold text-zinc-900">Termos de Uso</h2>
+                    <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700">Mock</span>
+                  </div>
+                  <div className="space-y-2">
+                    {mockTermsSections.map((section) => (
+                      <article key={section.title} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                        <h3 className="text-[12px] font-semibold text-zinc-800">{section.title}</h3>
+                        <p className="mt-1 text-[11px] leading-relaxed text-zinc-600">{section.text}</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+
+                <section id="admin-privacidade" className="appear-up rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "150ms" }}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h2 className="text-[14px] font-semibold text-zinc-900">Politicas de Privacidade</h2>
+                    <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700">Mock</span>
+                  </div>
+                  <div className="space-y-2">
+                    {mockPrivacySections.map((section) => (
+                      <article key={section.title} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                        <h3 className="text-[12px] font-semibold text-zinc-800">{section.title}</h3>
+                        <p className="mt-1 text-[11px] leading-relaxed text-zinc-600">{section.text}</p>
+                      </article>
+                    ))}
+                  </div>
                 </section>
 
                 <section id="admin-auditoria" className="appear-up rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "200ms" }}>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { IconFile, IconHeart, IconHome, IconPin, IconUser } from "@/components/icons";
 
@@ -16,7 +17,14 @@ function resolveTab(pathname: string): Tab {
 }
 
 export function UserBottomNav() {
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname() ?? "";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
   if (pathname.startsWith("/vet")) return null;
   if (pathname.startsWith("/lyka-admin-x7k9m2p4q8r1")) return null;
 

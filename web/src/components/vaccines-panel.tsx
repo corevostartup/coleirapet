@@ -1,19 +1,12 @@
 "use client";
 
+import type { ComponentProps } from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
+import { VaccineDetailsModal } from "@/components/vaccine-details-modal";
 import { IconCalendar } from "@/components/icons";
-
-type VaccineStatus = "applied" | "pending";
-
-type VaccineItem = {
-  id: string;
-  name: string;
-  status: VaccineStatus;
-  stateLabel: "Aplicada" | "Pendente";
-  date: string;
-  dateLabel: string;
-};
+import type { VaccineItem, VaccineStatus } from "@/lib/vaccines/vaccine-item";
 
 type VaccinesResponse = {
   vaccines: VaccineItem[];
@@ -36,10 +29,14 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
   const [modalOpen, setModalOpen] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [detailVaccine, setDetailVaccine] = useState<VaccineItem | null>(null);
 
   const [name, setName] = useState("");
   const [status, setStatus] = useState<VaccineStatus>("pending");
   const [date, setDate] = useState("");
+  const [veterinarian, setVeterinarian] = useState("");
+  const [clinic, setClinic] = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -104,6 +101,9 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
     setName("");
     setStatus("pending");
     setDate("");
+    setVeterinarian("");
+    setClinic("");
+    setNotes("");
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -115,7 +115,14 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
       const res = await fetch("/api/vaccines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, status, date }),
+        body: JSON.stringify({
+          name,
+          status,
+          date,
+          veterinarian: veterinarian.trim() || undefined,
+          clinic: clinic.trim() || undefined,
+          notes: notes.trim() || undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -169,7 +176,15 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Vacinas</h3>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1">
+          <Link
+            prefetch
+            href="/dados/carteira-vacinacao"
+            aria-label="Abrir carteira de vacinacao"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200/90 bg-emerald-50/80 text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100/90 active:scale-[0.97]"
+          >
+            <IconVaccineWalletNav className="h-[18px] w-[18px]" />
+          </Link>
           <button
             type="button"
             onClick={openModal}
@@ -198,12 +213,23 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
             <VaccineCard
               key={vaccine.id}
               vaccine={vaccine}
+              onOpenDetails={() => setDetailVaccine(vaccine)}
               onToggleStatus={() => handleToggleStatus(vaccine)}
               toggling={togglingId === vaccine.id}
             />
           ))}
         </div>
       )}
+
+      <VaccineDetailsModal
+        vaccine={detailVaccine}
+        open={detailVaccine !== null}
+        onClose={() => setDetailVaccine(null)}
+        onUpdated={(v) => {
+          setVaccines((current) => current.map((item) => (item.id === v.id ? v : item)));
+          setDetailVaccine(v);
+        }}
+      />
 
       {mounted && modalOpen
         ? createPortal(
@@ -287,6 +313,32 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                     </div>
                   </div>
 
+                  <p className="text-[11px] font-semibold text-zinc-600">Opcional</p>
+                  <div className="grid min-w-0 gap-2">
+                    <input
+                      value={veterinarian}
+                      onChange={(e) => setVeterinarian(e.target.value)}
+                      placeholder="Veterinario(a)"
+                      maxLength={120}
+                      className="box-border w-full min-w-0 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[13px] text-zinc-900 outline-none focus:border-emerald-400 focus:bg-white"
+                    />
+                    <input
+                      value={clinic}
+                      onChange={(e) => setClinic(e.target.value)}
+                      placeholder="Clinica ou estabelecimento"
+                      maxLength={120}
+                      className="box-border w-full min-w-0 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[13px] text-zinc-900 outline-none focus:border-emerald-400 focus:bg-white"
+                    />
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Observacoes (lote, etc.)"
+                      maxLength={800}
+                      rows={2}
+                      className="box-border w-full min-w-0 resize-none rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[13px] text-zinc-900 outline-none focus:border-emerald-400 focus:bg-white"
+                    />
+                  </div>
+
                   {modalError ? <p className="text-[11px] font-medium text-rose-600">{modalError}</p> : null}
 
                   <button
@@ -314,32 +366,66 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
   );
 }
 
+function IconVaccineWalletNav(props: ComponentProps<"svg">) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      {...props}
+    >
+      <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+      <path d="M2.5 10.5h19" />
+      <path d="M6 15.5h5" />
+      <circle cx="17.5" cy="15.5" r="1.35" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 function VaccineCard({
   vaccine,
+  onOpenDetails,
   onToggleStatus,
   toggling,
 }: {
   vaccine: VaccineItem;
+  onOpenDetails: () => void;
   onToggleStatus: () => void;
   toggling: boolean;
 }) {
   return (
     <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
-      <div className="flex items-center justify-between">
-        <p className="text-[12px] font-medium text-zinc-800">{vaccine.name}</p>
+      <div className="flex items-start justify-between gap-2">
         <button
           type="button"
-          onClick={onToggleStatus}
+          onClick={onOpenDetails}
+          className="min-w-0 flex-1 rounded-xl text-left transition hover:bg-white/60"
+        >
+          <p className="text-[12px] font-medium text-zinc-800">{vaccine.name}</p>
+          <p className="mt-0.5 text-[11px] text-zinc-500">Data: {vaccine.dateLabel}</p>
+          {vaccine.veterinarian.trim() ? (
+            <p className="mt-0.5 truncate text-[10px] text-zinc-500">Prof.: {vaccine.veterinarian}</p>
+          ) : null}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleStatus();
+          }}
           disabled={toggling}
           title="Trocar status da vacina"
-          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
             vaccine.status === "applied" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
           } disabled:opacity-60`}
         >
           {toggling ? "Alterando..." : vaccine.stateLabel}
         </button>
       </div>
-      <p className="mt-0.5 text-[11px] text-zinc-500">Data: {vaccine.dateLabel}</p>
     </article>
   );
 }
