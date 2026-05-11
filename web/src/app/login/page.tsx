@@ -1,5 +1,6 @@
-import { LoginScreen } from "@/components/login/login-screen";
 import type { Metadata } from "next";
+
+import { LoginScreenLoader } from "./login-screen-loader";
 
 export const dynamic = "force-dynamic";
 
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function LoginPage() {
-  return <LoginScreen />;
+  return <LoginScreenLoader />;
 }

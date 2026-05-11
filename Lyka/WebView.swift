@@ -123,7 +123,8 @@ struct WebView: UIViewRepresentable {
         context.coordinator.onProgressChange = onProgressChange
         context.coordinator.startProgressObservation(webView: webView)
 
-        let request = URLRequest(url: url)
+        // Revalida com o servidor para evitar HTML/JS de deploys diferentes no cache do WKWebView (hidratação partida).
+        let request = URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 60)
         webView.load(request)
         return webView
     }
@@ -135,7 +136,7 @@ struct WebView: UIViewRepresentable {
         // cancelava a navegacao (NSURLError -999) e podia deixar o WebContent hung / "check connection".
         if context.coordinator.loadedSwiftURL != url {
             context.coordinator.loadedSwiftURL = url
-            uiView.load(URLRequest(url: url))
+            uiView.load(URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 60))
         }
     }
 

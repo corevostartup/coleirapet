@@ -852,6 +852,7 @@ export function LoginScreen() {
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto lg:pl-4">
             <div
+              suppressHydrationWarning
               data-lyka-desktop-login={desktopLoginOpen ? "1" : "0"}
               className="flex w-full flex-col items-end flex-1 data-[lyka-desktop-login=0]:min-h-full data-[lyka-desktop-login=0]:justify-center data-[lyka-desktop-login=1]:min-h-0 data-[lyka-desktop-login=1]:justify-start data-[lyka-desktop-login=1]:py-2 sm:data-[lyka-desktop-login=1]:py-3"
             >
