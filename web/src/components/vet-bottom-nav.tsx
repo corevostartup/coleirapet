@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { IconCollar, IconFile, IconPin, IconUser } from "@/components/icons";
 
@@ -14,15 +14,10 @@ function resolveVetTab(pathname: string): VetTab {
   return "pets";
 }
 
-export function VetBottomNav() {
-  const [mounted, setMounted] = useState(false);
+/** `usePathname` só após mount (ver UserBottomNav). */
+function VetBottomNavInner() {
   const pathname = usePathname() ?? "";
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) return null;
   if (!pathname.startsWith("/vet")) return null;
 
   const tab = resolveVetTab(pathname);
@@ -56,4 +51,16 @@ export function VetBottomNav() {
       </ul>
     </nav>
   );
+}
+
+export function VetBottomNav() {
+  const [mounted, setMounted] = useState(false);
+
+  useLayoutEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  if (!mounted) return null;
+  return <VetBottomNavInner />;
 }

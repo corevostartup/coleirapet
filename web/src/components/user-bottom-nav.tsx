@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { IconFile, IconHeart, IconHome, IconPin, IconUser } from "@/components/icons";
 
@@ -16,15 +16,10 @@ function resolveTab(pathname: string): Tab {
   return "home";
 }
 
-export function UserBottomNav() {
-  const [mounted, setMounted] = useState(false);
+/** `usePathname` só depois do mount — chamar no SSR/hidratação inicial quebra o boundary Loading/Suspense no Next 16. */
+function UserBottomNavInner() {
   const pathname = usePathname() ?? "";
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) return null;
   if (pathname.startsWith("/vet")) return null;
   if (pathname.startsWith("/lyka-admin-x7k9m2p4q8r1")) return null;
 
@@ -57,4 +52,16 @@ export function UserBottomNav() {
       </ul>
     </nav>
   );
+}
+
+export function UserBottomNav() {
+  const [mounted, setMounted] = useState(false);
+
+  useLayoutEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  if (!mounted) return null;
+  return <UserBottomNavInner />;
 }

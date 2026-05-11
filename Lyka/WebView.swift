@@ -119,6 +119,7 @@ struct WebView: UIViewRepresentable {
 
         context.coordinator.webView = webView
         context.coordinator.baseURL = url
+        context.coordinator.loadedSwiftURL = url
         context.coordinator.onProgressChange = onProgressChange
         context.coordinator.startProgressObservation(webView: webView)
 
@@ -130,7 +131,10 @@ struct WebView: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {
         context.coordinator.baseURL = url
         context.coordinator.onProgressChange = onProgressChange
-        if uiView.url != url {
+        // Nunca comparar com uiView.url: durante a carga e um redirect e nil, o que fazia load() repetido,
+        // cancelava a navegacao (NSURLError -999) e podia deixar o WebContent hung / "check connection".
+        if context.coordinator.loadedSwiftURL != url {
+            context.coordinator.loadedSwiftURL = url
             uiView.load(URLRequest(url: url))
         }
     }
@@ -141,6 +145,8 @@ struct WebView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKScriptMessageHandler {
         var baseURL: URL = URL(string: "about:blank")!
+        /// Ultima URL pedida via Swift (evita multiplos load que cancelam o anterior).
+        var loadedSwiftURL: URL?
         var onProgressChange: ((Double) -> Void)?
         weak var webView: WKWebView?
         private var progressObservation: NSKeyValueObservation?

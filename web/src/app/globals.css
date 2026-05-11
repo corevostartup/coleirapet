@@ -40,6 +40,17 @@ body {
 	padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
 }
 
+/* Login · CTAs: WebKit/iOS aplica cor propria em button/link — rotulo sempre branco. */
+.lyka-login-cta,
+.lyka-login-cta:visited,
+.lyka-login-cta:hover,
+.lyka-login-cta:active,
+.lyka-login-cta:focus,
+.lyka-login-cta:focus-visible {
+	color: #ffffff !important;
+	-webkit-text-fill-color: #ffffff !important;
+}
+
 a {
 	color: inherit;
 	text-decoration: none;

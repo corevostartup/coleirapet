@@ -93,8 +93,7 @@ export function ProductCarousel() {
                 </div>
 
                 <div className="flex w-[58%] flex-col justify-center p-3">
-                  <p className="text-[13px] font-semibold text-zinc-900">{slide.title}</p>
-                  <p className="mt-0.5 text-[11px] text-zinc-600">{slide.description}</p>
+                  <p className="text-[11px] text-zinc-600">{slide.description}</p>
                   <a
                     href={slide.ctaHref}
                     target={slide.ctaHref.startsWith("http") ? "_blank" : undefined}

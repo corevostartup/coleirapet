@@ -1,10 +1,19 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { IconShare } from "@/components/icons";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 import { PET_PROFILE_PHOTO_INPUT_ID } from "@/lib/pets/profile-photo-input-id";
+
+/** SVG local: evita named import de `@/components/icons` virar `undefined` no bundle Webpack/RSC. */
+function ShareProfileIcon(props: ComponentProps<"svg">) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" x2="12" y1="2" y2="15" />
+    </svg>
+  );
+}
 
 type Props = {
   petName: string;
@@ -234,7 +243,15 @@ export function ProfilePetDetailsEditor({
     <>
       <section className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
         <div className="relative h-[220px]">
-          <Image src={photoUrl} alt={`Foto da ${name || petName}`} fill className="object-cover" sizes="(max-width: 768px) 100vw, 440px" />
+          {/* eslint-disable-next-line @next/next/no-img-element -- evita default export de next/image vir undefined no Webpack/RSC */}
+          <img
+            src={photoUrl}
+            alt={`Foto da ${name || petName}`}
+            className="absolute inset-0 h-full w-full object-cover"
+            width={440}
+            height={220}
+            decoding="async"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           <div className="absolute bottom-4 left-4">
             <h2 className="text-[28px] font-semibold text-white">{name.trim() || "Pet"}</h2>
@@ -256,7 +273,7 @@ export function ProfilePetDetailsEditor({
                 className="flex items-center gap-1.5 rounded-xl bg-white/92 px-3 py-1.5 text-[12px] font-semibold text-zinc-700 shadow-sm transition hover:bg-white"
                 aria-label="Compartilhar perfil publico do pet"
               >
-                <IconShare className="h-4 w-4 shrink-0" />
+                <ShareProfileIcon className="h-4 w-4 shrink-0" />
                 {shareCopiedHint ? "Copiado!" : "Compartilhar"}
               </button>
             ) : null}
