@@ -8,7 +8,7 @@ function shouldHideSplash(pathname: unknown): boolean {
     return false;
   }
   const p = pathname;
-  if (p === "/auth" || p === "/login") {
+  if (p === "/auth" || p === "/login" || p === "/criar-conta" || p === "/verify") {
     return true;
   }
   if (p.length >= 6 && p.slice(0, 6) === "/auth/") {

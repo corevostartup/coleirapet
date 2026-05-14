@@ -5,6 +5,7 @@ import {
   AUTH_USER_NAME_COOKIE,
   AUTH_USER_PHOTO_COOKIE,
   AUTH_USER_UID_COOKIE,
+  USER_PROFILE_EMAIL_PLACEHOLDER,
 } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserNameCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_PETS, COLLECTION_USER, COLLECTION_VETERINARIANS } from "@/lib/firebase/collections";
@@ -77,6 +78,7 @@ function parseOptionalText(value: unknown, maxLength: number) {
 function parseEmail(value: unknown) {
   const email = parseOptionalText(value, 160);
   if (email === undefined || email === null || email === "") return email;
+  if (email === USER_PROFILE_EMAIL_PLACEHOLDER) return email;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 }
 

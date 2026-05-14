@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { ProfilePetDetailsEditor } from "@/components/profile-pet-details-editor";
-import { ProfileQuickActions } from "@/components/profile-quick-actions";
 import { ProfilePetSwitcher } from "@/components/profile-pet-switcher";
 import { ProfileUserDetailsEditor } from "@/components/profile-user-details-editor";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -230,8 +229,6 @@ export default async function ProfilePage({
           })}
         </div>
       </section>
-
-      <ProfileQuickActions />
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "320ms" }}>
         <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Conta</h3>

@@ -13,7 +13,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(hasValidSession ? "/home" : "/login", request.url));
   }
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/criar-conta" || pathname === "/verify") {
     if ((session && !uid) || (session === "dev" && !isDevAuthBypassEnabled())) {
       const res = NextResponse.next();
       res.cookies.delete(AUTH_SESSION_COOKIE);

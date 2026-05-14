@@ -18,12 +18,12 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             WebView(url: appURL, onProgressChange: { webLoadProgress = $0 })
-                .background(Color.black)
+                .background(Color.white)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea()
 
             if webLoadProgress < 0.98 {
-                LykaCenteredLoadBar(progress: webLoadProgress)
+                LykaWebLoadingOverlay(progress: webLoadProgress)
                     .allowsHitTesting(false)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Progresso de carregamento")
@@ -36,8 +36,46 @@ struct ContentView: View {
     }
 }
 
-/// Barra verde compacta, centralizada na tela (WKWebView / iOS shell).
-private struct LykaCenteredLoadBar: View {
+/// Durante cargas do WKWebView (ex.: navegacao apos NFC): so logo flutuante + barra — fundo transparente, sem nebula/anel/estrelas.
+private struct LykaWebLoadingOverlay: View {
+    let progress: Double
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let emeraldGlow = Color(red: 34 / 255, green: 197 / 255, blue: 94 / 255)
+    private static let floatPeriod: Double = 3.4
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: false)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+                .truncatingRemainder(dividingBy: Self.floatPeriod) / Self.floatPeriod
+            let angle = t * 2 * Double.pi
+            let offsetY = reduceMotion ? CGFloat(0) : CGFloat(-11 * (1 - cos(angle)) / 2)
+            let rotationDeg = reduceMotion ? CGFloat(0) : CGFloat(sin(angle) * 1.1)
+
+            VStack {
+                Spacer(minLength: 0)
+                VStack(spacing: 24) {
+                    Image("ColeiraSplashLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 200, height: 200)
+                        .accessibilityHidden(true)
+                        .shadow(color: Self.emeraldGlow.opacity(0.22), radius: 18, x: 0, y: 12)
+                        .offset(y: offsetY)
+                        .rotationEffect(.degrees(rotationDeg))
+                    LykaInlineLoadBar(progress: progress)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.clear)
+        }
+    }
+}
+
+/// Barra verde compacta (sem espacers fullscreen — usada abaixo do mascote).
+private struct LykaInlineLoadBar: View {
     let progress: Double
 
     private var clamped: CGFloat {
@@ -49,22 +87,17 @@ private struct LykaCenteredLoadBar: View {
     private let barHeight: CGFloat = 2.5
 
     var body: some View {
-        VStack {
-            Spacer(minLength: 0)
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.white.opacity(0.14))
-                    .frame(width: trackWidth, height: barHeight)
-                Capsule()
-                    .fill(Self.barGreen)
-                    .frame(width: trackWidth * clamped, height: barHeight)
-                    .opacity(clamped > 0.001 ? 1 : 0)
-                    .shadow(color: Self.barGreen.opacity(0.4), radius: 8, x: 0, y: 0)
-            }
-            .frame(width: trackWidth, height: barHeight)
-            Spacer(minLength: 0)
+        ZStack(alignment: .leading) {
+            Capsule()
+                .fill(Color.black.opacity(0.08))
+                .frame(width: trackWidth, height: barHeight)
+            Capsule()
+                .fill(Self.barGreen)
+                .frame(width: trackWidth * clamped, height: barHeight)
+                .opacity(clamped > 0.001 ? 1 : 0)
+                .shadow(color: Self.barGreen.opacity(0.4), radius: 8, x: 0, y: 0)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(width: trackWidth, height: barHeight)
         .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.82), value: clamped)
     }
 }

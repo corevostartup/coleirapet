@@ -1,14 +1,14 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
 import {
-  ActionCodeSettings,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   OAuthProvider,
   browserLocalPersistence,
-  isSignInWithEmailLink,
-  sendSignInLinkToEmail,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithEmailLink,
+  signOut as firebaseSignOut,
+  updateProfile,
   getAuth,
   getRedirectResult,
   inMemoryPersistence,
@@ -23,7 +23,6 @@ type GoogleSignInResult =
   | { type: "redirect" };
 
 let persistenceReady: Promise<void> | null = null;
-const EMAIL_LINK_STORAGE_KEY = "lyka_email_link_signin_email";
 
 function getFirebaseConfig() {
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -46,11 +45,15 @@ function getFirebaseConfig() {
   };
 }
 
-function getFirebaseApp() {
+export function getLykaFirebaseApp() {
   if (!getApps().length) {
     return initializeApp(getFirebaseConfig());
   }
   return getApp();
+}
+
+function getFirebaseApp() {
+  return getLykaFirebaseApp();
 }
 
 async function ensureAuthPersistence() {
@@ -159,45 +162,53 @@ export async function createAccountWithEmailPassword(email: string, password: st
   return result.user.getIdToken();
 }
 
-function buildEmailLinkActionCodeSettings(): ActionCodeSettings {
-  if (typeof window === "undefined") {
-    throw new Error("Email link precisa ser iniciado no navegador.");
-  }
-  return {
-    url: `${window.location.origin}/login?mode=email-link`,
-    handleCodeInApp: true,
-  };
-}
-
-export async function sendEmailLinkToSignIn(email: string): Promise<void> {
-  const auth = getAuth(getFirebaseApp());
-  await ensureAuthPersistence();
-  const normalizedEmail = email.trim();
-  await sendSignInLinkToEmail(auth, normalizedEmail, buildEmailLinkActionCodeSettings());
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, normalizedEmail);
-  }
-}
-
-export function getEmailForStoredLinkSignIn(): string {
+/** URL de retorno após o usuário clicar no link de verificação (Firebase Auth). Deve estar nos domínios autorizados no console. */
+export function getEmailVerificationContinueUrl(): string {
   if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(EMAIL_LINK_STORAGE_KEY)?.trim() ?? "";
+  return `${window.location.origin}/verify`;
 }
 
-export function isEmailLinkSignInUrl(url: string): boolean {
-  const auth = getAuth(getFirebaseApp());
-  return isSignInWithEmailLink(auth, url);
-}
-
-export async function completeEmailLinkSignIn(email: string, url?: string): Promise<string> {
+/**
+ * Cadastro por e-mail (como Locus): cria conta, define nome de exibição e envia e-mail de confirmação.
+ */
+export async function registerWithEmailPasswordAndSendVerification(
+  displayName: string,
+  email: string,
+  password: string,
+): Promise<string> {
   const auth = getAuth(getFirebaseApp());
   await ensureAuthPersistence();
-  const currentUrl = url ?? (typeof window !== "undefined" ? window.location.href : "");
-  const result = await signInWithEmailLink(auth, email.trim(), currentUrl);
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
+  const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  const user = result.user;
+  const trimmedName = displayName.trim();
+  if (trimmedName) {
+    await updateProfile(user, { displayName: trimmedName });
   }
-  return result.user.getIdToken();
+  await sendEmailVerification(user, {
+    url: getEmailVerificationContinueUrl(),
+  });
+  return user.getIdToken();
+}
+
+export async function sendSignupVerificationEmailAgain(): Promise<void> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  const user = auth.currentUser;
+  if (!user) throw new Error("Nenhum usuario autenticado.");
+  await sendEmailVerification(user, {
+    url: getEmailVerificationContinueUrl(),
+  });
+}
+
+export async function sendPasswordResetEmailLyka(email: string): Promise<void> {
+  const auth = getAuth(getFirebaseApp());
+  await ensureAuthPersistence();
+  await sendPasswordResetEmail(auth, email.trim());
+}
+
+export async function signOutFirebaseClient(): Promise<void> {
+  const auth = getAuth(getFirebaseApp());
+  await firebaseSignOut(auth);
 }
 
 /**

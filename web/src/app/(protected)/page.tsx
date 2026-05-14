@@ -283,21 +283,45 @@ export default async function Home() {
         />
 
         <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "360ms" }}>
-          <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Proximos eventos</h3>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h3 className="text-[14px] font-semibold text-zinc-900">Proximos eventos</h3>
+              <p className="mt-0.5 text-[11px] text-zinc-500">Vacinas pendentes e lembretes de medicacao do pet</p>
+            </div>
+            <Link href="/dados" className="text-[11px] font-semibold text-emerald-700 underline decoration-emerald-600/35 underline-offset-2">
+              Ver em Dados
+            </Link>
+          </div>
           <div className="space-y-2">
             {upcomingEvents.length === 0 ? (
               <p className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[12px] text-zinc-500">
-                Nenhum evento pendente (vacinas pendentes ou lembretes de medicação).
+                Nenhuma vacina pendente nem lembrete cadastrado.{" "}
+                <Link href="/dados" className="font-semibold text-emerald-700 underline decoration-emerald-600/35">
+                  Abrir Dados
+                </Link>
               </p>
             ) : (
               upcomingEvents.map((item) => (
-                <article key={item.id} className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className={`h-2.5 w-2.5 rounded-full ${item.kind === "warning" ? "bg-amber-500" : "bg-blue-500"}`} />
-                    <p className="text-[13px] font-medium text-zinc-800">{item.label}</p>
+                <Link
+                  key={item.id}
+                  href="/dados"
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 transition hover:border-emerald-200 hover:bg-emerald-50/40"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.kind === "warning" ? "bg-amber-500" : "bg-blue-500"}`} />
+                    <div className="min-w-0">
+                      <span
+                        className={`mb-0.5 inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
+                          item.source === "vaccine" ? "bg-amber-100 text-amber-900" : "bg-blue-100 text-blue-900"
+                        }`}
+                      >
+                        {item.source === "vaccine" ? "Vacina pendente" : "Lembrete"}
+                      </span>
+                      <p className="truncate text-[13px] font-medium text-zinc-800">{item.label}</p>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-zinc-500">{item.when}</p>
-                </article>
+                  <p className="shrink-0 text-right text-[11px] text-zinc-500">{item.when}</p>
+                </Link>
               ))
             )}
           </div>

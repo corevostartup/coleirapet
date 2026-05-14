@@ -10,3 +10,6 @@ export const AUTH_SESSION_VALUES = ["apple", "google", "email", "dev"] as const;
 export type AuthSessionValue = (typeof AUTH_SESSION_VALUES)[number];
 
 export const AUTH_SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
+
+/** Rótulo de email no perfil após Sign in with Apple (até o tutor informar um email real). */
+export const USER_PROFILE_EMAIL_PLACEHOLDER = "Não Informado";

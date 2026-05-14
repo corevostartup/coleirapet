@@ -10,6 +10,8 @@ export type HomeUpcomingEventRow = {
   label: string;
   when: string;
   kind: "warning" | "info";
+  /** Vacina pendente ou lembrete de medicação (exibido na home). */
+  source: "vaccine" | "reminder";
   sortAt: number;
 };
 
@@ -81,25 +83,26 @@ export async function fetchHomeUpcomingEvents(petRef: DocumentReference, limit =
   const vaccineDocs = await readVaccineDocsUnified(petRef);
   for (const doc of vaccineDocs) {
     const data = doc.data() as { name?: string; status?: string; date?: string };
-    if (data.status !== "pending") continue;
+    /** Igual a `vaccineFromDoc`: só "applied" tira da lista de pendentes; omissão conta como pendente. */
+    const status = data.status === "applied" ? "applied" : "pending";
+    if (status !== "pending") continue;
+
     const date = typeof data.date === "string" ? data.date.trim() : "";
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    const sortAt = parseIsoDateAtLocalMidnight(date);
     const name = typeof data.name === "string" && data.name.trim() ? data.name.trim() : "Vacina";
+    const hasIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    const sortAt = hasIsoDate ? parseIsoDateAtLocalMidnight(date) : Number.MAX_SAFE_INTEGER - 1000;
     rows.push({
       id: `v-${doc.id}`,
-      label: `${name} (pendente)`,
-      when: formatVaccineWhenLabel(date),
+      label: name,
+      when: hasIsoDate ? formatVaccineWhenLabel(date) : "Data nao informada",
       kind: "warning",
+      source: "vaccine",
       sortAt,
     });
   }
 
-  const reminderSnap = await petRef
-    .collection(SUBCOLLECTION_MEDICATION_REMINDERS)
-    .orderBy("createdAt", "desc")
-    .limit(30)
-    .get();
+  /** Sem `orderBy`: evita índice composto e inclui lembretes legados sem `createdAt` (como em `/api/pets/medication-reminders`). */
+  const reminderSnap = await petRef.collection(SUBCOLLECTION_MEDICATION_REMINDERS).limit(120).get();
 
   for (const doc of reminderSnap.docs) {
     const data = doc.data() as { name?: string; time?: string };
@@ -109,9 +112,10 @@ export async function fetchHomeUpcomingEvents(petRef: DocumentReference, limit =
     const sortAt = nextMedicationOccurrenceMs(time);
     rows.push({
       id: `m-${doc.id}`,
-      label: `Lembrete: ${name}`,
+      label: name,
       when: formatMedicationWhenLabel(time),
       kind: "info",
+      source: "reminder",
       sortAt,
     });
   }

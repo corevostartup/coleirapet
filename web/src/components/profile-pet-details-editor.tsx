@@ -58,6 +58,53 @@ function formatWeight(value: number | null) {
   return `${value.toFixed(1)} kg`;
 }
 
+/**
+ * Obtem a foto de perfil atual como File para `navigator.share({ files })` (Web Share Level 2).
+ * Falha silenciosamente (CORS, rede) e o fluxo segue sem anexo.
+ */
+async function fetchPetPhotoAsShareFile(imageSrc: string, displayName: string): Promise<File | null> {
+  if (typeof window === "undefined") return null;
+  const trimmed = imageSrc.trim();
+  if (!trimmed) return null;
+
+  try {
+    const absolute =
+      trimmed.startsWith("http://") || trimmed.startsWith("https://")
+        ? trimmed
+        : new URL(trimmed, window.location.origin).href;
+
+    let sameOrigin = false;
+    try {
+      sameOrigin = new URL(absolute).origin === window.location.origin;
+    } catch {
+      sameOrigin = false;
+    }
+
+    const res = await fetch(absolute, {
+      mode: "cors",
+      credentials: sameOrigin ? "include" : "omit",
+    });
+    if (!res.ok) return null;
+
+    const blob = await res.blob();
+    if (!blob.size) return null;
+
+    const mime = blob.type && blob.type.startsWith("image/") ? blob.type : "image/jpeg";
+    const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : mime.includes("gif") ? "gif" : "jpg";
+    const safe =
+      displayName
+        .trim()
+        .replace(/[/\\?%*:|"<>]/g, "-")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 48) || "pet";
+
+    return new File([blob], `${safe}-perfil.${ext}`, { type: mime });
+  } catch {
+    return null;
+  }
+}
+
 export function ProfilePetDetailsEditor({
   petName,
   petIdentity,
@@ -139,21 +186,43 @@ export function ProfilePetDetailsEditor({
     const url = sharePublicUrl.trim();
     const textLines = [display];
     if (idLine) textLines.push(idLine);
-    textLines.push("", url);
-    const text = textLines.join("\n");
+    /** Corpo sem URL: `navigator.share({ text, url })` ja anexa o link — incluir URL em `text` duplicava no share sheet (ex.: iOS). */
+    const textForShare = textLines.join("\n");
+    const textForClipboard = [textForShare, url].filter(Boolean).join("\n\n");
     const title = `Perfil de ${display}`;
+    const minimalShare: ShareData = {
+      title,
+      text: textForShare,
+      url,
+    };
 
-    try {
-      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-        await navigator.share({ title, text, url });
-        return;
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      let sharedWithImage = false;
+      try {
+        const imageFile = await fetchPetPhotoAsShareFile(photoUrl, display);
+        if (imageFile && typeof navigator.canShare === "function") {
+          const withFiles: ShareData = { ...minimalShare, files: [imageFile] };
+          if (navigator.canShare(withFiles)) {
+            await navigator.share(withFiles);
+            sharedWithImage = true;
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
       }
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+
+      if (sharedWithImage) return;
+
+      try {
+        await navigator.share(minimalShare);
+        return;
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+      }
     }
 
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(textForClipboard);
       setShareCopiedHint(true);
       if (shareHintTimerRef.current) clearTimeout(shareHintTimerRef.current);
       shareHintTimerRef.current = setTimeout(() => {
@@ -161,7 +230,7 @@ export function ProfilePetDetailsEditor({
         shareHintTimerRef.current = null;
       }, 2000);
     } catch {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+      window.open(`https://wa.me/?text=${encodeURIComponent(textForClipboard)}`, "_blank", "noopener,noreferrer");
     }
   }
 

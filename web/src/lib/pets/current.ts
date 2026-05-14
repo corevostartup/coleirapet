@@ -7,9 +7,12 @@ import {
   SUBCOLLECTION_VACCINES_LEGACY,
 } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { pet as mockPet } from "@/lib/mock";
 import { getPetImageOrDefault } from "@/lib/pets/image";
+import { pickRandomFunPlaceholderPetName } from "@/lib/pets/placeholder-names";
 import { isLegacyUiDemoPetName } from "@/lib/pets/legacy-ui-demo-pets";
+
+/** Quando o documento nao tem nome (legado ou apagado). */
+const PET_DISPLAY_NAME_FALLBACK = "Não informado";
 
 type PetDoc = {
   ownerId?: string;
@@ -200,9 +203,9 @@ function toPetProfile(petId: string, data: PetDoc): PetProfile {
     nfcId: parseString(data.nfcId),
     nfcPairedAt: parseString(data.nfcPairedAt),
     nfcPin: parseNfcPin(data.nfcPin),
-    name: parseString(data.name) ?? mockPet.name,
-    breed: parseString(data.breed) ?? mockPet.breed,
-    image: getPetImageOrDefault(parseString(data.image) ?? mockPet.image),
+    name: parseString(data.name) ?? PET_DISPLAY_NAME_FALLBACK,
+    breed: parseString(data.breed) ?? "",
+    image: getPetImageOrDefault(parseString(data.image)),
     age: parseNumber(data.age),
     weightKg: parseNumber(data.weightKg),
     sex: parseString(data.sex),
@@ -309,22 +312,18 @@ function defaultPetDoc(ownerId: string) {
     nfcId: "",
     nfcPairedAt: "",
     publicPageSlug: generatePublicPageSlug(),
-    name: mockPet.name,
-    breed: mockPet.breed,
-    image: getPetImageOrDefault(mockPet.image),
-    age: mockPet.age,
-    weightKg: mockPet.weightKg,
-    sex: mockPet.sex,
-    size: mockPet.size,
-    emergencyContact: "(11) 98888-1234",
-    color: "Dourado",
+    name: pickRandomFunPlaceholderPetName(),
+    breed: "",
+    image: "",
+    emergencyContact: "",
+    color: "",
     microchipId: "",
     notes: "",
     publicFields: {
       name: true,
       breed: false,
       color: false,
-      emergencyContact: true,
+      emergencyContact: false,
       microchipId: false,
       notes: false,
     },

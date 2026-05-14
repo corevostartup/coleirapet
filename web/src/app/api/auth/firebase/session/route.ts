@@ -1,3 +1,4 @@
+import type { DocumentSnapshot } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
 import {
   AUTH_SESSION_COOKIE,
@@ -5,6 +6,7 @@ import {
   AUTH_USER_NAME_COOKIE,
   AUTH_USER_PHOTO_COOKIE,
   AUTH_USER_UID_COOKIE,
+  USER_PROFILE_EMAIL_PLACEHOLDER,
 } from "@/lib/auth/constants";
 import { COLLECTION_USER } from "@/lib/firebase/collections";
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from "@/lib/firebase/admin";
@@ -30,6 +32,55 @@ type UserProfileUpsertInput = {
   userPhotoUrl: string | null;
   provider: string;
 };
+
+const APPLE_PLACEHOLDER_USER_NAME = "User";
+
+function isApplePrivateRelayEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return email.toLowerCase().includes("privaterelay.appleid.com");
+}
+
+/**
+ * Perfil exibido no app: Sign in with Apple costuma trazer nome e email de relay pouco amigaveis.
+ * Novos logins Apple usam placeholders; contas existentes só trocam relay pelo rótulo, preservando dados já editados.
+ */
+function resolveAppleProfileFromSnapshot(
+  userSnapshot: DocumentSnapshot,
+  verified: VerifiedIdentity,
+): { userName: string; email: string; userPhotoUrl: string | null } {
+  const verifiedEmail = verified.email?.trim() ?? "";
+  const verifiedName = verified.name?.trim() ?? "";
+  const tokenIsRelay = isApplePrivateRelayEmail(verifiedEmail);
+
+  if (!userSnapshot.exists) {
+    return {
+      userName: APPLE_PLACEHOLDER_USER_NAME,
+      email: USER_PROFILE_EMAIL_PLACEHOLDER,
+      userPhotoUrl: null,
+    };
+  }
+
+  const raw = (userSnapshot.data() ?? {}) as { name?: unknown; email?: unknown; photoURL?: unknown };
+  let name = typeof raw.name === "string" ? raw.name.trim() : "";
+  let email = typeof raw.email === "string" ? raw.email.trim() : "";
+  let photoURL: string | null =
+    typeof raw.photoURL === "string" && raw.photoURL.trim() ? raw.photoURL.trim() : null;
+
+  const hadRelay = isApplePrivateRelayEmail(email);
+  const emailStillMatchesTokenRelay = tokenIsRelay && email === verifiedEmail;
+
+  if (hadRelay || emailStillMatchesTokenRelay) {
+    email = USER_PROFILE_EMAIL_PLACEHOLDER;
+    if (!name || (verifiedName.length > 0 && name === verifiedName)) {
+      name = APPLE_PLACEHOLDER_USER_NAME;
+    }
+  }
+
+  if (!name) name = APPLE_PLACEHOLDER_USER_NAME;
+  if (!email) email = USER_PROFILE_EMAIL_PLACEHOLDER;
+
+  return { userName: name, email, userPhotoUrl: photoURL };
+}
 
 async function verifyIdTokenWithAdmin(idToken: string): Promise<VerifiedIdentity> {
   const decoded = await getFirebaseAdminAuth().verifyIdToken(idToken);
@@ -86,11 +137,14 @@ async function verifyIdTokenWithIdentityToolkit(idToken: string): Promise<Verifi
   };
 }
 
-async function upsertUserProfileSafe(input: UserProfileUpsertInput): Promise<string | null> {
+async function upsertUserProfileSafe(
+  input: UserProfileUpsertInput,
+  preloadedSnapshot?: DocumentSnapshot,
+): Promise<string | null> {
   try {
     const nowIso = new Date().toISOString();
     const userRef = getFirebaseAdminDb().collection(COLLECTION_USER).doc(input.uid);
-    const userSnapshot = await userRef.get();
+    const userSnapshot = preloadedSnapshot ?? (await userRef.get());
     await userRef.set(
       {
         uid: input.uid,
@@ -142,21 +196,41 @@ export async function POST(request: Request) {
     if (provider === "apple" && verified.firebaseProvider !== "apple.com") {
       return NextResponse.json({ error: "Token nao pertence a Apple" }, { status: 403 });
     }
-    if (provider === "email" && !["password", "email", "emailLink"].includes(verified.firebaseProvider)) {
+    if (provider === "email" && !["password", "email"].includes(verified.firebaseProvider)) {
       return NextResponse.json({ error: "Token nao pertence ao login por email" }, { status: 403 });
     }
 
-    const userName = (verified.name ?? verified.email ?? "Tutor(a)").trim();
+    const userRef = getFirebaseAdminDb().collection(COLLECTION_USER).doc(verified.uid);
+    const userSnapshot = await userRef.get();
+
+    let userName: string;
+    let profileEmail: string | null;
+    let profilePhoto: string | null;
+
+    if (provider === "apple") {
+      const resolved = resolveAppleProfileFromSnapshot(userSnapshot, verified);
+      userName = resolved.userName;
+      profileEmail = resolved.email;
+      profilePhoto = resolved.userPhotoUrl;
+    } else {
+      userName = (verified.name ?? verified.email ?? "Tutor(a)").trim();
+      profileEmail = verified.email ?? null;
+      profilePhoto = verified.picture ?? null;
+    }
+
     const encodedUserName = encodeURIComponent(userName.slice(0, 80));
-    const userPhotoUrl = typeof verified.picture === "string" ? verified.picture.trim() : "";
-    const encodedUserPhotoUrl = userPhotoUrl ? encodeURIComponent(userPhotoUrl.slice(0, 1024)) : "";
-    const profileWriteWarning = await upsertUserProfileSafe({
-      uid: verified.uid,
-      email: verified.email ?? null,
-      userName,
-      userPhotoUrl: verified.picture ?? null,
-      provider: verified.firebaseProvider || provider,
-    });
+    const userPhotoUrlTrimmed = typeof profilePhoto === "string" ? profilePhoto.trim() : "";
+    const encodedUserPhotoUrl = userPhotoUrlTrimmed ? encodeURIComponent(userPhotoUrlTrimmed.slice(0, 1024)) : "";
+    const profileWriteWarning = await upsertUserProfileSafe(
+      {
+        uid: verified.uid,
+        email: profileEmail,
+        userName,
+        userPhotoUrl: profilePhoto,
+        provider: verified.firebaseProvider || provider,
+      },
+      userSnapshot,
+    );
     const defaultPetProvisionWarning = await (async () => {
       try {
         await getOrCreateCurrentPet(verified.uid);
