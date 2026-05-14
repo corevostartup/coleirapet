@@ -17,6 +17,10 @@ function shouldHideSplash(pathname: unknown): boolean {
   if (p.length >= 7 && p.slice(0, 7) === "/login/") {
     return true;
   }
+  /* Pareamento NFC usa `location.replace` no iOS — evita splash completa em cima do loader minimo. */
+  if (p.length >= 8 && p.slice(0, 8) === "/tag-nfc") {
+    return true;
+  }
   return false;
 }
 
@@ -59,6 +63,19 @@ const FADE_MS = 520;
 
 function LykaSplashOverlay() {
   const [phase, setPhase] = useState<"show" | "exit" | "gone">("show");
+  const [wkProgress, setWkProgress] = useState(0);
+  const [wkProgressFromNative, setWkProgressFromNative] = useState(false);
+
+  useEffect(() => {
+    const onProgress = (ev: Event) => {
+      const detail = (ev as CustomEvent<number>).detail;
+      const n = typeof detail === "number" && Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 0;
+      setWkProgressFromNative(true);
+      setWkProgress(n);
+    };
+    window.addEventListener("lyka-wk-load-progress", onProgress as EventListener);
+    return () => window.removeEventListener("lyka-wk-load-progress", onProgress as EventListener);
+  }, []);
 
   useEffect(() => {
     if (phase !== "show") return;
@@ -129,10 +146,19 @@ function LykaSplashOverlay() {
           />
         </div>
 
-        <div className="splash-hud mt-8 flex gap-2.5" aria-hidden>
-          <span className="splash-hud-dot" style={{ animationDelay: "0ms" }} />
-          <span className="splash-hud-dot" style={{ animationDelay: "180ms" }} />
-          <span className="splash-hud-dot" style={{ animationDelay: "360ms" }} />
+        <div
+          className="splash-load-track mt-8"
+          role="progressbar"
+          aria-label="Carregando"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={wkProgressFromNative ? Math.round(wkProgress * 100) : undefined}
+        >
+          <div
+            className="splash-load-fill"
+            style={{ width: wkProgressFromNative ? `${Math.max(1, wkProgress * 100)}%` : "0%" }}
+          />
+          {!wkProgressFromNative ? <div className="splash-load-shimmer" aria-hidden /> : null}
         </div>
       </div>
     </div>

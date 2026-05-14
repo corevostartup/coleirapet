@@ -94,6 +94,11 @@ struct WebView: UIViewRepresentable {
                     window.webkit.messageHandlers.lykaNativeNFC.postMessage({ action: 'writePairingPassword', password, publicUrl });
                 }
             };
+            window.LykaNativeShare = {
+                share: (payload) => {
+                    window.webkit.messageHandlers.lykaNativeShare.postMessage(payload || {});
+                }
+            };
         })();
         """
 
@@ -101,6 +106,7 @@ struct WebView: UIViewRepresentable {
         contentController.addUserScript(userScript)
         contentController.add(context.coordinator, name: "lykaNativeAuth")
         contentController.add(context.coordinator, name: "lykaNativeNFC")
+        contentController.add(context.coordinator, name: "lykaNativeShare")
 
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = contentController
@@ -166,9 +172,18 @@ struct WebView: UIViewRepresentable {
             stopProgressObservation()
             progressObservation = webView.observe(\.estimatedProgress, options: [.new]) { [weak self] webView, _ in
                 DispatchQueue.main.async {
-                    self?.onProgressChange?(webView.estimatedProgress)
+                    let p = webView.estimatedProgress
+                    self?.onProgressChange?(p)
+                    self?.dispatchWebKitLoadProgressToPage(webView: webView, progress: p)
                 }
             }
+        }
+
+        /// Envia progresso da WKWebView para a splash web (substitui os tres pontinhos por barra).
+        private func dispatchWebKitLoadProgressToPage(webView: WKWebView, progress: Double) {
+            let clamped = min(1, max(0, progress))
+            let js = "window.dispatchEvent(new CustomEvent('lyka-wk-load-progress',{detail:\(clamped)}));"
+            webView.evaluateJavaScript(js, completionHandler: nil)
         }
 
         func stopProgressObservation() {
@@ -182,8 +197,65 @@ struct WebView: UIViewRepresentable {
                 handleAuthMessage(message)
             case "lykaNativeNFC":
                 handleNFCMessage(message)
+            case "lykaNativeShare":
+                handleNativeShareMessage(message)
             default:
                 break
+            }
+        }
+
+        /// Folha nativa de partilha (WKWebView perde o gesto do utilizador se houver `await` antes de `navigator.share`).
+        private func handleNativeShareMessage(_ message: WKScriptMessage) {
+            guard let body = message.body as? [String: Any],
+                  let text = body["text"] as? String,
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else {
+                return
+            }
+
+            let title = (body["title"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let imageUrlString = (body["imageUrl"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let imageURL = imageUrlString.flatMap { URL(string: $0) }
+
+            Task { @MainActor [weak self] in
+                guard let self, let webView = self.webView else { return }
+
+                var items: [Any] = []
+                if let title, !title.isEmpty {
+                    items.append(title)
+                }
+                items.append(text)
+                if let imageURL {
+                    do {
+                        let (data, _) = try await URLSession.shared.data(from: imageURL)
+                        if let image = UIImage(data: data), image.size.width > 0 {
+                            items.append(image)
+                        }
+                    } catch {
+                        // Partilha so com texto se a imagem nao for acessivel sem cookies.
+                    }
+                }
+
+                guard
+                    let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                    let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+                        ?? windowScene.windows.first?.rootViewController
+                else {
+                    return
+                }
+
+                let presenter = UIViewController.lykaTopMost(from: rootVC)
+                let activity = UIActivityViewController(activityItems: items, applicationActivities: nil)
+
+                if let pop = activity.popoverPresentationController {
+                    pop.sourceView = webView
+                    pop.sourceRect = CGRect(x: webView.bounds.midX - 1, y: webView.bounds.midY - 1, width: 2, height: 2)
+                    pop.permittedArrowDirections = []
+                }
+
+                presenter.present(activity, animated: true)
             }
         }
 
@@ -517,6 +589,7 @@ struct WebView: UIViewRepresentable {
 extension WebView.Coordinator: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         onProgressChange?(1.0)
+        dispatchWebKitLoadProgressToPage(webView: webView, progress: 1.0)
     }
 }
 
@@ -635,6 +708,21 @@ private extension URL {
             return URL(string: "\(scheme)://\(host):\(port)")
         }
         return URL(string: "\(scheme)://\(host)")
+    }
+}
+
+private extension UIViewController {
+    static func lykaTopMost(from root: UIViewController) -> UIViewController {
+        if let presented = root.presentedViewController {
+            return lykaTopMost(from: presented)
+        }
+        if let nav = root as? UINavigationController, let visible = nav.visibleViewController {
+            return lykaTopMost(from: visible)
+        }
+        if let tab = root as? UITabBarController, let selected = tab.selectedViewController {
+            return lykaTopMost(from: selected)
+        }
+        return root
     }
 }
 

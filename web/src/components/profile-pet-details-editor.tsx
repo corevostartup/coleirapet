@@ -105,6 +105,84 @@ async function fetchPetPhotoAsShareFile(imageSrc: string, displayName: string): 
   }
 }
 
+const SHARE_THUMB_MAX_PX = 480;
+const SHARE_THUMB_JPEG_Q = 0.82;
+
+/** Reduz a imagem para miniatura JPEG (melhor para `navigator.share` e apps de mensagens). */
+async function toShareThumbnailFile(source: File, displayName: string): Promise<File> {
+  if (typeof document === "undefined") return source;
+  const safe =
+    displayName
+      .trim()
+      .replace(/[/\\?%*:|"<>]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 48) || "pet";
+
+  const objectUrl = URL.createObjectURL(source);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("img"));
+      el.src = objectUrl;
+    });
+
+    const nw = img.naturalWidth || img.width;
+    const nh = img.naturalHeight || img.height;
+    if (!nw || !nh) return source;
+
+    const scale = Math.min(1, SHARE_THUMB_MAX_PX / Math.max(nw, nh));
+    const tw = Math.max(1, Math.round(nw * scale));
+    const th = Math.max(1, Math.round(nh * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = tw;
+    canvas.height = th;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return source;
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, tw, th);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b), "image/jpeg", SHARE_THUMB_JPEG_Q);
+    });
+    if (!blob || blob.size === 0) return source;
+
+    return new File([blob], `${safe}-miniatura.jpg`, { type: "image/jpeg" });
+  } catch {
+    return source;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function toAbsoluteImageUrlForShare(src: string): string | null {
+  const trimmed = src.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  if (typeof window === "undefined") return null;
+  try {
+    return new URL(trimmed, window.location.origin).href;
+  } catch {
+    return null;
+  }
+}
+
+/** App iOS Lyka: folha de partilha nativa (WKWebView perde o gesto se houver `await` antes de `navigator.share`). */
+function tryIosLykaNativeShare(payload: { title: string; text: string; imageUrl: string | null }): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as Window & {
+    __LYKA_IOS_APP__?: boolean;
+    LykaNativeShare?: { share: (p: { title: string; text: string; imageUrl: string | null }) => void };
+  };
+  if (!w.__LYKA_IOS_APP__ || typeof w.LykaNativeShare?.share !== "function") return false;
+  w.LykaNativeShare.share(payload);
+  return true;
+}
+
 export function ProfilePetDetailsEditor({
   petName,
   petIdentity,
@@ -182,39 +260,49 @@ export function ProfilePetDetailsEditor({
     if (!sharePublicUrl?.trim()) return;
     const display = (name.trim() || petName).trim() || "Nao informado";
     const idRaw = petIdentity?.trim() ?? "";
-    const idLine = idRaw && idRaw !== "Nao disponivel" ? `ID: ${idRaw}` : "";
+    const hasId = Boolean(idRaw && idRaw !== "Nao disponivel");
     const url = sharePublicUrl.trim();
-    const textLines = [display];
-    if (idLine) textLines.push(idLine);
-    /** Corpo sem URL: `navigator.share({ text, url })` ja anexa o link — incluir URL em `text` duplicava no share sheet (ex.: iOS). */
-    const textForShare = textLines.join("\n");
-    const textForClipboard = [textForShare, url].filter(Boolean).join("\n\n");
+
+    const textLines = [`Nome: ${display}`];
+    if (hasId) textLines.push(`ID: ${idRaw}`);
+    /** Sem URL aqui: no iOS `navigator.share({ text, url })` ja junta o link; duplicar no `text` mostrava dois links. */
+    const textBodyNoUrl = textLines.join("\n");
+    /** Um unico URL no payload de copiar/colar. */
+    const textForClipboard = `${textBodyNoUrl}\n\n${url}`;
     const title = `Perfil de ${display}`;
-    const minimalShare: ShareData = {
-      title,
-      text: textForShare,
-      url,
-    };
+
+    if (tryIosLykaNativeShare({ title, text: textForClipboard, imageUrl: toAbsoluteImageUrlForShare(photoUrl) })) {
+      return;
+    }
 
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-      let sharedWithImage = false;
       try {
-        const imageFile = await fetchPetPhotoAsShareFile(photoUrl, display);
+        await navigator.share({ title, text: textForClipboard });
+        return;
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+      }
+
+      try {
+        const rawFile = await fetchPetPhotoAsShareFile(photoUrl, display);
+        const imageFile = rawFile ? await toShareThumbnailFile(rawFile, display) : null;
         if (imageFile && typeof navigator.canShare === "function") {
-          const withFiles: ShareData = { ...minimalShare, files: [imageFile] };
+          const withFiles: ShareData = {
+            title,
+            text: `${textBodyNoUrl}\n\n${url}`,
+            files: [imageFile],
+          };
           if (navigator.canShare(withFiles)) {
             await navigator.share(withFiles);
-            sharedWithImage = true;
+            return;
           }
         }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
       }
 
-      if (sharedWithImage) return;
-
       try {
-        await navigator.share(minimalShare);
+        await navigator.share({ title, text: textBodyNoUrl, url });
         return;
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
