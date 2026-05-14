@@ -25,6 +25,7 @@ struct ContentView: View {
             if webLoadProgress < 0.98 {
                 LykaWebLoadingOverlay(progress: webLoadProgress)
                     .allowsHitTesting(false)
+                    .background(Color.clear)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Progresso de carregamento")
                     .accessibilityValue("\(Int(min(1, webLoadProgress) * 100)) por cento")
@@ -36,13 +37,12 @@ struct ContentView: View {
     }
 }
 
-/// Durante cargas do WKWebView (ex.: navegacao apos NFC): so logo flutuante + barra — fundo transparente, sem nebula/anel/estrelas.
+/// Durante cargas do WKWebView: apenas mascote flutuante + barra logo abaixo; sem fundo, sem outros elementos.
 private struct LykaWebLoadingOverlay: View {
     let progress: Double
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let emeraldGlow = Color(red: 34 / 255, green: 197 / 255, blue: 94 / 255)
     private static let floatPeriod: Double = 3.4
 
     var body: some View {
@@ -53,20 +53,21 @@ private struct LykaWebLoadingOverlay: View {
             let offsetY = reduceMotion ? CGFloat(0) : CGFloat(-11 * (1 - cos(angle)) / 2)
             let rotationDeg = reduceMotion ? CGFloat(0) : CGFloat(sin(angle) * 1.1)
 
-            VStack {
-                Spacer(minLength: 0)
-                VStack(spacing: 24) {
+            ZStack {
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                VStack(spacing: 16) {
                     Image("ColeiraSplashLogo")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 200, height: 200)
                         .accessibilityHidden(true)
-                        .shadow(color: Self.emeraldGlow.opacity(0.22), radius: 18, x: 0, y: 12)
                         .offset(y: offsetY)
                         .rotationEffect(.degrees(rotationDeg))
+
                     LykaInlineLoadBar(progress: progress)
                 }
-                Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.clear)
@@ -74,7 +75,7 @@ private struct LykaWebLoadingOverlay: View {
     }
 }
 
-/// Barra verde compacta (sem espacers fullscreen — usada abaixo do mascote).
+/// Barra de progresso compacta, logo abaixo do mascote.
 private struct LykaInlineLoadBar: View {
     let progress: Double
 
@@ -89,13 +90,12 @@ private struct LykaInlineLoadBar: View {
     var body: some View {
         ZStack(alignment: .leading) {
             Capsule()
-                .fill(Color.black.opacity(0.08))
+                .fill(Color.black.opacity(0.06))
                 .frame(width: trackWidth, height: barHeight)
             Capsule()
                 .fill(Self.barGreen)
                 .frame(width: trackWidth * clamped, height: barHeight)
                 .opacity(clamped > 0.001 ? 1 : 0)
-                .shadow(color: Self.barGreen.opacity(0.4), radius: 8, x: 0, y: 0)
         }
         .frame(width: trackWidth, height: barHeight)
         .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.82), value: clamped)

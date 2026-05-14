@@ -297,7 +297,7 @@ function LoginAuthFormSection({
                 <button
                   type="button"
                   disabled={authInProgress}
-                  className="lyka-login-cta mx-auto mt-1 block w-full text-center text-[13px] font-medium text-emerald-700 underline decoration-emerald-600/35"
+                  className="mx-auto mt-1 block w-full rounded-lg py-1 text-center text-[13px] font-medium text-emerald-700 underline decoration-emerald-600/35 outline-none transition hover:text-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-400/80 focus-visible:ring-offset-2 disabled:opacity-50"
                   onClick={() => {
                     setShowForgotPassword(false);
                     setOauthHint(null);
@@ -368,7 +368,7 @@ function LoginAuthFormSection({
                 <button
                   type="button"
                   disabled={authInProgress}
-                  className="lyka-login-cta w-full text-center text-[13px] font-medium text-emerald-700 underline decoration-emerald-600/35 underline-offset-2"
+                  className="w-full rounded-lg py-1 text-center text-[13px] font-medium text-emerald-700 underline decoration-emerald-600/35 underline-offset-2 outline-none transition hover:text-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-400/80 focus-visible:ring-offset-2 disabled:opacity-50"
                   onClick={() => {
                     setIsRegisteringEmail(false);
                     setOauthHint(null);
@@ -381,7 +381,7 @@ function LoginAuthFormSection({
                   <button
                     type="button"
                     disabled={authInProgress}
-                    className="lyka-login-cta w-full text-center text-[13px] font-medium text-emerald-700 underline decoration-emerald-600/35 underline-offset-2"
+                    className="w-full rounded-lg py-1 text-center text-[13px] font-medium text-emerald-700 underline decoration-emerald-600/35 underline-offset-2 outline-none transition hover:text-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-400/80 focus-visible:ring-offset-2 disabled:opacity-50"
                     onClick={() => {
                       setIsRegisteringEmail(true);
                       setOauthHint(null);
@@ -392,7 +392,7 @@ function LoginAuthFormSection({
                   <button
                     type="button"
                     disabled={authInProgress}
-                    className="lyka-login-cta w-full text-center text-[12px] font-medium text-zinc-500 underline decoration-zinc-300 underline-offset-2"
+                    className="w-full rounded-lg py-1 text-center text-[12px] font-medium text-zinc-600 underline decoration-zinc-400/50 underline-offset-2 outline-none transition hover:text-zinc-800 focus-visible:ring-2 focus-visible:ring-zinc-400/80 focus-visible:ring-offset-2 disabled:opacity-50"
                     onClick={() => {
                       setShowForgotPassword(true);
                       setForgotPasswordSuccess(false);

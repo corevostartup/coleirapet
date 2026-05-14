@@ -180,7 +180,7 @@ export function ProfilePetDetailsEditor({
 
   async function sharePublicProfile() {
     if (!sharePublicUrl?.trim()) return;
-    const display = (name.trim() || petName).trim() || "Pet";
+    const display = (name.trim() || petName).trim() || "Nao informado";
     const idRaw = petIdentity?.trim() ?? "";
     const idLine = idRaw && idRaw !== "Nao disponivel" ? `ID: ${idRaw}` : "";
     const url = sharePublicUrl.trim();
@@ -315,7 +315,7 @@ export function ProfilePetDetailsEditor({
           {/* eslint-disable-next-line @next/next/no-img-element -- evita default export de next/image vir undefined no Webpack/RSC */}
           <img
             src={photoUrl}
-            alt={`Foto da ${name || petName}`}
+            alt="Foto do pet no perfil"
             className="absolute inset-0 h-full w-full object-cover"
             width={440}
             height={220}
@@ -323,7 +323,7 @@ export function ProfilePetDetailsEditor({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           <div className="absolute bottom-4 left-4">
-            <h2 className="text-[28px] font-semibold text-white">{name.trim() || "Pet"}</h2>
+            <h2 className="text-[28px] font-semibold text-white">{name.trim() || "Nao informado"}</h2>
             <p className="text-[12px] text-white/80">{petBreed}</p>
           </div>
           <div className="absolute bottom-4 right-4 flex max-w-[calc(100%-2rem)] flex-wrap items-center justify-end gap-2">
@@ -359,8 +359,8 @@ export function ProfilePetDetailsEditor({
       </section>
 
       <form onSubmit={handleSubmit} className="appear-up mt-3 space-y-3" style={{ animationDelay: "140ms" }}>
-        <section className="grid grid-cols-2 gap-2.5">
-          <article className="elev-card col-span-2 rounded-2xl p-3.5">
+        <section className="grid grid-cols-4 gap-2 sm:gap-2.5">
+          <article className="elev-card col-span-4 rounded-2xl p-3.5">
             <p className="text-[11px] uppercase tracking-wide text-zinc-500">Identidade do pet</p>
             <button
               type="button"
@@ -382,8 +382,8 @@ export function ProfilePetDetailsEditor({
               </span>
             </button>
           </article>
-          <article className="elev-card rounded-2xl p-3.5">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Idade</p>
+          <article className="elev-card min-w-0 rounded-2xl p-2.5 sm:p-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500 sm:text-[11px]">Idade</p>
             {isEditing ? (
               <input
                 type="number"
@@ -393,14 +393,16 @@ export function ProfilePetDetailsEditor({
                 value={age ?? ""}
                 onChange={(event) => setAge(event.target.value === "" ? null : Number(event.target.value))}
                 placeholder="Idade"
-                className="mt-2 h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[14px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring sm:mt-2 sm:h-10 sm:px-3 sm:text-[16px]"
               />
             ) : (
-              <p className="mt-2 text-[24px] font-semibold text-zinc-900">{age === null ? "Nao informado" : `${age} anos`}</p>
+              <p className="mt-1.5 truncate text-[15px] font-semibold leading-tight text-zinc-900 sm:mt-2 sm:text-[20px] md:text-[24px]" title={age === null ? "Nao informado" : `${age} anos`}>
+                {age === null ? "Nao informado" : `${age} anos`}
+              </p>
             )}
           </article>
-          <article className="elev-card rounded-2xl p-3.5">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Peso</p>
+          <article className="elev-card min-w-0 rounded-2xl p-2.5 sm:p-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500 sm:text-[11px]">Peso</p>
             {isEditing ? (
               <input
                 type="number"
@@ -410,14 +412,16 @@ export function ProfilePetDetailsEditor({
                 value={weightKg ?? ""}
                 onChange={(event) => setWeightKg(event.target.value === "" ? null : Number(event.target.value))}
                 placeholder="Peso (kg)"
-                className="mt-2 h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[14px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring sm:mt-2 sm:h-10 sm:px-3 sm:text-[16px]"
               />
             ) : (
-              <p className="mt-2 text-[24px] font-semibold text-zinc-900">{formatWeight(weightKg)}</p>
+              <p className="mt-1.5 truncate text-[15px] font-semibold leading-tight text-zinc-900 sm:mt-2 sm:text-[20px] md:text-[24px]" title={formatWeight(weightKg)}>
+                {formatWeight(weightKg)}
+              </p>
             )}
           </article>
-          <article className="elev-card rounded-2xl p-3.5">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Sexo</p>
+          <article className="elev-card min-w-0 rounded-2xl p-2.5 sm:p-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500 sm:text-[11px]">Sexo</p>
             {isEditing ? (
               <input
                 type="text"
@@ -425,14 +429,16 @@ export function ProfilePetDetailsEditor({
                 value={sex}
                 onChange={(event) => setSex(event.target.value)}
                 placeholder="Sexo"
-                className="mt-2 h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[14px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring sm:mt-2 sm:h-10 sm:px-3 sm:text-[16px]"
               />
             ) : (
-              <p className="mt-2 text-[20px] font-semibold text-zinc-900">{sex.trim() || "Nao informado"}</p>
+              <p className="mt-1.5 truncate text-[14px] font-semibold leading-tight text-zinc-900 sm:mt-2 sm:text-[18px] md:text-[20px]" title={sex.trim() || "Nao informado"}>
+                {sex.trim() || "Nao informado"}
+              </p>
             )}
           </article>
-          <article className="elev-card rounded-2xl p-3.5">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Porte</p>
+          <article className="elev-card min-w-0 rounded-2xl p-2.5 sm:p-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500 sm:text-[11px]">Porte</p>
             {isEditing ? (
               <input
                 type="text"
@@ -440,10 +446,12 @@ export function ProfilePetDetailsEditor({
                 value={size}
                 onChange={(event) => setSize(event.target.value)}
                 placeholder="Porte"
-                className="mt-2 h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring"
+                className="mt-1.5 h-9 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[14px] font-semibold text-zinc-900 outline-none ring-emerald-200 transition focus:ring sm:mt-2 sm:h-10 sm:px-3 sm:text-[16px]"
               />
             ) : (
-              <p className="mt-2 text-[20px] font-semibold text-zinc-900">{size.trim() || "Nao informado"}</p>
+              <p className="mt-1.5 truncate text-[14px] font-semibold leading-tight text-zinc-900 sm:mt-2 sm:text-[18px] md:text-[20px]" title={size.trim() || "Nao informado"}>
+                {size.trim() || "Nao informado"}
+              </p>
             )}
           </article>
         </section>

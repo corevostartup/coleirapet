@@ -256,6 +256,11 @@ struct WebView: UIViewRepresentable {
                 return
             }
 
+            // Haptico ao iniciar escaneamento NFC — feedback tatil imediato ao tocar no botao
+            let impactGen = UIImpactFeedbackGenerator(style: .medium)
+            impactGen.prepare()
+            impactGen.impactOccurred()
+
             nfcPairingMode = mode
             didHandleNfcSessionResult = false
             let session = NFCNDEFReaderSession(delegate: self, queue: nil, invalidateAfterFirstRead: false)
@@ -388,7 +393,7 @@ struct WebView: UIViewRepresentable {
             }
         }
 
-        /// Cartao estilo notificacao no topo (cores alinhadas ao layout web Lyka). Sem botao OK.
+        /// Cartao estilo notificacao na parte inferior (acima do menu), sem bloquear toques. Sem botao OK.
         private func presentLykaPushStyleToast(
             title: String,
             subtitle: String,
@@ -407,7 +412,7 @@ struct WebView: UIViewRepresentable {
                 var wrap = document.createElement('div');
                 wrap.id = '__lyka_nfc_toast';
                 wrap.setAttribute('role','status');
-                wrap.style.cssText = 'position:fixed;left:12px;right:12px;top:max(12px,env(safe-area-inset-top));z-index:2147483646;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;pointer-events:none;animation:__lyka_toast_in 0.38s cubic-bezier(0.16,1,0.3,1) both';
+                wrap.style.cssText = 'position:fixed;left:12px;right:12px;top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px) + 72px);z-index:2147483640;max-width:428px;margin-left:auto;margin-right:auto;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;pointer-events:none;animation:__lyka_nfc_toast_in 0.38s cubic-bezier(0.16,1,0.3,1) both';
                 var card = document.createElement('div');
                 card.style.cssText = 'background:#ffffff;border:1px solid #e5ebe7;border-radius:18px;box-shadow:0 16px 40px -24px rgba(17,24,39,0.35),0 8px 26px -12px rgba(5,150,105,0.14);padding:14px 16px;display:flex;gap:12px;align-items:flex-start';
                 var dot = document.createElement('span');
@@ -423,15 +428,15 @@ struct WebView: UIViewRepresentable {
                 t2.textContent = '\(subtitleEsc)';
                 text.appendChild(t1); text.appendChild(t2);
                 card.appendChild(dot); card.appendChild(text); wrap.appendChild(card);
-                if (!document.getElementById('__lyka_toast_style')) {
+                if (!document.getElementById('__lyka_nfc_toast_style')) {
                   var st = document.createElement('style');
-                  st.id = '__lyka_toast_style';
-                  st.textContent = '@keyframes __lyka_toast_in{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:translateY(0)}}@keyframes __lyka_toast_out{to{opacity:0;transform:translateY(-12px)}}';
+                  st.id = '__lyka_nfc_toast_style';
+                  st.textContent = '@keyframes __lyka_nfc_toast_in{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes __lyka_nfc_toast_out{to{opacity:0;transform:translateY(16px)}}';
                   document.head.appendChild(st);
                 }
                 (document.body || document.documentElement).appendChild(wrap);
                 setTimeout(function(){
-                  wrap.style.animation = '__lyka_toast_out 0.34s ease-out both';
+                  wrap.style.animation = '__lyka_nfc_toast_out 0.34s ease-out both';
                   setTimeout(function(){ try { wrap.remove(); } catch(e) {} }, 360);
                 }, \(dismissMs));
               } catch (e) {}
@@ -453,20 +458,20 @@ struct WebView: UIViewRepresentable {
         /// Apos leitura NFC bem-sucedida no pareamento: haptico + toast estilo push (sem botao OK), depois navega para gravacao do PIN.
         private func presentNfcTagReadSuccessToastThenGoToWriteStep() {
             presentLykaPushStyleToast(
-                title: "TAG lida com sucesso",
-                subtitle: "Agora grave o PIN.",
-                visibleSeconds: 3.8,
+                title: "Tag lida com sucesso",
+                subtitle: "Agora grave o PIN na tag para finalizar o pareamento.",
+                visibleSeconds: 4.5,
                 playSuccessHaptic: true,
                 afterVisible: { [weak self] in self?.goToPairingPasswordStep() }
             )
         }
 
-        /// Apos gravar PIN e URL na tag: toast + continua fluxo no servidor (sem alert nativo).
+        /// Apos gravar PIN e URL na tag: mesmo toast inferior que na leitura; fluxo no servidor em paralelo.
         private func presentNfcTagWriteSuccessToastAndFinalizePairing() {
             presentLykaPushStyleToast(
-                title: "Tag gravada",
-                subtitle: "Concluindo pareamento…",
-                visibleSeconds: 4.2,
+                title: "Tag gravada com sucesso",
+                subtitle: "Concluindo pareamento. Aguarde um instante.",
+                visibleSeconds: 4.5,
                 playSuccessHaptic: true,
                 afterVisible: nil
             )
@@ -593,7 +598,6 @@ extension WebView.Coordinator: NFCNDEFReaderSessionDelegate {
                             return
                         }
 
-                        session.alertMessage = "Tag gravada."
                         session.invalidate()
                         DispatchQueue.main.async { [weak self] in
                             self?.presentNfcTagWriteSuccessToastAndFinalizePairing()

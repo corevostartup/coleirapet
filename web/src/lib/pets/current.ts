@@ -8,7 +8,6 @@ import {
 } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { getPetImageOrDefault } from "@/lib/pets/image";
-import { pickRandomFunPlaceholderPetName } from "@/lib/pets/placeholder-names";
 import { isLegacyUiDemoPetName } from "@/lib/pets/legacy-ui-demo-pets";
 
 /** Quando o documento nao tem nome (legado ou apagado). */
@@ -312,7 +311,7 @@ function defaultPetDoc(ownerId: string) {
     nfcId: "",
     nfcPairedAt: "",
     publicPageSlug: generatePublicPageSlug(),
-    name: pickRandomFunPlaceholderPetName(),
+    name: "Nao informado",
     breed: "",
     image: "",
     emergencyContact: "",

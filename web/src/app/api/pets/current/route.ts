@@ -129,7 +129,7 @@ export async function PATCH(request: Request) {
 
   const { petRef, pet } = await getOrCreateCurrentPet(auth.uid);
   const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-  if (name !== undefined) updates.name = name;
+  if (name !== undefined) updates.name = name === "" ? "Nao informado" : name;
   if (age !== undefined) updates.age = age;
   if (weightKg !== undefined) updates.weightKg = weightKg;
   if (sex !== undefined) updates.sex = sex;
