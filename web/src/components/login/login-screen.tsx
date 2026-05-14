@@ -937,8 +937,8 @@ export function LoginScreen({ variant = "login" }: { variant?: "login" | "signup
   };
 
   return (
-    <main className="ios-safe-top relative min-h-screen overflow-hidden bg-black lg:min-h-0 lg:overflow-visible">
-      <div className="relative flex min-h-screen flex-col overflow-hidden px-3 py-10 pb-16 sm:px-6 lg:hidden">
+    <main className="ios-safe-top relative min-h-dvh overflow-x-hidden bg-black lg:min-h-0 lg:overflow-visible">
+      <div className="relative flex min-h-dvh flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-8 pb-[max(4rem,calc(env(safe-area-inset-bottom,0px)+2.5rem))] sm:px-6 lg:hidden">
         <div className="splash-nebula pointer-events-none absolute inset-[-20%] opacity-70" />
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           {LOGIN_BG_STARS.map((star, index) => (
@@ -956,7 +956,7 @@ export function LoginScreen({ variant = "login" }: { variant?: "login" | "signup
           ))}
         </div>
 
-        <div className="relative z-[1] mx-auto flex w-full max-w-[440px] flex-1 flex-col items-center justify-center">
+        <div className="relative z-[1] mx-auto flex w-full max-w-[440px] flex-1 flex-col items-center justify-[safe_center]">
           {/* Mesmo visual da coluna do logo no desktop: anel + coleira flutuante (sem moldura / hero). */}
           <div className="relative flex w-full max-w-full flex-col items-center justify-center overflow-visible py-4 appear-up">
             <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">

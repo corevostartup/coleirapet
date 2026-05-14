@@ -465,7 +465,6 @@ struct WebView: UIViewRepresentable {
             }
         }
 
-        /// Cartao estilo notificacao na parte inferior (acima do menu), sem bloquear toques. Sem botao OK.
         private func presentLykaPushStyleToast(
             title: String,
             subtitle: String,
@@ -529,11 +528,17 @@ struct WebView: UIViewRepresentable {
 
         /// Apos leitura NFC bem-sucedida no pareamento: haptico + toast estilo push (sem botao OK), depois navega para gravacao do PIN.
         private func presentNfcTagReadSuccessToastThenGoToWriteStep() {
+            let impact = UIImpactFeedbackGenerator(style: .heavy)
+            impact.prepare()
+            impact.impactOccurred()
+            let notify = UINotificationFeedbackGenerator()
+            notify.prepare()
+            notify.notificationOccurred(.success)
             presentLykaPushStyleToast(
                 title: "Tag lida com sucesso",
                 subtitle: "Agora grave o PIN na tag para finalizar o pareamento.",
                 visibleSeconds: 4.5,
-                playSuccessHaptic: true,
+                playSuccessHaptic: false,
                 afterVisible: { [weak self] in self?.goToPairingPasswordStep() }
             )
         }

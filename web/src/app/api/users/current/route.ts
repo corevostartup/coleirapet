@@ -160,7 +160,13 @@ export async function PATCH(request: Request) {
   if (vet.specialty === null) return NextResponse.json({ error: "Especialidade invalida" }, { status: 400 });
   if (vet.bio === null) return NextResponse.json({ error: "Bio invalida" }, { status: 400 });
 
-  await getOrCreateCurrentUserProfile(auth.uid, { fallbackName: auth.fallbackName });
+  const existingUser = await getOrCreateCurrentUserProfile(auth.uid, { fallbackName: auth.fallbackName });
+  if (userType === "vet" && existingUser.userType !== "vet") {
+    return NextResponse.json(
+      { error: "Cadastro como veterinario esta temporariamente indisponivel." },
+      { status: 403 },
+    );
+  }
 
   const nowIso = new Date().toISOString();
   const updates: Record<string, unknown> = {

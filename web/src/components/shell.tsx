@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { IconBell } from "@/components/icons";
+import { TopBarNotificationsLink } from "@/components/top-bar-notifications-link";
 
 type Tab = "home" | "health" | "location" | "dados" | "profile";
 
@@ -28,17 +27,7 @@ export function TopBar({
   action?: ReactNode | null;
   leadingAction?: ReactNode;
 }) {
-  const defaultBell = (
-    <Link
-      prefetch
-      href="/notifications"
-      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:text-zinc-900"
-      aria-label="Notificacoes"
-    >
-      <IconBell className="h-5 w-5" />
-      <span className="pulse-soft absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-500" />
-    </Link>
-  );
+  const defaultBell = <TopBarNotificationsLink />;
 
   return (
     <header className="glass-card appear-up relative z-[1800] rounded-[28px] px-4 py-3">

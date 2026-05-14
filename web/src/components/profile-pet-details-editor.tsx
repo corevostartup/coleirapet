@@ -15,6 +15,15 @@ function ShareProfileIcon(props: ComponentProps<"svg">) {
   );
 }
 
+/** Check curto para feedback apos copiar link (clipboard). */
+function CopiedCheckIcon(props: ComponentProps<"svg">) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 type Props = {
   petName: string;
   petIdentity: string;
@@ -427,11 +436,17 @@ export function ProfilePetDetailsEditor({
               <button
                 type="button"
                 onClick={() => void sharePublicProfile()}
-                className="flex items-center gap-1.5 rounded-xl bg-white/92 px-3 py-1.5 text-[12px] font-semibold text-zinc-700 shadow-sm transition hover:bg-white"
-                aria-label="Compartilhar perfil publico do pet"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/92 text-zinc-700 shadow-sm transition hover:bg-white"
+                title={shareCopiedHint ? "Copiado!" : "Compartilhar"}
+                aria-label={
+                  shareCopiedHint ? "Link copiado para a area de transferencia" : "Compartilhar perfil publico do pet"
+                }
               >
-                <ShareProfileIcon className="h-4 w-4 shrink-0" />
-                {shareCopiedHint ? "Copiado!" : "Compartilhar"}
+                {shareCopiedHint ? (
+                  <CopiedCheckIcon className="h-5 w-5 shrink-0 text-emerald-600" />
+                ) : (
+                  <ShareProfileIcon className="h-5 w-5 shrink-0" />
+                )}
               </button>
             ) : null}
             <button

@@ -87,7 +87,8 @@ export default async function Home() {
     image: currentPet?.image ?? pet.image,
     name: currentPet?.name ?? pet.name,
     breed: currentPet?.breed ?? pet.breed,
-    age: currentPet?.age ?? pet.age ?? null,
+    /** Com pet persistido, só a idade do cadastro (null = nao informada); evita cair no mock "3 anos". */
+    age: currentPet ? currentPet.age : (pet.age ?? null),
     wellbeing: pet.wellbeing,
   };
   const nfcLat = currentPet?.lastNfcAccessLat;
@@ -158,7 +159,7 @@ export default async function Home() {
 
   return (
     <AppShell tab="home">
-      <TopBar title="Monitoramento em tempo real" subtitle="Lyka">
+      <TopBar title="Monitoramento" subtitle="Lyka">
         {isVet ? (
           <Link
             href="/vet/pets"

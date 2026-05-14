@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 /** Rotas em que a splash nao deve aparecer. Sem `startsWith` (alguns WKWebView/polyfills rebentam com TypeError interno). */
 function shouldHideSplash(pathname: unknown): boolean {
@@ -166,10 +167,35 @@ function LykaSplashOverlay() {
 }
 
 /**
- * Sem `usePathname()` (dev Next 16 + React 19 pode rebentar). Sem import separado de outro .tsx da splash.
+ * Fecha a splash ao navegar para rotas onde ela nao deve existir (ex.: `/tag-nfc/*` apos pareamento NFC).
+ * `usePathname` so depois do primeiro frame (mesmo padrao que `UserBottomNav`) para evitar stress no Next 16.
+ */
+function SplashHideOnHiddenRoutesInner({ onHide }: { onHide: () => void }) {
+  const pathname = usePathname() ?? "";
+  useLayoutEffect(() => {
+    if (shouldHideSplash(pathname)) {
+      onHide();
+    }
+  }, [pathname, onHide]);
+  return null;
+}
+
+/**
+ * Gate inicial com `window.location`; sincronizacao de rota com `usePathname` num filho montado apos rAF.
  */
 export function SplashScreenRoot() {
   const [showSplash, setShowSplash] = useState(false);
+  const [pathSyncReady, setPathSyncReady] = useState(false);
+  const dismissSplash = useCallback(() => {
+    setShowSplash(false);
+  }, []);
+
+  useLayoutEffect(() => {
+    const id = requestAnimationFrame(() => {
+      setPathSyncReady(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
@@ -187,9 +213,10 @@ export function SplashScreenRoot() {
     setShowSplash(true);
   }, []);
 
-  if (!showSplash) {
-    return null;
-  }
-
-  return <LykaSplashOverlay />;
+  return (
+    <>
+      {pathSyncReady ? <SplashHideOnHiddenRoutesInner onHide={dismissSplash} /> : null}
+      {showSplash ? <LykaSplashOverlay /> : null}
+    </>
+  );
 }

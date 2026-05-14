@@ -1,7 +1,16 @@
+"use client";
+
 import Link from "next/link";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { AppShell, TopBar } from "@/components/shell";
-import { IconBell, IconNotificationSettings } from "@/components/icons";
+import { IconBell } from "@/components/icons";
 import { notifications as notificationItems } from "@/lib/mock";
+import {
+  ensureReadIdsInitialized,
+  loadReadNotificationIds,
+  markNotificationIdsRead,
+  unreadNotificationCount,
+} from "@/lib/notifications-read";
 
 function kindDotClass(kind: "info" | "warning" | "success") {
   if (kind === "warning") return "bg-amber-500";
@@ -10,7 +19,16 @@ function kindDotClass(kind: "info" | "warning" | "success") {
 }
 
 export default function NotificationsPage() {
-  const unreadCount = notificationItems.filter((n) => n.unread).length;
+  const allIds = useMemo(() => notificationItems.map((n) => n.id), []);
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set(allIds));
+
+  useLayoutEffect(() => {
+    ensureReadIdsInitialized(notificationItems);
+    markNotificationIdsRead(allIds);
+    setReadIds(loadReadNotificationIds());
+  }, [allIds]);
+
+  const unreadCount = unreadNotificationCount(notificationItems, readIds);
 
   return (
     <AppShell tab="home">
@@ -19,11 +37,12 @@ export default function NotificationsPage() {
         subtitle="Alertas da conta"
         action={
           <Link
+            prefetch
             href="/notifications/settings"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-emerald-700 shadow-sm transition hover:bg-emerald-50 hover:text-emerald-800"
+            className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:text-zinc-900"
             aria-label="Configuracao de notificacoes"
           >
-            <IconNotificationSettings className="h-[22px] w-[22px]" />
+            <IconBell className="h-5 w-5" />
           </Link>
         }
       />
@@ -61,34 +80,37 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {notificationItems.map((item, index) => (
-              <li key={item.id}>
-                <article
-                  className={`appear-up rounded-2xl border px-3 py-2.5 transition ${
-                    item.unread
-                      ? "border-emerald-200/90 bg-emerald-50/60 shadow-[0_8px_20px_-16px_rgba(6,78,59,0.35)]"
-                      : "border-zinc-200 bg-zinc-50"
-                  }`}
-                  style={{ animationDelay: `${120 + index * 40}ms` }}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${kindDotClass(item.kind)}`} aria-hidden />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                        <p className="text-[13px] font-semibold text-zinc-900">{item.title}</p>
-                        <time className="shrink-0 text-[11px] text-zinc-500">{item.when}</time>
+            {notificationItems.map((item, index) => {
+              const isUnread = !readIds.has(item.id);
+              return (
+                <li key={item.id}>
+                  <article
+                    className={`appear-up rounded-2xl border px-3 py-2.5 transition ${
+                      isUnread
+                        ? "border-emerald-200/90 bg-emerald-50/60 shadow-[0_8px_20px_-16px_rgba(6,78,59,0.35)]"
+                        : "border-zinc-200 bg-zinc-50"
+                    }`}
+                    style={{ animationDelay: `${120 + index * 40}ms` }}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${kindDotClass(item.kind)}`} aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                          <p className="text-[13px] font-semibold text-zinc-900">{item.title}</p>
+                          <time className="shrink-0 text-[11px] text-zinc-500">{item.when}</time>
+                        </div>
+                        <p className="mt-1 text-[12px] leading-snug text-zinc-600">{item.body}</p>
+                        {isUnread ? (
+                          <span className="mt-2 inline-flex rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+                            Nova
+                          </span>
+                        ) : null}
                       </div>
-                      <p className="mt-1 text-[12px] leading-snug text-zinc-600">{item.body}</p>
-                      {item.unread ? (
-                        <span className="mt-2 inline-flex rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
-                          Nova
-                        </span>
-                      ) : null}
                     </div>
-                  </div>
-                </article>
-              </li>
-            ))}
+                  </article>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

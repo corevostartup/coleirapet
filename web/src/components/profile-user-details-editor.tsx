@@ -20,6 +20,9 @@ type Props = {
 
 type SaveState = "idle" | "saving" | "success" | "error";
 
+/** Novo cadastro como veterinario desativado na UI; utilizadores ja `vet` mantem a opcao ativa. */
+const CAN_SELECT_VETERINARIAN_USER_TYPE = (initialUserType: "Tutor" | "vet") => initialUserType === "vet";
+
 export function ProfileUserDetailsEditor({
   initialName,
   initialEmail,
@@ -199,25 +202,41 @@ export function ProfileUserDetailsEditor({
         <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
           <p className="text-[11px] uppercase tracking-wide text-zinc-500">Tipo de usuario</p>
           {isEditing ? (
-            <div className="mt-1 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setUserType("Tutor")}
-                className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition ${
-                  userType === "Tutor" ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
-                }`}
-              >
-                Tutor
-              </button>
-              <button
-                type="button"
-                onClick={() => setUserType("vet")}
-                className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition ${
-                  userType === "vet" ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
-                }`}
-              >
-                Veterinário
-              </button>
+            <div className="mt-1 flex flex-col gap-1.5">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUserType("Tutor")}
+                  className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition ${
+                    userType === "Tutor" ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
+                  }`}
+                >
+                  Tutor
+                </button>
+                <button
+                  type="button"
+                  disabled={!CAN_SELECT_VETERINARIAN_USER_TYPE(initialUserType)}
+                  title={
+                    CAN_SELECT_VETERINARIAN_USER_TYPE(initialUserType)
+                      ? undefined
+                      : "Cadastro como veterinario temporariamente indisponivel."
+                  }
+                  onClick={() => {
+                    if (!CAN_SELECT_VETERINARIAN_USER_TYPE(initialUserType)) return;
+                    setUserType("vet");
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                    userType === "vet" ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"
+                  }`}
+                >
+                  Veterinário
+                </button>
+              </div>
+              {!CAN_SELECT_VETERINARIAN_USER_TYPE(initialUserType) ? (
+                <p className="text-[11px] leading-snug text-zinc-500">
+                  Cadastro como veterinario esta momentaneamente indisponivel.
+                </p>
+              ) : null}
             </div>
           ) : (
             <p className="mt-0.5 text-[14px] font-medium text-zinc-800">{userType === "vet" ? "Veterinário" : "Tutor"}</p>

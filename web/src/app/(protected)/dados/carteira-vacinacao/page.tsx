@@ -38,7 +38,7 @@ export default async function CarteiraVacinacaoPage() {
   const petBreed = (currentPet?.breed ?? pet.breed).trim();
   const petImage = getPetImageOrDefault(currentPet?.image ?? pet.image);
   const petIdentity = currentPet?.petIdentity?.trim() && currentPet.petIdentity !== "Nao disponivel" ? currentPet.petIdentity : "—";
-  const petAge = currentPet?.age ?? pet.age ?? null;
+  const petAge = currentPet ? currentPet.age : (pet.age ?? null);
   const petWeightKg = currentPet?.weightKg ?? pet.weightKg ?? null;
 
   return (
