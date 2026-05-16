@@ -3,15 +3,16 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { NFCPairLink } from "@/components/nfc-pair-link";
 import { HomeLocationSecurityCard } from "@/components/home-location-security-card";
+import { HomeWeightChartSection } from "@/components/home-weight-chart-section";
 import { AppShell, TopBar } from "@/components/shell";
 import { ProductCarousel } from "@/components/product-carousel";
-import { IconCollar, IconStethoscope, IconWave } from "@/components/icons";
+import { IconCollar, IconStethoscope, IconVaccineWallet, IconWave } from "@/components/icons";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import type { DocumentReference } from "firebase-admin/firestore";
-import { SUBCOLLECTION_ACTIVITY_MINUTES } from "@/lib/firebase/collections";
 import { fetchHomeUpcomingEvents } from "@/lib/home/upcoming-events";
-import { metrics, pet, weeklyActivity } from "@/lib/mock";
+import { fetchWeeklyActivityLast7Days } from "@/lib/home/weekly-activity";
+import { metrics, pet } from "@/lib/mock";
 import { getOrCreateCurrentPet } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
@@ -30,26 +31,6 @@ function formatPtBrDateTime(iso: string | null | undefined) {
 function isCoordinateLikeAddress(value: string | null | undefined) {
   if (!value) return false;
   return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(value.trim());
-}
-
-type ActivityMinutesDoc = {
-  date?: string;
-  minutes?: number;
-};
-
-function buildFallbackWeeklyActivity() {
-  return weeklyActivity.map((item) => ({ ...item }));
-}
-
-function startOfDay(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-}
-
-function toIsoDate(value: Date) {
-  const yyyy = value.getFullYear();
-  const mm = String(value.getMonth() + 1).padStart(2, "0");
-  const dd = String(value.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 }
 
 /** Cookie definido pelo app iOS apos gravar a tag; cobre cache stale do pet em outra instancia. */
@@ -105,43 +86,9 @@ export default async function Home() {
     ? `Ultimo acesso NFC: ${formatPtBrDateTime(currentPet?.lastNfcAccessAt) ?? "agora"} · Zona segura ativa`
     : "Aguardando compartilhamento de localizacao via NFC";
 
-  let weeklyActivityData = buildFallbackWeeklyActivity();
+  const weeklyActivityData = await fetchWeeklyActivityLast7Days(petRef);
   let upcomingEvents: Awaited<ReturnType<typeof fetchHomeUpcomingEvents>> = [];
   if (uid && petRef) {
-    try {
-      const activitySnapshot = await petRef
-        .collection(SUBCOLLECTION_ACTIVITY_MINUTES)
-        .orderBy("date", "desc")
-        .limit(90)
-        .get();
-
-      const activityByDate = new Map<string, number>();
-      for (const doc of activitySnapshot.docs) {
-        const data = doc.data() as ActivityMinutesDoc;
-        const date = typeof data.date === "string" ? data.date : "";
-        const minutes = typeof data.minutes === "number" ? Math.max(0, Math.round(data.minutes)) : 0;
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-        if (activityByDate.has(date)) continue;
-        activityByDate.set(date, minutes);
-      }
-
-      const labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"] as const;
-      const today = startOfDay(new Date());
-      const last7Days: Array<{ day: string; activeMinutes: number; steps: number }> = [];
-      for (let offset = 6; offset >= 0; offset--) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - offset);
-        const jsDay = date.getDay();
-        const label = labels[(jsDay + 6) % 7];
-        const isoDate = toIsoDate(date);
-        const activeMinutes = activityByDate.get(isoDate) ?? 0;
-        last7Days.push({ day: label, activeMinutes, steps: 0 });
-      }
-      weeklyActivityData = last7Days;
-    } catch {
-      // Em caso de falha, mantém visual e dados mock como fallback.
-      weeklyActivityData = buildFallbackWeeklyActivity();
-    }
     try {
       upcomingEvents = await fetchHomeUpcomingEvents(petRef);
     } catch {
@@ -152,9 +99,6 @@ export default async function Home() {
   const maxActivity = Math.max(...weeklyActivityData.map((item) => item.activeMinutes), 1);
   const avgActivity = Math.round(
     weeklyActivityData.reduce((total, item) => total + item.activeMinutes, 0) / weeklyActivityData.length,
-  );
-  const avgSteps = Math.round(
-    weeklyActivityData.reduce((total, item) => total + item.steps, 0) / weeklyActivityData.length,
   );
 
   return (
@@ -176,6 +120,7 @@ export default async function Home() {
 
         {!isNfcPaired ? (
           <section
+            data-lyka-shell-span="full"
             className="appear-up mt-3 rounded-[26px] border border-emerald-200/90 bg-gradient-to-b from-emerald-50 via-white to-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
             style={{ animationDelay: "50ms" }}
           >
@@ -203,7 +148,11 @@ export default async function Home() {
           </section>
         ) : null}
 
-        <section className="appear-up mt-3 overflow-hidden rounded-[30px] border border-zinc-200 bg-white shadow-[0_20px_40px_-28px_rgba(12,18,14,0.5)]" style={{ animationDelay: "60ms" }}>
+        <section
+          data-lyka-shell-span="full"
+          className="appear-up mt-3 overflow-hidden rounded-[30px] border border-zinc-200 bg-white shadow-[0_20px_40px_-28px_rgba(12,18,14,0.5)]"
+          style={{ animationDelay: "60ms" }}
+        >
           <div className="relative h-[260px]">
             <Image
               src={cardPet.image}
@@ -211,7 +160,7 @@ export default async function Home() {
               fill
               priority
               className="object-cover"
-              sizes="(max-width: 768px) 100vw, 440px"
+                    sizes="(max-width: 767px) 100vw, min(50vw, 520px)"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">
@@ -226,15 +175,21 @@ export default async function Home() {
           </div>
         </section>
 
-        <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "120ms" }}>
-          <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Produtos</h3>
-
+        <section
+          data-lyka-shell-span="full"
+          className="appear-up mt-3 rounded-[26px] bg-white px-3 py-2 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
+          style={{ animationDelay: "120ms" }}
+        >
           <ProductCarousel />
         </section>
 
-        <section className="appear-up mt-3 grid grid-cols-4 gap-2" style={{ animationDelay: "180ms" }}>
+        <section
+          data-lyka-shell-span="full"
+          className="appear-up mt-3 grid grid-cols-4 gap-1.5 sm:gap-2"
+          style={{ animationDelay: "180ms" }}
+        >
           {metrics.map((item) => (
-            <article key={item.label} className="elev-card rounded-xl p-2">
+            <article key={item.label} className="elev-card min-w-0 rounded-xl p-1.5 sm:p-2">
               <p className="truncate text-[9px] uppercase tracking-wide text-zinc-500">{item.label}</p>
               <p className="mt-1.5 text-[15px] font-semibold leading-none text-zinc-900">
                 {item.value}
@@ -245,45 +200,84 @@ export default async function Home() {
           ))}
         </section>
 
-        <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "240ms" }}>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-[14px] font-semibold text-zinc-900">Atividade semanal</h3>
-            <IconWave className="h-5 w-5 text-zinc-500" />
-          </div>
-          <div className="mb-3 flex items-center justify-between text-[11px]">
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">Minutos ativos por dia</span>
-            <span className="text-zinc-500">Meta: 60 min</span>
-          </div>
-          <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3">
-            <div className="grid grid-cols-7 items-end gap-2">
-              {weeklyActivityData.map((item) => (
-                <div key={item.day} className="flex flex-col items-center gap-1">
-                  <span className="text-[10px] font-semibold text-zinc-500">{item.activeMinutes}</span>
-                  <div
-                    className="w-full rounded-t-md bg-gradient-to-t from-emerald-500 to-emerald-300"
-                    style={{
-                      height: `${12 + (item.activeMinutes / maxActivity) * 90}px`,
-                      minHeight: "12px",
-                    }}
-                    title={`${item.activeMinutes} min`}
-                  />
-                  <span className="text-[10px] font-medium text-zinc-500">{item.day}</span>
-                </div>
-              ))}
+        <section
+          data-lyka-shell-span="full"
+          className="appear-up mt-3"
+          style={{ animationDelay: "210ms" }}
+        >
+          <Link
+            href="/dados/carteira-vacinacao"
+            className="flex items-center justify-between gap-3 rounded-[26px] border border-emerald-200 bg-emerald-50 px-4 py-3.5 shadow-[0_16px_28px_-22px_rgba(16,94,62,0.22)] transition hover:border-emerald-300 hover:bg-emerald-100/80"
+          >
+            <div className="min-w-0">
+              <p className="text-[14px] font-semibold text-emerald-950">Carteira de vacinação</p>
+              <p className="mt-0.5 text-[11px] text-emerald-900/85">
+                Consulte vacinas aplicadas e abra a carteira completa do pet.
+              </p>
             </div>
-          </div>
-          <p className="mt-3 text-[11px] text-zinc-500">Media: {avgActivity} min/dia · {Math.round(avgSteps / 100) / 10} mil passos por dia</p>
+            <IconVaccineWallet className="h-9 w-9 shrink-0 text-emerald-700" aria-hidden />
+          </Link>
         </section>
 
-        <HomeLocationSecurityCard
-          addressLabel={locationAddressLabel}
-          updateLabel={locationUpdateLabel}
-          lat={hasRealNfcLocation ? nfcLat : null}
-          lng={hasRealNfcLocation ? nfcLng : null}
-          animationDelay="300ms"
-        />
+        <div
+          data-lyka-shell-span="full"
+          className="appear-up grid grid-cols-2 gap-2 sm:gap-3"
+          style={{ animationDelay: "240ms" }}
+        >
+          <Link
+            href="/home/atividade"
+            prefetch
+            className="group block min-h-0 min-w-0 rounded-[22px] outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:rounded-[26px]"
+          >
+            <article className="flex aspect-square min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-zinc-100/80 bg-white p-2.5 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)] transition active:scale-[0.98] group-hover:border-emerald-300/60 sm:rounded-[26px] sm:p-3">
+              <div className="mb-1 flex items-center justify-between gap-1">
+                <h3 className="truncate text-[12px] font-semibold text-zinc-900 sm:text-[13px]">Atividade</h3>
+                <IconWave className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden />
+              </div>
+              <p className="mb-2 line-clamp-2 text-[10px] leading-snug text-zinc-500">
+                Ø {avgActivity} min/d · meta 60
+              </p>
+              <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-zinc-100 bg-zinc-50 p-2">
+                <div className="grid min-h-0 flex-1 grid-cols-7 items-end gap-0.5 sm:gap-1">
+                  {weeklyActivityData.map((item) => (
+                    <div key={item.day} className="flex min-w-0 flex-col items-center gap-0.5">
+                      <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">{item.activeMinutes}</span>
+                      <div
+                        className="w-full rounded-t-sm bg-gradient-to-t from-emerald-500 to-emerald-300"
+                        style={{
+                          height: `${6 + (item.activeMinutes / maxActivity) * 42}px`,
+                          minHeight: "5px",
+                        }}
+                        title={`${item.activeMinutes} min`}
+                      />
+                      <span className="text-[8px] font-medium text-zinc-500 sm:text-[9px]">{item.day}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
+          </Link>
 
-        <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "360ms" }}>
+          <Link
+            href="/home/peso"
+            prefetch
+            className="group block min-h-0 min-w-0 rounded-[22px] outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:rounded-[26px]"
+          >
+            <HomeWeightChartSection animationDelay="240ms" compact />
+          </Link>
+        </div>
+
+        <div data-lyka-shell-span="full">
+          <HomeLocationSecurityCard
+            addressLabel={locationAddressLabel}
+            updateLabel={locationUpdateLabel}
+            lat={hasRealNfcLocation ? nfcLat : null}
+            lng={hasRealNfcLocation ? nfcLng : null}
+            animationDelay="320ms"
+          />
+        </div>
+
+        <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "380ms" }}>
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div>
               <h3 className="text-[14px] font-semibold text-zinc-900">Proximos eventos</h3>

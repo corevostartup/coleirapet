@@ -90,6 +90,39 @@ function parseDurationToTotalMinutes(s: string): number | null {
   return total;
 }
 
+function startOfDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function toIsoDate(value: Date) {
+  const yyyy = value.getFullYear();
+  const mm = String(value.getMonth() + 1).padStart(2, "0");
+  const dd = String(value.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Ultimos 7 dias (incl. hoje), alinhado ao card da Home. */
+function buildWeeklyActivityFromEntries(entries: Entry[]) {
+  const labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"] as const;
+  const byDate = new Map<string, number>();
+  for (const e of entries) {
+    const iso = e.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) continue;
+    byDate.set(iso, (byDate.get(iso) ?? 0) + e.minutes);
+  }
+  const today = startOfDay(new Date());
+  const out: { day: string; isoDate: string; activeMinutes: number }[] = [];
+  for (let offset = 6; offset >= 0; offset--) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    const jsDay = date.getDay();
+    const label = labels[(jsDay + 6) % 7];
+    const isoDate = toIsoDate(date);
+    out.push({ day: label, isoDate, activeMinutes: byDate.get(isoDate) ?? 0 });
+  }
+  return out;
+}
+
 export function HealthActivityMinutesPanel() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,10 +139,18 @@ export function HealthActivityMinutesPanel() {
     savingRef.current = saving;
   }, [saving]);
 
-  const avgMinutes = useMemo(() => {
-    if (!entries.length) return 0;
-    return Math.round(entries.reduce((sum, item) => sum + item.minutes, 0) / entries.length);
-  }, [entries]);
+  const weeklyActivity = useMemo(() => buildWeeklyActivityFromEntries(entries), [entries]);
+  const maxWeeklyMinutes = useMemo(
+    () => Math.max(...weeklyActivity.map((item) => item.activeMinutes), 1),
+    [weeklyActivity],
+  );
+  const avgWeeklyMinutes = useMemo(
+    () =>
+      weeklyActivity.length
+        ? Math.round(weeklyActivity.reduce((sum, item) => sum + item.activeMinutes, 0) / weeklyActivity.length)
+        : 0,
+    [weeklyActivity],
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -223,13 +264,14 @@ export function HealthActivityMinutesPanel() {
 
   return (
     <section
+      data-lyka-shell-span="full"
       className="appear-up mt-3 min-w-0 overflow-x-clip rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
       style={{ animationDelay: "155ms" }}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Minutos ativos por dia</h3>
-          <p className="mt-0.5 text-[12px] text-zinc-500">Media: {avgMinutes} min/dia</p>
+          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Atividade Semanal</h3>
+          <p className="mt-0.5 text-[12px] text-zinc-500">Media (7 dias): {avgWeeklyMinutes} min/dia</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <button
@@ -247,6 +289,33 @@ export function HealthActivityMinutesPanel() {
       </div>
 
       {error ? <p className="mt-1 text-[12px] font-medium text-red-600">{error}</p> : null}
+
+      {!loading ? (
+        <>
+          <div className="mb-3 flex items-center justify-between text-[11px]">
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">Minutos ativos por dia</span>
+            <span className="text-zinc-500">Meta: 60 min</span>
+          </div>
+          <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3">
+            <div className="grid grid-cols-7 items-end gap-2">
+              {weeklyActivity.map((item) => (
+                <div key={item.isoDate} className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-semibold text-zinc-500">{item.activeMinutes}</span>
+                  <div
+                    className="w-full rounded-t-md bg-gradient-to-t from-emerald-500 to-emerald-300"
+                    style={{
+                      height: `${12 + (item.activeMinutes / maxWeeklyMinutes) * 90}px`,
+                      minHeight: "12px",
+                    }}
+                    title={`${item.activeMinutes} min`}
+                  />
+                  <span className="text-[10px] font-medium text-zinc-500">{item.day}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
 
       {loading ? (
         <p className="mt-3 text-[12px] text-zinc-500">Carregando registros...</p>

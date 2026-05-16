@@ -49,9 +49,13 @@ export default async function HealthPage() {
         }
       />
 
-      <section className="appear-up mt-3 grid grid-cols-4 gap-2" style={{ animationDelay: "80ms" }}>
+      <section
+        data-lyka-shell-span="full"
+        className="appear-up mt-3 grid grid-cols-4 gap-1.5 sm:gap-2"
+        style={{ animationDelay: "80ms" }}
+      >
         {metrics.map((item) => (
-          <article key={item.label} className="elev-card rounded-xl p-2">
+          <article key={item.label} className="elev-card min-w-0 rounded-xl p-1.5 sm:p-2">
             <p className="truncate text-[9px] uppercase tracking-wide text-zinc-500">{item.label}</p>
             <p className="mt-1.5 text-[15px] font-semibold leading-none text-zinc-900">
               {item.value}
@@ -62,7 +66,11 @@ export default async function HealthPage() {
         ))}
       </section>
 
-      <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "140ms" }}>
+      <section
+        data-lyka-shell-span="full"
+        className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
+        style={{ animationDelay: "140ms" }}
+      >
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-[14px] font-semibold text-zinc-900">Tendencia cardiaca</h3>
           <IconWave className="h-5 w-5 text-zinc-500" />

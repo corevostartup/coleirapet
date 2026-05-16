@@ -1,11 +1,10 @@
 "use client";
 
-import type { ComponentProps } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { VaccineDetailsModal } from "@/components/vaccine-details-modal";
-import { IconCalendar } from "@/components/icons";
+import { IconCalendar, IconVaccineWallet } from "@/components/icons";
 import type { VaccineItem, VaccineStatus } from "@/lib/vaccines/vaccine-item";
 
 type VaccinesResponse = {
@@ -183,7 +182,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
             aria-label="Abrir carteira de vacinacao"
             className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200/90 bg-emerald-50/80 text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100/90 active:scale-[0.97]"
           >
-            <IconVaccineWalletNav className="h-[18px] w-[18px]" />
+            <IconVaccineWallet className="h-[18px] w-[18px]" />
           </Link>
           <button
             type="button"
@@ -363,26 +362,6 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
           )
         : null}
     </section>
-  );
-}
-
-function IconVaccineWalletNav(props: ComponentProps<"svg">) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      {...props}
-    >
-      <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
-      <path d="M2.5 10.5h19" />
-      <path d="M6 15.5h5" />
-      <circle cx="17.5" cy="15.5" r="1.35" fill="currentColor" stroke="none" />
-    </svg>
   );
 }
 

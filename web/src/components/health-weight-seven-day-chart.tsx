@@ -52,14 +52,21 @@ function buildLastSevenDaysSlots(entries: WeightChartEntry[]): Slot[] {
   return slots;
 }
 
-/** Mesmos âncoras de layout da seção «Atividade semanal» na home (grid 7 dias + cartão cinza). Gráfico em linha com pontos (estilo Saúde). */
-export function HealthWeightSevenDayChart({ entries }: { entries: WeightChartEntry[] }) {
+/** Grafico peso 7 dias; `variant="compact"` para card quadrado na Home (sem blocos de titulo extra). */
+export function HealthWeightSevenDayChart({
+  entries,
+  variant = "default",
+}: {
+  entries: WeightChartEntry[];
+  variant?: "default" | "compact";
+}) {
   const strokeGradId = useId().replace(/:/g, "");
+  const compact = variant === "compact";
   const slots = useMemo(() => buildLastSevenDaysSlots(entries), [entries]);
 
   const chartGeom = useMemo(() => {
     const vbW = 280;
-    const vbH = 72;
+    const vbH = compact ? 50 : 72;
     const values = slots.map((s) => s.weightKg).filter((w): w is number => w != null);
     if (values.length === 0) {
       return {
@@ -113,7 +120,7 @@ export function HealthWeightSevenDayChart({ entries }: { entries: WeightChartEnt
     });
 
     return { pathD, circles, gridYs, vbW, vbH };
-  }, [slots]);
+  }, [slots, compact]);
 
   const avgWeek = useMemo(() => {
     const nums = slots.map((s) => s.weightKg).filter((w): w is number => w != null);
@@ -124,39 +131,48 @@ export function HealthWeightSevenDayChart({ entries }: { entries: WeightChartEnt
 
   const hasAnyPoint = chartGeom.circles.length > 0;
 
-  return (
-    <div className="mt-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h4 className="text-[14px] font-semibold text-zinc-900">Variacao em 7 dias</h4>
-        <IconWave className="h-5 w-5 text-zinc-500" aria-hidden />
-      </div>
-      <div className="mb-3 flex items-center justify-between text-[11px]">
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">Peso (kg)</span>
-        <span className="text-zinc-500">
-          {avgWeek != null ? `Media: ${formatKgShort(avgWeek)} kg` : "Sem pontos nesta semana"}
-        </span>
+  const inner = (
+    <div
+      className={
+        compact
+          ? "flex min-h-0 flex-1 flex-col rounded-xl border border-zinc-100 bg-zinc-50 p-2"
+          : "rounded-2xl border border-zinc-100 bg-zinc-50 p-3"
+      }
+    >
+      <div className={`grid grid-cols-7 ${compact ? "shrink-0 gap-0.5" : "gap-2"}`}>
+        {slots.map((s) => (
+          <div key={s.dateIso} className="flex flex-col items-center justify-end">
+            <span
+              className={`font-semibold tabular-nums text-zinc-500 ${compact ? "text-[8px]" : "text-[10px]"}`}
+            >
+              {s.weightKg != null ? formatKgShort(s.weightKg) : "—"}
+            </span>
+          </div>
+        ))}
       </div>
 
-      <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-3">
-        <div className="grid grid-cols-7 gap-2">
-          {slots.map((s) => (
-            <div key={s.dateIso} className="flex flex-col items-center justify-end">
-              <span className="text-[10px] font-semibold tabular-nums text-zinc-500">
-                {s.weightKg != null ? formatKgShort(s.weightKg) : "—"}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="relative mt-1 h-[72px] w-full min-w-0">
-          {!hasAnyPoint ? (
-            <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-zinc-200/90 bg-white/40 px-2 text-center text-[11px] text-zinc-500">
-              Registre o peso em pelo menos um dia para ver a linha.
-            </div>
-          ) : (
+      <div
+        className={
+          compact
+            ? "relative mt-0.5 flex min-h-0 min-w-0 flex-1 flex-col"
+            : "relative mt-1 h-[72px] w-full min-w-0"
+        }
+      >
+        {!hasAnyPoint ? (
+          <div
+            className={`flex w-full items-center justify-center rounded-xl border border-dashed border-zinc-200/90 bg-white/40 text-center text-zinc-500 ${
+              compact
+                ? "min-h-0 flex-1 px-1.5 py-2 text-[9px] leading-snug"
+                : "h-full px-2 text-[11px]"
+            }`}
+          >
+            {compact ? "Sem dados na semana" : "Registre o peso em pelo menos um dia para ver a linha."}
+          </div>
+        ) : compact ? (
+          <div className="relative min-h-0 w-full flex-1">
             <svg
               viewBox={`0 0 ${chartGeom.vbW} ${chartGeom.vbH}`}
-              className="h-full w-full overflow-visible"
+              className="absolute inset-0 h-full w-full overflow-visible"
               preserveAspectRatio="xMidYMid meet"
               aria-hidden
             >
@@ -185,7 +201,7 @@ export function HealthWeightSevenDayChart({ entries }: { entries: WeightChartEnt
                   d={chartGeom.pathD}
                   fill="none"
                   stroke={`url(#${strokeGradId}-ln)`}
-                  strokeWidth={2.25}
+                  strokeWidth={1.85}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -193,22 +209,88 @@ export function HealthWeightSevenDayChart({ entries }: { entries: WeightChartEnt
 
               {chartGeom.circles.map((c) => (
                 <g key={c.key}>
-                  <circle cx={c.cx} cy={c.cy} r={5.5} fill="#ffffff" stroke="#10b981" strokeWidth={2} />
-                  <circle cx={c.cx} cy={c.cy} r={2.2} fill="#10b981" />
+                  <circle cx={c.cx} cy={c.cy} r={4.25} fill="#ffffff" stroke="#10b981" strokeWidth={1.5} />
+                  <circle cx={c.cx} cy={c.cy} r={1.8} fill="#10b981" />
                 </g>
               ))}
             </svg>
-          )}
-        </div>
+          </div>
+        ) : (
+          <svg
+            viewBox={`0 0 ${chartGeom.vbW} ${chartGeom.vbH}`}
+            className="h-full w-full overflow-visible"
+            preserveAspectRatio="xMidYMid meet"
+            aria-hidden
+          >
+            <defs>
+              <linearGradient id={`${strokeGradId}-ln`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="100%" stopColor="#10b981" />
+              </linearGradient>
+            </defs>
 
-        <div className="mt-2 grid grid-cols-7 gap-2">
-          {slots.map((s) => (
-            <div key={`${s.dateIso}-lab`} className="flex flex-col items-center">
-              <span className="text-[10px] font-medium text-zinc-500">{s.day}</span>
-            </div>
-          ))}
-        </div>
+            {chartGeom.gridYs.map((gy, idx) => (
+              <line
+                key={idx}
+                x1={8}
+                y1={gy}
+                x2={chartGeom.vbW - 8}
+                y2={gy}
+                stroke="#e4e4e7"
+                strokeWidth={0.75}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+
+            {chartGeom.pathD ? (
+              <path
+                d={chartGeom.pathD}
+                fill="none"
+                stroke={`url(#${strokeGradId}-ln)`}
+                strokeWidth={2.25}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : null}
+
+            {chartGeom.circles.map((c) => (
+              <g key={c.key}>
+                <circle cx={c.cx} cy={c.cy} r={5.5} fill="#ffffff" stroke="#10b981" strokeWidth={2} />
+                <circle cx={c.cx} cy={c.cy} r={2.2} fill="#10b981" />
+              </g>
+            ))}
+          </svg>
+        )}
       </div>
+
+      <div className={`grid grid-cols-7 ${compact ? "mt-1 shrink-0 gap-0.5" : "mt-2 gap-2"}`}>
+        {slots.map((s) => (
+          <div key={`${s.dateIso}-lab`} className="flex flex-col items-center">
+            <span className={`font-medium text-zinc-500 ${compact ? "text-[8px]" : "text-[10px]"}`}>{s.day}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (compact) {
+    return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{inner}</div>;
+  }
+
+  return (
+    <div className="mt-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h4 className="text-[14px] font-semibold text-zinc-900">Variacao em 7 dias</h4>
+        <IconWave className="h-5 w-5 text-zinc-500" aria-hidden />
+      </div>
+      <div className="mb-3 flex items-center justify-between text-[11px]">
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">Peso (kg)</span>
+        <span className="text-zinc-500">
+          {avgWeek != null ? `Media: ${formatKgShort(avgWeek)} kg` : "Sem pontos nesta semana"}
+        </span>
+      </div>
+
+      {inner}
 
       <p className="mt-3 text-[11px] text-zinc-500">Ultimos 7 dias · uma medicao por dia</p>
     </div>

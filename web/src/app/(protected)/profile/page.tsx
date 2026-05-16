@@ -166,33 +166,38 @@ export default async function ProfilePage({
         sharePublicUrl={sharePublicUrl}
       />
 
-      <section className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "170ms" }}>
-        <div className="flex items-center gap-3 p-3">
-          <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-zinc-200">
-            <Image
-              src={tutorPhoto}
-              alt="Foto do tutor"
-              fill
-              className="object-cover"
-              sizes="64px"
-            />
+      <div className="appear-up flex flex-col gap-3" style={{ animationDelay: "170ms" }}>
+        <section className="overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
+          <div className="flex items-center gap-3 p-3">
+            <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-zinc-200">
+              <Image
+                src={tutorPhoto}
+                alt="Foto do tutor"
+                fill
+                className="object-cover"
+                sizes="64px"
+              />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-zinc-500">Tutor</p>
+              <p className="text-[15px] font-semibold text-zinc-900">{tutorName}</p>
+              <p className="text-[12px] text-zinc-500">Responsavel principal</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Tutor</p>
-            <p className="text-[15px] font-semibold text-zinc-900">{tutorName}</p>
-            <p className="text-[12px] text-zinc-500">Responsavel principal</p>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <ProfileUserDetailsEditor
-        initialName={currentUser?.name ?? tutorName}
-        initialEmail={currentUser?.email ?? ""}
-        initialPhone={currentUser?.phone ?? ""}
-        initialBirthDate={currentUser?.birthDate ?? ""}
-        initialUserType={currentUser?.userType ?? "Tutor"}
-        initialVeterinarian={currentVeterinarian}
-      />
+        <div className="flex min-w-0 flex-col gap-3">
+          <h3 className="text-[14px] font-semibold text-zinc-900 md:px-1">Dados do usuario</h3>
+          <ProfileUserDetailsEditor
+            initialName={currentUser?.name ?? tutorName}
+            initialEmail={currentUser?.email ?? ""}
+            initialPhone={currentUser?.phone ?? ""}
+            initialBirthDate={currentUser?.birthDate ?? ""}
+            initialUserType={currentUser?.userType ?? "Tutor"}
+            initialVeterinarian={currentVeterinarian}
+          />
+        </div>
+      </div>
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "200ms" }}>
         <div className="mb-3 flex items-center justify-between">

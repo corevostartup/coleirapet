@@ -1,16 +1,12 @@
 import type { ReactNode } from "react";
 import { TopBarNotificationsLink } from "@/components/top-bar-notifications-link";
+import { UserAppShellLayout } from "@/components/user-app-shell-layout";
 
 type Tab = "home" | "health" | "location" | "dados" | "profile";
 
-export function AppShell({ children }: { children: ReactNode; tab?: Tab }) {
-  return (
-    <main className="ios-safe-top min-h-screen px-3 py-4 pb-28 sm:px-6">
-      <div className="mx-auto w-full max-w-[440px]">
-        {children}
-      </div>
-    </main>
-  );
+/** Em telemovel mantem coluna estreita; a partir de md (tablet/iPad paisagem e desktop) grelha + menu lateral como na area medica. */
+export function AppShell({ children, tab: _tab }: { children: ReactNode; tab?: Tab }) {
+  return <UserAppShellLayout>{children}</UserAppShellLayout>;
 }
 
 export function TopBar({
@@ -30,7 +26,7 @@ export function TopBar({
   const defaultBell = <TopBarNotificationsLink />;
 
   return (
-    <header className="glass-card appear-up relative z-[1800] rounded-[28px] px-4 py-3">
+    <header className="glass-card appear-up relative z-[1800] rounded-[28px] px-4 py-3 md:px-5 md:py-3.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-start gap-2">
           {leadingAction ? <div className="shrink-0">{leadingAction}</div> : null}

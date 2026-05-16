@@ -115,7 +115,7 @@ export function ProfileUserDetailsEditor({
   return (
     <form
       onSubmit={handleSubmit}
-      className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
+      className="appear-up rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
       style={{ animationDelay: "190ms" }}
     >
       <div className="mb-3 flex items-center justify-between gap-3">

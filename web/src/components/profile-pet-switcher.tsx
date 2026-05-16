@@ -236,7 +236,7 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
                     Oferta
                   </span>
                 </div>
-                <p className="mt-0.5 text-[11px] text-emerald-800">De R$ 39,90 por R$ 19,00</p>
+                <p className="mt-0.5 text-[11px] text-emerald-800">De R$ 39,90 por R$ 19,90</p>
                 <p className="mt-1 text-[11px] text-emerald-800">Acesso a todos os recursos e pets ilimitados.</p>
               </article>
             </div>

@@ -74,9 +74,11 @@ export function IconCamera(props: IconProps) {
 export function IconShare(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
-      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-      <polyline points="16 6 12 2 8 6" />
-      <line x1="12" x2="12" y1="2" y2="15" />
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="10.49" x2="15.41" y2="6.51" />
+      <line x1="8.59" y1="13.51" x2="15.41" y2="17.49" />
     </svg>
   );
 }
@@ -163,6 +165,18 @@ export function IconPill(props: IconProps) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
       <path d="M10.5 21.5a6 6 0 0 1-8.5-8.5l6.9-6.9a6 6 0 0 1 8.5 8.5Z" />
       <path d="m8 8 8 8" />
+    </svg>
+  );
+}
+
+/** Cartao / carteira de vacinacao (mesmo desenho do atalho em Vacinas). */
+export function IconVaccineWallet(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+      <path d="M2.5 10.5h19" />
+      <path d="M6 15.5h5" />
+      <circle cx="17.5" cy="15.5" r="1.35" fill="currentColor" stroke="none" />
     </svg>
   );
 }

@@ -8,9 +8,20 @@ import { PET_PROFILE_PHOTO_INPUT_ID } from "@/lib/pets/profile-photo-input-id";
 function ShareProfileIcon(props: ComponentProps<"svg">) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
-      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-      <polyline points="16 6 12 2 8 6" />
-      <line x1="12" x2="12" y1="2" y2="15" />
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="10.49" x2="15.41" y2="6.51" />
+      <line x1="8.59" y1="13.51" x2="15.41" y2="17.49" />
+    </svg>
+  );
+}
+
+function EditPhotoIcon(props: ComponentProps<"svg">) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z" />
     </svg>
   );
 }
@@ -436,7 +447,7 @@ export function ProfilePetDetailsEditor({
               <button
                 type="button"
                 onClick={() => void sharePublicProfile()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/92 text-zinc-700 shadow-sm transition hover:bg-white"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/92 text-zinc-700 shadow-sm transition hover:bg-white"
                 title={shareCopiedHint ? "Copiado!" : "Compartilhar"}
                 aria-label={
                   shareCopiedHint ? "Link copiado para a area de transferencia" : "Compartilhar perfil publico do pet"
@@ -453,9 +464,18 @@ export function ProfilePetDetailsEditor({
               type="button"
               disabled={isPhotoBusy}
               onClick={() => fileInputRef.current?.click()}
-              className="rounded-xl bg-white/92 px-3 py-1.5 text-[12px] font-semibold text-zinc-700 shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/92 text-zinc-700 shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+              title={photoState === "uploading" ? "Enviando foto..." : "Alterar foto do pet"}
+              aria-label={photoState === "uploading" ? "Enviando foto do pet" : "Alterar foto do pet"}
             >
-              {photoState === "uploading" ? "Enviando..." : "Editar"}
+              {photoState === "uploading" ? (
+                <span
+                  className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-700"
+                  aria-hidden
+                />
+              ) : (
+                <EditPhotoIcon className="h-5 w-5 shrink-0" />
+              )}
             </button>
           </div>
         </div>
