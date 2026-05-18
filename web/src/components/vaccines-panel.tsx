@@ -141,7 +141,12 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
   }
 
   async function handleToggleStatus(vaccine: VaccineItem) {
-    const confirmed = window.confirm("deseja trocar status");
+    if (!vaccine.canOwnerEditStatus) {
+      setError("Apenas o veterinario que cadastrou esta vacina pode alterar o status.");
+      return;
+    }
+    const nextLabel = vaccine.status === "applied" ? "Pendente" : "Aplicada";
+    const confirmed = window.confirm(`Alterar status de "${vaccine.name}" para ${nextLabel}?`);
     if (!confirmed) return;
     setError(null);
     setTogglingId(vaccine.id);
@@ -244,7 +249,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                 className="absolute inset-0 cursor-default"
                 onClick={() => !saving && closeModal()}
               />
-              <section className="relative z-[1] mx-auto w-[min(420px,calc(100vw-1rem))] max-w-[428px] rounded-[26px] border border-zinc-200 bg-white p-3 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)] sm:p-4">
+              <section className="relative z-[1] mx-auto w-[min(420px,calc(100vw-1rem))] max-w-[428px] min-w-0 overflow-x-hidden rounded-[26px] border border-zinc-200 bg-white p-3 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)] sm:p-4">
                 <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <div className="min-w-0 flex-1 pr-0 sm:pr-2">
                     <h3 id="vaccine-modal-title" className="text-[15px] font-semibold text-zinc-900">
@@ -282,7 +287,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                       autoFocus
                     />
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
+                  <div className="grid min-w-0 grid-cols-1 gap-3">
                     <div className="min-w-0">
                       <label htmlFor="vaccine-status" className="text-[12px] font-semibold text-zinc-700">
                         Status
@@ -297,7 +302,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                         <option value="applied">Aplicada</option>
                       </select>
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 overflow-hidden">
                       <label htmlFor="vaccine-date" className="text-[12px] font-semibold text-zinc-700">
                         Data
                       </label>
@@ -306,7 +311,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
                         type="date"
                         value={date}
                         onChange={(event) => setDate(event.target.value)}
-                        className="mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:px-3"
+                        className="lyka-date-field mt-2 box-border h-11 min-h-11 rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:px-3"
                         required
                       />
                     </div>
@@ -390,20 +395,31 @@ function VaccineCard({
             <p className="mt-0.5 truncate text-[10px] text-zinc-500">Prof.: {vaccine.veterinarian}</p>
           ) : null}
         </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleStatus();
-          }}
-          disabled={toggling}
-          title="Trocar status da vacina"
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-            vaccine.status === "applied" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-          } disabled:opacity-60`}
-        >
-          {toggling ? "Alterando..." : vaccine.stateLabel}
-        </button>
+        {vaccine.canOwnerEditStatus ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleStatus();
+            }}
+            disabled={toggling}
+            title="Trocar status da vacina"
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              vaccine.status === "applied" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+            } disabled:opacity-60`}
+          >
+            {toggling ? "Alterando..." : vaccine.stateLabel}
+          </button>
+        ) : (
+          <span
+            title="Status definido pelo veterinario"
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              vaccine.status === "applied" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+            }`}
+          >
+            {vaccine.stateLabel}
+          </span>
+        )}
       </div>
     </article>
   );

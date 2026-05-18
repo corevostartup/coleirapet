@@ -6,6 +6,9 @@ import { COLLECTION_PETS, SUBCOLLECTION_VACCINES, SUBCOLLECTION_VACCINES_LEGACY 
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
+import { canVetEditVaccineStatus } from "@/lib/vaccines/vaccine-access";
+import type { VaccineStatus } from "@/lib/vaccines/vaccine-item";
+import { vaccineFromDoc } from "@/lib/vaccines/vaccine-item";
 
 type GetVaccinesParams = {
   petId?: string;
@@ -17,6 +20,26 @@ type CreateVaccinePayload = {
   date?: string;
   nextDose?: string;
   observation?: string;
+};
+
+type UpdateVaccinePayload = {
+  petId?: string;
+  id?: string;
+  status?: VaccineStatus;
+};
+
+type VaccineSourceDoc = {
+  name?: string;
+  date?: string;
+  status?: VaccineStatus;
+  createdBy?: string;
+  createdByUid?: string;
+  prescribedByName?: string;
+  prescribedByCrmv?: string;
+  nextDose?: string;
+  observation?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 async function requireVetAuthContext() {
@@ -126,11 +149,14 @@ export async function POST(request: Request) {
 
     const ref = await petRef.collection(SUBCOLLECTION_VACCINES).add({
       name: name.slice(0, 80),
+      status: "applied",
       date: date.slice(0, 20),
       nextDose: (nextDose || "Nao informado").slice(0, 40),
       observation: observation.slice(0, 400),
       prescribedByName: auth.vetName.slice(0, 80),
       prescribedByCrmv: prescribedByCrmv.slice(0, 40),
+      createdBy: "vet",
+      createdByUid: auth.uid,
       createdAt: nowIso,
       updatedAt: nowIso,
     });
@@ -157,6 +183,74 @@ export async function POST(request: Request) {
       {
         error: "Falha ao adicionar vacina",
         detail: error instanceof Error ? error.message : "Erro desconhecido ao adicionar vacina.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  const auth = await requireVetAuthContext();
+  if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+
+  let body: UpdateVaccinePayload;
+  try {
+    body = (await request.json()) as UpdateVaccinePayload;
+  } catch {
+    return NextResponse.json({ error: "Body invalido" }, { status: 400 });
+  }
+
+  const petId = typeof body.petId === "string" ? body.petId.trim() : "";
+  const id = typeof body.id === "string" ? body.id.trim() : "";
+  if (!petId) return NextResponse.json({ error: "PetId invalido" }, { status: 400 });
+  if (!id) return NextResponse.json({ error: "Id da vacina invalido" }, { status: 400 });
+  if (body.status !== "applied" && body.status !== "pending") {
+    return NextResponse.json({ error: "Status invalido" }, { status: 400 });
+  }
+
+  try {
+    const db = getFirebaseAdminDb();
+    const petRef = db.collection(COLLECTION_PETS).doc(petId);
+    const petSnap = await petRef.get();
+    if (!petSnap.exists) return NextResponse.json({ error: "Pet nao encontrado" }, { status: 404 });
+
+    const canonicalRef = petRef.collection(SUBCOLLECTION_VACCINES).doc(id);
+    const legacyRef = petRef.collection(SUBCOLLECTION_VACCINES_LEGACY).doc(id);
+    const canonicalSnap = await canonicalRef.get();
+    const legacySnap = canonicalSnap.exists ? null : await legacyRef.get();
+    const sourceData = (canonicalSnap.exists ? canonicalSnap.data() : legacySnap?.data()) as VaccineSourceDoc | undefined;
+
+    if (!sourceData) {
+      return NextResponse.json({ error: "Vacina nao encontrada" }, { status: 404 });
+    }
+
+    if (!canVetEditVaccineStatus(sourceData, auth.uid)) {
+      return NextResponse.json(
+        { error: "Apenas o veterinario que cadastrou esta vacina pode alterar o status." },
+        { status: 403 },
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    await canonicalRef.set(
+      {
+        ...sourceData,
+        status: body.status,
+        updatedAt: nowIso,
+      },
+      { merge: true },
+    );
+
+    const refreshed = await canonicalRef.get();
+    return NextResponse.json({
+      ok: true,
+      vaccine: vaccineFromDoc(id, refreshed.data() as VaccineSourceDoc),
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Falha ao atualizar vacina",
+        detail: error instanceof Error ? error.message : "Erro desconhecido ao atualizar vacina.",
       },
       { status: 500 },
     );

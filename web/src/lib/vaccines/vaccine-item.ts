@@ -1,3 +1,9 @@
+import {
+  canOwnerEditVaccineStatus,
+  resolveVaccineCreatedBy,
+  type VaccineCreatedBy,
+} from "@/lib/vaccines/vaccine-access";
+
 export type VaccineStatus = "applied" | "pending";
 
 export type VaccineItem = {
@@ -5,6 +11,9 @@ export type VaccineItem = {
   name: string;
   status: VaccineStatus;
   stateLabel: "Aplicada" | "Pendente";
+  createdBy: VaccineCreatedBy;
+  /** Tutor pode alternar pendente/aplicada apenas em vacinas que ele cadastrou. */
+  canOwnerEditStatus: boolean;
   date: string;
   dateLabel: string;
   veterinarian: string;
@@ -38,6 +47,10 @@ function toPtBrDateTime(iso: string) {
 type VaccineDoc = {
   name?: string;
   status?: VaccineStatus;
+  createdBy?: string;
+  createdByUid?: string;
+  prescribedByName?: string;
+  prescribedByCrmv?: string;
   date?: string;
   veterinarian?: string;
   clinic?: string;
@@ -47,7 +60,13 @@ type VaccineDoc = {
 };
 
 export function vaccineFromDoc(id: string, data: VaccineDoc): VaccineItem {
-  const status = data.status === "applied" ? "applied" : "pending";
+  const createdBy = resolveVaccineCreatedBy(data);
+  const status =
+    data.status === "applied" || data.status === "pending"
+      ? data.status
+      : createdBy === "vet"
+        ? "applied"
+        : "pending";
   const date = typeof data.date === "string" ? data.date : "";
   const name = typeof data.name === "string" && data.name.trim() ? data.name.trim() : "Vacina";
   const veterinarian = typeof data.veterinarian === "string" ? data.veterinarian.trim() : "";
@@ -61,6 +80,8 @@ export function vaccineFromDoc(id: string, data: VaccineDoc): VaccineItem {
     name,
     status,
     stateLabel: status === "applied" ? "Aplicada" : "Pendente",
+    createdBy,
+    canOwnerEditStatus: canOwnerEditVaccineStatus(data),
     date,
     dateLabel: toPtBrDate(date),
     veterinarian,

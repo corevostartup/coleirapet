@@ -17,14 +17,18 @@ function ShareProfileIcon(props: ComponentProps<"svg">) {
   );
 }
 
-function EditPhotoIcon(props: ComponentProps<"svg">) {
+function EditCameraIcon(props: ComponentProps<"svg">) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z" />
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.4a2 2 0 0 1 2-2h3l1.8-2.3h6.4L17 6.4h3a2 2 0 0 1 2 2Z" />
+      <circle cx="12" cy="13" r="3.2" />
     </svg>
   );
 }
+
+/** Mesmo vidro translucido do badge Bem-estar na Home (sobre foto com gradiente). */
+const petHeroGlassBtnClass =
+  "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/20 text-white backdrop-blur transition hover:bg-white/30 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-70";
 
 /** Check curto para feedback apos copiar link (clipboard). */
 function CopiedCheckIcon(props: ComponentProps<"svg">) {
@@ -447,14 +451,14 @@ export function ProfilePetDetailsEditor({
               <button
                 type="button"
                 onClick={() => void sharePublicProfile()}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/92 text-zinc-700 shadow-sm transition hover:bg-white"
+                className={petHeroGlassBtnClass}
                 title={shareCopiedHint ? "Copiado!" : "Compartilhar"}
                 aria-label={
                   shareCopiedHint ? "Link copiado para a area de transferencia" : "Compartilhar perfil publico do pet"
                 }
               >
                 {shareCopiedHint ? (
-                  <CopiedCheckIcon className="h-5 w-5 shrink-0 text-emerald-600" />
+                  <CopiedCheckIcon className="h-5 w-5 shrink-0 text-emerald-200" />
                 ) : (
                   <ShareProfileIcon className="h-5 w-5 shrink-0" />
                 )}
@@ -464,17 +468,17 @@ export function ProfilePetDetailsEditor({
               type="button"
               disabled={isPhotoBusy}
               onClick={() => fileInputRef.current?.click()}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/92 text-zinc-700 shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+              className={petHeroGlassBtnClass}
               title={photoState === "uploading" ? "Enviando foto..." : "Alterar foto do pet"}
               aria-label={photoState === "uploading" ? "Enviando foto do pet" : "Alterar foto do pet"}
             >
               {photoState === "uploading" ? (
                 <span
-                  className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-700"
+                  className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
                   aria-hidden
                 />
               ) : (
-                <EditPhotoIcon className="h-5 w-5 shrink-0" />
+                <EditCameraIcon className="h-5 w-5 shrink-0" />
               )}
             </button>
           </div>

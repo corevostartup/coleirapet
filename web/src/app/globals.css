@@ -67,6 +67,15 @@ a {
 	margin: 0;
 }
 
+/* iOS/WebKit: input[type=date] tem largura intrinseca e estoura o container estreito. */
+.lyka-date-field {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	-webkit-min-logical-width: 0;
+}
+
 .glass-card {
 	background: color-mix(in srgb, var(--surface) 82%, transparent);
 	backdrop-filter: blur(12px);

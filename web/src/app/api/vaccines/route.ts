@@ -10,6 +10,7 @@ import {
 } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { canOwnerEditVaccineStatus } from "@/lib/vaccines/vaccine-access";
 import type { VaccineStatus } from "@/lib/vaccines/vaccine-item";
 import { vaccineFromDoc } from "@/lib/vaccines/vaccine-item";
 
@@ -39,6 +40,10 @@ type VaccineSourceDoc = {
   name?: string;
   date?: string;
   status?: VaccineStatus;
+  createdBy?: string;
+  createdByUid?: string;
+  prescribedByName?: string;
+  prescribedByCrmv?: string;
   createdAt?: string;
   veterinarian?: string;
   clinic?: string;
@@ -161,6 +166,8 @@ export async function POST(request: Request) {
       name: name.slice(0, 80),
       status,
       date,
+      createdBy: "owner",
+      createdByUid: auth.uid,
       createdAt: nowIso,
       updatedAt: nowIso,
     };
@@ -234,6 +241,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Vacina nao encontrada" }, { status: 404 });
     }
 
+    if (hasStatus && !canOwnerEditVaccineStatus(sourceData)) {
+      return NextResponse.json(
+        { error: "Apenas o veterinario que cadastrou esta vacina pode alterar o status." },
+        { status: 403 },
+      );
+    }
+
     const nextStatus: VaccineStatus =
       hasStatus && (body.status === "applied" || body.status === "pending")
         ? body.status
@@ -248,6 +262,10 @@ export async function PATCH(request: Request) {
       status: nextStatus,
       updatedAt: nowIso,
     };
+    if (typeof sourceData.createdBy === "string") merged.createdBy = sourceData.createdBy;
+    if (typeof sourceData.createdByUid === "string") merged.createdByUid = sourceData.createdByUid;
+    if (typeof sourceData.prescribedByName === "string") merged.prescribedByName = sourceData.prescribedByName;
+    if (typeof sourceData.prescribedByCrmv === "string") merged.prescribedByCrmv = sourceData.prescribedByCrmv;
 
     if (hasVet) merged.veterinarian = sliceText(body.veterinarian, 120);
     else if (typeof sourceData.veterinarian === "string") merged.veterinarian = sourceData.veterinarian;

@@ -3,7 +3,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { IconStethoscope } from "@/components/icons";
-import type { VaccineItem } from "@/lib/vaccines/vaccine-item";
+import type { VaccineItem, VaccineStatus } from "@/lib/vaccines/vaccine-item";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   const display = value.trim() || "Nao informado";
@@ -28,6 +28,7 @@ export function VaccineDetailsModal({
   onUpdated?: (v: VaccineItem) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [status, setStatus] = useState<VaccineStatus>("pending");
   const [vet, setVet] = useState("");
   const [clinic, setClinic] = useState("");
   const [notes, setNotes] = useState("");
@@ -41,6 +42,7 @@ export function VaccineDetailsModal({
 
   useEffect(() => {
     if (!vaccine || !open) return;
+    setStatus(vaccine.status);
     setVet(vaccine.veterinarian);
     setClinic(vaccine.clinic);
     setNotes(vaccine.notes);
@@ -71,16 +73,20 @@ export function VaccineDetailsModal({
     setSaving(true);
     setSaveError(null);
     try {
+      const payload: Record<string, unknown> = {
+        id: vaccine.id,
+        veterinarian: vet,
+        clinic,
+        notes,
+      };
+      if (vaccine.canOwnerEditStatus) {
+        payload.status = status;
+      }
+
       const res = await fetch("/api/vaccines", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: vaccine.id,
-          status: vaccine.status,
-          veterinarian: vet,
-          clinic,
-          notes,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -98,7 +104,8 @@ export function VaccineDetailsModal({
 
   if (!mounted || !open || !vaccine) return null;
 
-  const dateTitle = vaccine.status === "applied" ? "Data da aplicacao" : "Data prevista";
+  const displayStatus = editing && vaccine.canOwnerEditStatus ? status : vaccine.status;
+  const dateTitle = displayStatus === "applied" ? "Data da aplicacao" : "Data prevista";
 
   return createPortal(
     <div
@@ -123,10 +130,10 @@ export function VaccineDetailsModal({
                 </h2>
                 <span
                   className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                    vaccine.status === "applied" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"
+                    displayStatus === "applied" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"
                   }`}
                 >
-                  {vaccine.stateLabel}
+                  {displayStatus === "applied" ? "Aplicada" : "Pendente"}
                 </span>
               </div>
             </div>
@@ -167,45 +174,55 @@ export function VaccineDetailsModal({
 
           {editing ? (
             <div className="mt-4 space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
-              <p className="text-[12px] font-semibold text-emerald-900">Profissional e observacoes</p>
-              <div>
-                <label htmlFor="vd-vet" className="text-[11px] font-semibold text-zinc-600">
-                  Veterinario(a)
-                </label>
+              <p className="text-[12px] font-semibold text-emerald-900">Editar detalhes</p>
+              {vaccine.canOwnerEditStatus ? (
+                <div>
+                  <label htmlFor="vd-status" className="text-[11px] font-semibold text-zinc-600">
+                    Status
+                  </label>
+                  <select
+                    id="vd-status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as VaccineStatus)}
+                    className="mt-1 box-border h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[13px] text-zinc-900 outline-none focus:border-emerald-400"
+                  >
+                    <option value="pending">Pendente</option>
+                    <option value="applied">Aplicada</option>
+                  </select>
+                </div>
+              ) : (
+                <p className="rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2 text-[11px] leading-snug text-amber-900">
+                  Esta vacina foi cadastrada pelo veterinario. Apenas o profissional que registrou pode alterar o status.
+                </p>
+              )}
+              <div className="grid min-w-0 gap-2">
                 <input
                   id="vd-vet"
                   value={vet}
                   onChange={(e) => setVet(e.target.value)}
                   maxLength={120}
-                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
-                  placeholder="Nome do profissional"
+                  placeholder="Veterinario(a)"
+                  aria-label="Veterinario(a)"
+                  className="box-border w-full min-w-0 rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-[13px] text-zinc-900 outline-none focus:border-emerald-400"
                 />
-              </div>
-              <div>
-                <label htmlFor="vd-clinic" className="text-[11px] font-semibold text-zinc-600">
-                  Clinica
-                </label>
                 <input
                   id="vd-clinic"
                   value={clinic}
                   onChange={(e) => setClinic(e.target.value)}
                   maxLength={120}
-                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
-                  placeholder="Nome da clinica (opcional)"
+                  placeholder="Clinica ou estabelecimento"
+                  aria-label="Clinica ou estabelecimento"
+                  className="box-border w-full min-w-0 rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-[13px] text-zinc-900 outline-none focus:border-emerald-400"
                 />
-              </div>
-              <div>
-                <label htmlFor="vd-notes" className="text-[11px] font-semibold text-zinc-600">
-                  Observacoes
-                </label>
                 <textarea
                   id="vd-notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  rows={4}
+                  rows={2}
                   maxLength={800}
-                  placeholder="Lote, reacao, recomendacoes..."
-                  className="mt-1 box-border w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[13px] text-zinc-900 outline-none focus:border-emerald-400"
+                  placeholder="Observacoes (lote, etc.)"
+                  aria-label="Observacoes"
+                  className="box-border w-full min-w-0 resize-none rounded-2xl border border-zinc-200 bg-white px-3 py-2 text-[13px] text-zinc-900 outline-none focus:border-emerald-400"
                 />
               </div>
               {saveError ? <p className="text-[11px] font-medium text-rose-600">{saveError}</p> : null}
@@ -223,6 +240,7 @@ export function VaccineDetailsModal({
                   disabled={saving}
                   onClick={() => {
                     setEditing(false);
+                    setStatus(vaccine.status);
                     setVet(vaccine.veterinarian);
                     setClinic(vaccine.clinic);
                     setNotes(vaccine.notes);
@@ -240,7 +258,7 @@ export function VaccineDetailsModal({
               onClick={() => setEditing(true)}
               className="mt-4 w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 text-[13px] font-semibold text-zinc-800 transition hover:bg-zinc-100"
             >
-              Editar veterinario e observacoes
+              Editar detalhes
             </button>
           )}
 

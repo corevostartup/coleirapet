@@ -16,6 +16,8 @@ function resolveTab(pathname: string): Tab {
   return "home";
 }
 
+const DESKTOP_NAV_MQ = "(min-width: 768px)";
+
 /** `usePathname` só depois do mount — chamar no SSR/hidratação inicial quebra o boundary Loading/Suspense no Next 16. */
 function UserBottomNavInner() {
   const pathname = usePathname() ?? "";
@@ -34,7 +36,7 @@ function UserBottomNavInner() {
 
   return (
     <nav
-      className="appear-up fixed bottom-3 left-1/2 z-50 w-[calc(100%-1.5rem)] max-w-[428px] -translate-x-1/2 rounded-[24px] border border-zinc-200 bg-white/92 px-1.5 py-1.5 shadow-[0_18px_35px_-25px_rgba(15,23,42,0.5)] backdrop-blur md:hidden"
+      className="appear-up fixed bottom-3 left-1/2 z-50 hidden w-[calc(100%-1.5rem)] max-w-[428px] -translate-x-1/2 rounded-[24px] border border-zinc-200 bg-white/92 px-1.5 py-1.5 shadow-[0_18px_35px_-25px_rgba(15,23,42,0.5)] backdrop-blur max-md:block"
       style={{ animationDelay: "420ms" }}
     >
       <ul className="grid grid-cols-5">
@@ -55,13 +57,16 @@ function UserBottomNavInner() {
 }
 
 export function UserBottomNav() {
-  const [mounted, setMounted] = useState(false);
+  const [showMobileNav, setShowMobileNav] = useState(false);
 
   useLayoutEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
+    const mq = window.matchMedia(DESKTOP_NAV_MQ);
+    const update = () => setShowMobileNav(!mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
   }, []);
 
-  if (!mounted) return null;
+  if (!showMobileNav) return null;
   return <UserBottomNavInner />;
 }

@@ -63,9 +63,12 @@ function LocationAddressCard({ point }: { point: CurrentPetLocation }) {
   );
 }
 
+const DESKTOP_LAYOUT_MQ = "(min-width: 768px)";
+
 export function LocationView() {
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [finderMessages, setFinderMessages] = useState<FinderMessageItem[]>([]);
   const [locationHistory, setLocationHistory] = useState<LocationHistoryItem[]>([]);
   const [isNfcPaired, setIsNfcPaired] = useState(false);
@@ -75,12 +78,25 @@ export function LocationView() {
     addressLabel: "Nenhuma localizacao registrada",
     lastUpdateLabel: "Aguardando compartilhamento de localizacao via NFC",
   });
-  const disconnectedDevices = locationPageDevices.map((device) => ({
-    ...device,
-    status: device.name === "Tag NFC" && isNfcPaired ? "Conectado" : "Desconectado",
-  }));
+  const disconnectedDevices = locationPageDevices.map((device) => {
+    const isTagNfc = device.name === "Tag NFC";
+    const connected = isTagNfc && isNfcPaired;
+    return {
+      ...device,
+      status: connected ? "Conectado" : "Desconectado",
+      battery: isTagNfc ? (connected ? "100%" : "0%") : device.battery,
+    };
+  });
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const mq = window.matchMedia(DESKTOP_LAYOUT_MQ);
+    const update = () => setIsDesktopLayout(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
   useEffect(() => {
     if (locationHistory.length === 0) return;
     const pending = locationHistory.filter((item) => !item.address && typeof item.lat === "number" && typeof item.lng === "number");
@@ -277,7 +293,11 @@ export function LocationView() {
           </button>
           <div
             className="pointer-events-auto fixed left-1/2 flex w-[min(428px,calc(100%-1.5rem))] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-col gap-2 px-1"
-            style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 5.75rem)" }}
+            style={{
+              bottom: isDesktopLayout
+                ? "max(1.5rem, env(safe-area-inset-bottom))"
+                : "calc(env(safe-area-inset-bottom, 0px) + 5.75rem)",
+            }}
           >
             <LocationAddressCard point={petLocation} />
             <button
@@ -299,169 +319,168 @@ export function LocationView() {
         <>
           <TopBar title="Localizacao" subtitle="Rastreamento inteligente" />
 
-          <section
-            data-lyka-shell-span="full"
-            className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
-            style={{ animationDelay: "80ms" }}
-          >
-            <div className="relative isolate h-[200px] w-full overflow-hidden md:h-[min(42vh,320px)]">
-              <div className="absolute inset-0 z-0 min-h-0">
-                <LocationLeafletMap
-                  lat={petLocation.lat}
-                  lng={petLocation.lng}
-                  zoom={16}
-                  className="h-full w-full min-h-[200px] md:min-h-[min(42vh,320px)]"
-                  onMapClick={() => setMapFullscreen(true)}
-                />
-              </div>
-              <div className="pointer-events-none absolute inset-0 z-[1200]">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10" aria-hidden />
-                <div className="pointer-events-auto absolute inset-x-3 bottom-3">
-                  <LocationAddressCard point={petLocation} />
-                </div>
-              </div>
-            </div>
-          </section>
-
           <div
             data-lyka-shell-span="full"
-            className="appear-up grid grid-cols-1 gap-2 md:grid-cols-2 md:items-start md:gap-2"
-            style={{ animationDelay: "140ms" }}
+            className="appear-up grid grid-cols-1 gap-3 md:grid-cols-12 md:items-start md:gap-4 lg:gap-6"
+            style={{ animationDelay: "80ms" }}
           >
-            <section className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-[14px] font-semibold text-zinc-900">Status da coleira</h3>
-                <IconCollar className="h-5 w-5 text-zinc-600" />
-              </div>
-              <div className="space-y-2 text-[12px] text-zinc-700">
-                <p>Distancia atual: {location.distance}</p>
-                <p>Bateria: {location.battery}%</p>
-                <p>Zona segura principal: {location.safeZone}</p>
+            <section className="min-w-0 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)] md:col-span-7 lg:col-span-8">
+              <div className="relative isolate h-[200px] w-full overflow-hidden sm:h-[240px] md:h-[min(52vh,440px)] md:min-h-[320px] lg:h-[400px] lg:min-h-[360px]">
+                <div className="absolute inset-0 z-0 min-h-0">
+                  <LocationLeafletMap
+                    lat={petLocation.lat}
+                    lng={petLocation.lng}
+                    zoom={isDesktopLayout ? 15 : 16}
+                    zoomControl={isDesktopLayout}
+                    className="h-full min-h-[200px] w-full md:min-h-[320px] lg:min-h-[360px]"
+                    onMapClick={isDesktopLayout ? undefined : () => setMapFullscreen(true)}
+                  />
+                </div>
+                <div className="pointer-events-none absolute inset-0 z-[1200]">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10" aria-hidden />
+                  <div className="pointer-events-auto absolute inset-x-3 bottom-3 md:inset-x-4 md:bottom-4">
+                    <LocationAddressCard point={petLocation} />
+                    <button
+                      type="button"
+                      onClick={() => setMapFullscreen(true)}
+                      className="pointer-events-auto mt-2 w-full rounded-xl border border-white/30 bg-white/20 py-2 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/30 max-md:block md:mt-3 md:w-auto md:px-3 md:py-1.5"
+                    >
+                      <span className="md:hidden">Expandir mapa</span>
+                      <span className="hidden md:inline">Tela cheia</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </section>
 
-            <section className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-[14px] font-semibold text-zinc-900">Dispositivos conectados</h3>
-                <IconShield className="h-5 w-5 text-emerald-600" />
+            <div className="flex min-w-0 flex-col gap-3 md:col-span-5 md:gap-4 lg:col-span-4">
+              <section className="rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-[14px] font-semibold text-zinc-900">Status da coleira</h3>
+                  <IconCollar className="h-5 w-5 text-zinc-600" />
+                </div>
+                <div className="space-y-2 text-[12px] text-zinc-700">
+                  <p>Distancia atual: {location.distance}</p>
+                  <p>Bateria: {location.battery}%</p>
+                  <p>Zona segura principal: {location.safeZone}</p>
+                </div>
+              </section>
+
+              <section className="rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-[14px] font-semibold text-zinc-900">Dispositivos conectados</h3>
+                  <IconShield className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div className="space-y-2">
+                  {disconnectedDevices.map((device) => {
+                    const connected = device.status === "Conectado";
+                    const isTagNfc = device.name === "Tag NFC";
+                    return (
+                      <article
+                        key={device.name}
+                        className={`rounded-2xl border px-3 py-2.5 ${
+                          connected ? "border-zinc-200 bg-zinc-50" : "border-zinc-200/90 bg-zinc-50/80 opacity-95"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-[12px] font-medium text-zinc-800">{device.name}</p>
+                          <p className="text-[11px] text-zinc-500">{device.battery ?? "—"}</p>
+                        </div>
+                        <div className="mt-0.5 flex items-center justify-between gap-2">
+                          <p className={`text-[11px] ${connected ? "text-emerald-600" : "text-zinc-500"}`}>{device.status}</p>
+                          {isTagNfc ? (
+                            <Link
+                              href="/tag-nfc"
+                              className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100"
+                            >
+                              Gerenciar
+                            </Link>
+                          ) : null}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>
+
+            <section className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)] md:col-span-6">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-[14px] font-semibold text-zinc-900">Mensagens</h3>
+                  <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">
+                    Quando alguem ler a tag NFC em modo pet perdido, pode enviar um aviso — aparece aqui.
+                  </p>
+                </div>
+                <IconMessages className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
               </div>
-              <div className="space-y-2">
-                {disconnectedDevices.map((device) => {
-                  const connected = device.status === "Conectado";
-                  const isTagNfc = device.name === "Tag NFC";
-                  return (
-                    <article
-                      key={device.name}
-                      className={`rounded-2xl border px-3 py-2.5 ${
-                        connected ? "border-zinc-200 bg-zinc-50" : "border-zinc-200/90 bg-zinc-50/80 opacity-95"
-                      }`}
+
+              {finderMessages.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-3 py-4 text-center text-[12px] text-zinc-500">
+                  Nenhuma mensagem.
+                </p>
+              ) : (
+                <ul className="space-y-2 md:max-h-[280px] md:overflow-y-auto lg:max-h-[320px]">
+                  {finderMessages.map((m) => (
+                    <li
+                      key={m.id}
+                      className="rounded-2xl border border-zinc-200 bg-zinc-50/90 px-3 py-2.5 shadow-[0_8px_20px_-18px_rgba(10,16,13,0.45)]"
                     >
-                      <div className="flex items-center justify-between">
-                        <p className="text-[12px] font-medium text-zinc-800">{device.name}</p>
-                        <p className="text-[11px] text-zinc-500">{device.battery ?? "—"}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[12px] leading-snug text-zinc-800">{m.body}</p>
                       </div>
-                      <div className="mt-0.5 flex items-center justify-between gap-2">
-                        <p className={`text-[11px] ${connected ? "text-emerald-600" : "text-zinc-500"}`}>{device.status}</p>
-                        {isTagNfc ? (
-                          <Link
-                            href="/tag-nfc"
-                            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100"
-                          >
-                            Gerenciar
-                          </Link>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-zinc-500">
+                        <time dateTime={m.createdAt}>{m.createdAtLabel}</time>
+                        {m.senderLabel ? (
+                          <>
+                            <span aria-hidden className="text-zinc-300">
+                              ·
+                            </span>
+                            <span>{m.senderLabel}</span>
+                          </>
                         ) : null}
                       </div>
-                    </article>
-                  );
-                })}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="min-w-0 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)] md:col-span-6">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-[14px] font-semibold text-zinc-900">Historico de localizacao</h3>
+                  <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">Ultimos pontos compartilhados por leitura NFC.</p>
+                </div>
+                <IconPin className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
               </div>
+
+              {locationHistory.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-3 py-4 text-center text-[12px] text-zinc-500">
+                  Nenhum ponto registrado.
+                </p>
+              ) : (
+                <ul className="space-y-2 md:max-h-[280px] md:overflow-y-auto lg:max-h-[320px]">
+                  {locationHistory.map((item) => (
+                    <li key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50/90 px-3 py-2.5">
+                      <p className="text-[12px] font-medium text-zinc-800">{item.address || "Endereco indisponivel"}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-zinc-500">
+                        <time dateTime={item.at}>{item.atLabel}</time>
+                        {typeof item.accuracyM === "number" ? (
+                          <>
+                            <span aria-hidden className="text-zinc-300">
+                              ·
+                            </span>
+                            <span>Precisao {Math.round(item.accuracyM)}m</span>
+                          </>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           </div>
-
-          <section
-            data-lyka-shell-span="full"
-            className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
-            style={{ animationDelay: "185ms" }}
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-[14px] font-semibold text-zinc-900">Mensagens</h3>
-                <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">
-                  Quando alguem ler a tag NFC em modo pet perdido, pode enviar um aviso — aparece aqui.
-                </p>
-              </div>
-              <IconMessages className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
-            </div>
-
-            {finderMessages.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-3 py-4 text-center text-[12px] text-zinc-500">
-                Nenhuma mensagem.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {finderMessages.map((m) => (
-                  <li
-                    key={m.id}
-                    className="rounded-2xl border border-zinc-200 bg-zinc-50/90 px-3 py-2.5 shadow-[0_8px_20px_-18px_rgba(10,16,13,0.45)]"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-[12px] leading-snug text-zinc-800">{m.body}</p>
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-zinc-500">
-                      <time dateTime={m.createdAt}>{m.createdAtLabel}</time>
-                      {m.senderLabel ? (
-                        <>
-                          <span aria-hidden className="text-zinc-300">
-                            ·
-                          </span>
-                          <span>{m.senderLabel}</span>
-                        </>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section
-            data-lyka-shell-span="full"
-            className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
-            style={{ animationDelay: "200ms" }}
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-[14px] font-semibold text-zinc-900">Historico de localizacao</h3>
-                <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">Ultimos pontos compartilhados por leitura NFC.</p>
-              </div>
-              <IconPin className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
-            </div>
-
-            {locationHistory.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-3 py-4 text-center text-[12px] text-zinc-500">
-                Nenhum ponto registrado.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {locationHistory.map((item) => (
-                  <li key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50/90 px-3 py-2.5">
-                    <p className="text-[12px] font-medium text-zinc-800">{item.address || "Endereco indisponivel"}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-zinc-500">
-                      <time dateTime={item.at}>{item.atLabel}</time>
-                      {typeof item.accuracyM === "number" ? (
-                        <>
-                          <span aria-hidden className="text-zinc-300">
-                            ·
-                          </span>
-                          <span>Precisao {Math.round(item.accuracyM)}m</span>
-                        </>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
         </>
       ) : null}
 
