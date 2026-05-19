@@ -103,10 +103,15 @@ export default async function ProfilePage({
           notes: false,
         },
       };
-  const profileDevices = devices.map((device) => ({
-    ...device,
-    status: device.name === "Tag NFC" && Boolean(currentPet?.nfcId) ? "Conectado" : "Desconectado",
-  }));
+  const profileDevices = devices.map((device) => {
+    const isTagNfc = device.name === "Tag NFC";
+    const tagConnected = isTagNfc && Boolean(currentPet?.nfcId);
+    return {
+      ...device,
+      status: isTagNfc ? (tagConnected ? "Conectado" : "Desconectado") : "Desconectado",
+      battery: isTagNfc ? (tagConnected ? "100%" : "0%") : device.battery,
+    };
+  });
 
   const sharePublicUrl = currentPet ? await absolutePublicUrl(currentPet.publicPagePath) : null;
 
@@ -187,7 +192,6 @@ export default async function ProfilePage({
         </section>
 
         <div className="flex min-w-0 flex-col gap-3">
-          <h3 className="text-[14px] font-semibold text-zinc-900 md:px-1">Dados do usuario</h3>
           <ProfileUserDetailsEditor
             initialName={currentUser?.name ?? tutorName}
             initialEmail={currentUser?.email ?? ""}

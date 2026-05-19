@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HealthWeightSevenDayChart } from "@/components/health-weight-seven-day-chart";
+import { LykaDateCalendarPicker } from "@/components/lyka-date-calendar-picker";
 
 type Entry = {
   id: string;
@@ -19,11 +20,22 @@ function todayIso() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function minWeightDateIso() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 30);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function formatKgKg(value: number) {
   return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg`;
 }
 
 export function HealthWeightPanel() {
+  const maxDateIso = todayIso();
+  const minDateIso = useMemo(() => minWeightDateIso(), []);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -248,19 +260,16 @@ export function HealthWeightPanel() {
                 <form onSubmit={handleSubmit} className="grid gap-3">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
                     <div className="min-w-0">
-                      <label htmlFor="weight-date" className="text-[12px] font-semibold text-zinc-700">
-                        Data
-                      </label>
-                      <input
-                        id="weight-date"
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        readOnly={Boolean(editingId)}
-                        required
-                        className="mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition read-only:opacity-90 focus:border-emerald-400 focus:bg-white sm:px-3"
-                      />
-                    </div>
+                    <LykaDateCalendarPicker
+                      id="weight-date"
+                      label="Data"
+                      value={date}
+                      onChange={setDate}
+                      disabled={Boolean(editingId)}
+                      minDate={minDateIso}
+                      maxDate={maxDateIso}
+                    />
+                  </div>
                     <div className="min-w-0">
                       <label htmlFor="weight-value" className="text-[12px] font-semibold text-zinc-700">
                         Peso (kg)

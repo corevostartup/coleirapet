@@ -422,7 +422,7 @@ export function ProfilePetDetailsEditor({
 
   return (
     <>
-      <section className="appear-up mt-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
+      <section className="appear-up mt-3 mb-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
         <div className="relative h-[220px]">
           {/* eslint-disable-next-line @next/next/no-img-element -- evita default export de next/image vir undefined no Webpack/RSC */}
           <img
@@ -485,7 +485,7 @@ export function ProfilePetDetailsEditor({
         </div>
       </section>
 
-      <form onSubmit={handleSubmit} className="appear-up mt-3 space-y-3" style={{ animationDelay: "140ms" }}>
+      <form onSubmit={handleSubmit} className="appear-up space-y-3" style={{ animationDelay: "140ms" }}>
         <section className="grid grid-cols-4 gap-2 sm:gap-2.5">
           <article className="elev-card col-span-4 rounded-2xl p-3.5">
             <p className="text-[11px] uppercase tracking-wide text-zinc-500">Identidade do pet</p>

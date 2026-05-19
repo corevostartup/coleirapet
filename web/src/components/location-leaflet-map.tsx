@@ -18,15 +18,27 @@ type Props = {
   className?: string;
   /** Quando false, oculta os controles +/- do Leaflet (recomendado em tela cheia no mobile/iOS). */
   zoomControl?: boolean;
+  /** Exibe o pin do pet no mapa (padrao: true). */
+  showMarker?: boolean;
   /** Disparado ao clicar no mapa (ex.: abrir modo expandido). Drag/pinar não dispara como clique único. */
   onMapClick?: () => void;
+  ariaLabel?: string;
 };
 
 /**
  * Mapa Leaflet com tema alinhado ao app (tiles Carto Light + CSS em globals).
  * @see https://leafletjs.com/
  */
-export function LocationLeafletMap({ lat, lng, zoom = 15, className, zoomControl = true, onMapClick }: Props) {
+export function LocationLeafletMap({
+  lat,
+  lng,
+  zoom = 15,
+  className,
+  zoomControl = true,
+  showMarker = true,
+  onMapClick,
+  ariaLabel = "Mapa interativo da localizacao",
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const onMapClickRef = useLatest(onMapClick);
@@ -52,15 +64,17 @@ export function LocationLeafletMap({ lat, lng, zoom = 15, className, zoomControl
         maxZoom: 20,
       }).addTo(map);
 
-      const pinIcon = L.divIcon({
-        className: "leaflet-app-marker",
-        html: '<span class="leaflet-app-marker-dot" aria-hidden="true"></span>',
-        iconSize: [24, 24],
-        iconAnchor: [12, 22],
-        popupAnchor: [0, -20],
-      });
+      if (showMarker) {
+        const pinIcon = L.divIcon({
+          className: "leaflet-app-marker",
+          html: '<span class="leaflet-app-marker-dot" aria-hidden="true"></span>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 22],
+          popupAnchor: [0, -20],
+        });
 
-      L.marker([lat, lng], { icon: pinIcon }).addTo(map).bindPopup("Local aproximado da coleira");
+        L.marker([lat, lng], { icon: pinIcon }).addTo(map).bindPopup("Local aproximado da coleira");
+      }
 
       if (cancelled) {
         map.remove();
@@ -85,14 +99,14 @@ export function LocationLeafletMap({ lat, lng, zoom = 15, className, zoomControl
         mapRef.current = null;
       }
     };
-  }, [lat, lng, zoom, zoomControl]);
+  }, [lat, lng, zoom, zoomControl, showMarker]);
 
   return (
     <div
       ref={containerRef}
       className={`leaflet-map-app-theme ${className ?? ""}`.trim()}
       role="application"
-      aria-label="Mapa interativo da localizacao"
+      aria-label={ariaLabel}
       style={{ height: "100%", width: "100%", minHeight: "160px" }}
     />
   );

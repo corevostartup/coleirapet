@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { AppShell, TopBar } from "@/components/shell";
 import { MedicationRemindersPanel } from "@/components/medication-reminders-panel";
+import { DadosVeterinaryClinicsMap } from "@/components/dados-veterinary-clinics-map";
 import { VaccinesPanel } from "@/components/vaccines-panel";
 import { IconFile, IconShield } from "@/components/icons";
 import { pet, records } from "@/lib/mock";
@@ -56,7 +57,9 @@ export default async function DadosPage() {
 
   return (
     <AppShell tab="dados">
-      <TopBar title="Registros medicos" subtitle="Historico clinico" />
+      <div className="dados-page-topbar">
+        <TopBar title="Registros medicos" subtitle="Historico clinico" />
+      </div>
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
         <details>
@@ -115,7 +118,9 @@ export default async function DadosPage() {
 
       <VaccinesPanel animationDelay="120ms" />
 
-      <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "160ms" }}>
+      <DadosVeterinaryClinicsMap animationDelay="140ms" />
+
+      <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "180ms" }}>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-[14px] font-semibold text-zinc-900">Prontuario simplificado</h3>
           <IconFile className="h-5 w-5 text-zinc-600" />
@@ -130,7 +135,7 @@ export default async function DadosPage() {
         </div>
       </section>
 
-      <MedicationRemindersPanel animationDelay="220ms" />
+      <MedicationRemindersPanel animationDelay="240ms" />
     </AppShell>
   );
 }

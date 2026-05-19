@@ -321,7 +321,7 @@ export function LocationView() {
 
           <div
             data-lyka-shell-span="full"
-            className="appear-up grid grid-cols-1 gap-3 md:grid-cols-12 md:items-start md:gap-4 lg:gap-6"
+            className="appear-up flex flex-col gap-3 md:grid md:grid-cols-12 md:items-start md:gap-4 lg:gap-6"
             style={{ animationDelay: "80ms" }}
           >
             <section className="min-w-0 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)] md:col-span-7 lg:col-span-8">
@@ -338,22 +338,22 @@ export function LocationView() {
                 </div>
                 <div className="pointer-events-none absolute inset-0 z-[1200]">
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10" aria-hidden />
+                  <button
+                    type="button"
+                    onClick={() => setMapFullscreen(true)}
+                    className="pointer-events-auto absolute top-3 right-3 z-10 w-1/3 min-w-[5.5rem] max-w-[7.25rem] rounded-xl border border-white/30 bg-white/20 px-2 py-1.5 text-center text-[10px] font-semibold leading-tight text-white backdrop-blur transition hover:bg-white/30 sm:text-[11px] md:top-4 md:right-4"
+                  >
+                    <span className="md:hidden">Expandir mapa</span>
+                    <span className="hidden md:inline">Tela cheia</span>
+                  </button>
                   <div className="pointer-events-auto absolute inset-x-3 bottom-3 md:inset-x-4 md:bottom-4">
                     <LocationAddressCard point={petLocation} />
-                    <button
-                      type="button"
-                      onClick={() => setMapFullscreen(true)}
-                      className="pointer-events-auto mt-2 w-full rounded-xl border border-white/30 bg-white/20 py-2 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/30 max-md:block md:mt-3 md:w-auto md:px-3 md:py-1.5"
-                    >
-                      <span className="md:hidden">Expandir mapa</span>
-                      <span className="hidden md:inline">Tela cheia</span>
-                    </button>
                   </div>
                 </div>
               </div>
             </section>
 
-            <div className="flex min-w-0 flex-col gap-3 md:col-span-5 md:gap-4 lg:col-span-4">
+            <div className="contents md:col-span-5 md:flex md:min-w-0 md:flex-col md:gap-4 lg:col-span-4">
               <section className="rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-[14px] font-semibold text-zinc-900">Status da coleira</h3>

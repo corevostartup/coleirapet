@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
   publicSlug: string;
@@ -67,9 +67,10 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
   const [done, setDone] = useState(false);
   const [permissionHelp, setPermissionHelp] = useState<string | null>(null);
   const [permissionStateLabel, setPermissionStateLabel] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
 
-  async function shareCurrentLocation() {
-    if (busy || done) return;
+  const shareCurrentLocation = useCallback(async () => {
+    if (inFlightRef.current) return;
     setHint(null);
     setPermissionHelp(null);
     setPermissionStateLabel(null);
@@ -83,6 +84,7 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
       return;
     }
 
+    inFlightRef.current = true;
     setBusy(true);
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -141,9 +143,14 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
     } catch (error) {
       setHint(error instanceof Error ? error.message : "Falha ao compartilhar localizacao.");
     } finally {
+      inFlightRef.current = false;
       setBusy(false);
     }
-  }
+  }, [publicSlug]);
+
+  useEffect(() => {
+    void shareCurrentLocation();
+  }, [shareCurrentLocation]);
 
   return (
     <section className="mt-3 rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">
@@ -153,11 +160,11 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
       </p>
       <button
         type="button"
-        disabled={busy || done}
+        disabled={busy}
         onClick={() => void shareCurrentLocation()}
         className="mt-3 w-full rounded-2xl bg-emerald-600 py-3 text-[13px] font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
       >
-        {busy ? "Registrando localizacao..." : done ? "Localizacao registrada" : "Aceitar e compartilhar localizacao atual"}
+        {busy ? "Registrando localizacao..." : "Atualizar Localização"}
       </button>
       {hint ? <p className={`mt-2 text-[12px] ${done ? "text-emerald-700" : "text-rose-600"}`}>{hint}</p> : null}
       {permissionStateLabel ? <p className="mt-2 text-[11px] text-zinc-500">{permissionStateLabel}</p> : null}
@@ -166,7 +173,7 @@ export function PublicNfcLocationShare({ publicSlug }: Props) {
           <p className="mt-2 text-[12px] text-zinc-600">{permissionHelp}</p>
           <button
             type="button"
-            disabled={busy || done}
+            disabled={busy}
             onClick={() => void shareCurrentLocation()}
             className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white py-2.5 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-60"
           >
