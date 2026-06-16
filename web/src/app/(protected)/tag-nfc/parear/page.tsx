@@ -14,6 +14,16 @@ type NativeWindow = Window & {
   };
 };
 
+function hasFirstPetDataForNfc(pet: { name?: string | null; sex?: string | null } | null | undefined) {
+  if (!pet) return false;
+  const name = (pet.name ?? "").trim().toLowerCase();
+  const sex = (pet.sex ?? "").trim();
+  if (!sex) return false;
+  if (!name) return false;
+  if (name === "nao informado" || name === "não informado") return false;
+  return true;
+}
+
 function readIsIosNativeApp(): boolean {
   if (typeof window === "undefined") return false;
   const w = window as NativeWindow;
@@ -51,7 +61,11 @@ export default function TagNfcPairPage() {
           }
           throw new Error(payload?.detail || payload?.error || "Falha ao carregar pet atual.");
         }
-        const payload = (await petRes.json()) as { pet?: { publicPagePath?: string } };
+        const payload = (await petRes.json()) as { pet?: { publicPagePath?: string; name?: string; sex?: string | null } };
+        if (!hasFirstPetDataForNfc(payload.pet)) {
+          if (!cancelled) router.replace("/profile?newPet=1&from=tag-nfc");
+          return;
+        }
         const path = payload.pet?.publicPagePath?.trim();
         if (!path) throw new Error("Endereco publico do pet indisponivel.");
         const absolute = new URL(path, window.location.origin).toString();
@@ -90,7 +104,11 @@ export default function TagNfcPairPage() {
           body: JSON.stringify({ prepareWrite: true }),
         });
         if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          const payload = (await res.json().catch(() => null)) as { error?: string; requiresFirstPet?: boolean; redirectTo?: string } | null;
+          if (payload?.requiresFirstPet) {
+            router.replace(payload.redirectTo || "/profile?newPet=1&from=tag-nfc");
+            return;
+          }
           throw new Error(payload?.error ?? "Falha ao gerar PIN da Tag NFC.");
         }
         const data = (await res.json()) as { nfcPin?: string };
@@ -113,7 +131,7 @@ export default function TagNfcPairPage() {
     return () => {
       cancelled = true;
     };
-  }, [step]);
+  }, [router, step]);
 
   function handleStartScan() {
     const w = typeof window !== "undefined" ? (window as NativeWindow) : undefined;
@@ -144,7 +162,11 @@ export default function TagNfcPairPage() {
     })
       .then(async (res) => {
         if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          const payload = (await res.json().catch(() => null)) as { error?: string; requiresFirstPet?: boolean; redirectTo?: string } | null;
+          if (payload?.requiresFirstPet) {
+            router.replace(payload.redirectTo || "/profile?newPet=1&from=tag-nfc");
+            return;
+          }
           throw new Error(payload?.error ?? "Falha ao concluir pareamento NFC.");
         }
         const maxAgeSeconds = 60 * 60 * 24 * 365;

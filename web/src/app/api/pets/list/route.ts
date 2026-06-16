@@ -2,12 +2,29 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
+import { COLLECTION_PETS, COLLECTION_USER } from "@/lib/firebase/collections";
+import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { createOwnedPet, listOwnedPets, setCurrentPet } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 type SwitchPetPayload = {
   petId?: string;
 };
+
+async function deleteCollectionTree(collectionRef: FirebaseFirestore.CollectionReference): Promise<void> {
+  const snapshot = await collectionRef.get();
+  for (const doc of snapshot.docs) {
+    await deleteDocTree(doc.ref);
+  }
+}
+
+async function deleteDocTree(docRef: FirebaseFirestore.DocumentReference): Promise<void> {
+  const subcollections = await docRef.listCollections();
+  for (const subcollection of subcollections) {
+    await deleteCollectionTree(subcollection);
+  }
+  await docRef.delete();
+}
 
 async function requireAuthContext() {
   const jar = await cookies();
@@ -64,4 +81,39 @@ export async function POST() {
   await createOwnedPet(auth.uid);
   const data = await listOwnedPets(auth.uid);
   return NextResponse.json({ ok: true, ...data }, { status: 201 });
+}
+
+export async function DELETE(request: Request) {
+  const auth = await requireAuthContext();
+  if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+
+  let body: SwitchPetPayload;
+  try {
+    body = (await request.json()) as SwitchPetPayload;
+  } catch {
+    return NextResponse.json({ error: "Body invalido" }, { status: 400 });
+  }
+
+  const petId = typeof body.petId === "string" ? body.petId.trim() : "";
+  if (!petId) return NextResponse.json({ error: "Pet invalido" }, { status: 400 });
+
+  const db = getFirebaseAdminDb();
+  const petRef = db.collection(COLLECTION_PETS).doc(petId);
+  const petSnap = await petRef.get();
+  const petData = petSnap.data() as { ownerId?: string } | undefined;
+  if (!petSnap.exists || petData?.ownerId !== auth.uid) {
+    return NextResponse.json({ error: "Pet nao encontrado" }, { status: 404 });
+  }
+
+  await deleteDocTree(petRef);
+
+  const userRef = db.collection(COLLECTION_USER).doc(auth.uid);
+  const userSnap = await userRef.get();
+  const defaultPetId = typeof userSnap.data()?.defaultPetId === "string" ? userSnap.data()?.defaultPetId : "";
+  if (defaultPetId === petId) {
+    await userRef.set({ defaultPetId: "" }, { merge: true });
+  }
+
+  const data = await listOwnedPets(auth.uid);
+  return NextResponse.json({ ok: true, ...data });
 }

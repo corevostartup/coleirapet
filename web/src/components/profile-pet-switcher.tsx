@@ -40,7 +40,16 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
   const [open, setOpen] = useState(false);
   const [busyPetId, setBusyPetId] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [showAllPetsModal, setShowAllPetsModal] = useState(false);
+  const [pendingDeletePet, setPendingDeletePet] = useState<PetItem | null>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [showNewPetModal, setShowNewPetModal] = useState(false);
+  const [newPetName, setNewPetName] = useState("");
+  const [newPetBirthDate, setNewPetBirthDate] = useState("");
+  const [newPetWeightKg, setNewPetWeightKg] = useState("");
+  const [newPetSex, setNewPetSex] = useState("");
+  const [newPetSize, setNewPetSize] = useState("");
+  const [newPetError, setNewPetError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [pets, setPets] = useState(() => preparePetsList(initialPets));
   const [selectedPetId, setSelectedPetId] = useState(currentPet.id);
@@ -107,6 +116,44 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
     }
   }
 
+  async function deletePet(petId: string) {
+    if (!petId || busyPetId) return;
+    setHint(null);
+    setBusyPetId(`delete-${petId}`);
+    try {
+      const res = await fetch("/api/pets/list", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ petId }),
+      });
+
+      const payload = (await res.json().catch(() => null)) as
+        | {
+            error?: string;
+            currentPetId?: string;
+            pets?: PetItem[];
+          }
+        | null;
+      if (!res.ok) throw new Error(payload?.error ?? "Nao foi possivel excluir o pet.");
+
+      const nextPets = Array.isArray(payload?.pets) ? preparePetsList(payload.pets as PetItem[]) : [];
+      setPets(nextPets);
+      setSelectedPetId(payload?.currentPetId ?? nextPets[0]?.id ?? "");
+      setPendingDeletePet(null);
+      setShowAllPetsModal(false);
+
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("_r", String(Date.now()));
+        window.location.assign(url.toString());
+      }
+    } catch (error) {
+      setHint(error instanceof Error ? error.message : "Falha ao excluir pet.");
+    } finally {
+      setBusyPetId(null);
+    }
+  }
+
   async function createNewPet() {
     if (busyPetId) return;
     setHint(null);
@@ -117,10 +164,78 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
       return;
     }
 
+    setOpen(false);
+    setNewPetError(null);
+    setNewPetName("");
+    setNewPetBirthDate("");
+    setNewPetWeightKg("");
+    setNewPetSex("");
+    setNewPetSize("");
+    setShowNewPetModal(true);
+  }
+
+  function parseOptionalWeight(value: string) {
+    const trimmed = value.trim().replace(",", ".");
+    if (!trimmed) return undefined;
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || n <= 0 || n > 130) return null;
+    return Math.round(n * 10) / 10;
+  }
+
+  function parseOptionalBirthDate(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = new Date(`${trimmed}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return trimmed;
+  }
+
+  function ageFromBirthDate(isoDate?: string) {
+    if (!isoDate) return undefined;
+    const birth = new Date(`${isoDate}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) return undefined;
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    if (age < 0) return 0;
+    if (age > 40) return 40;
+    return age;
+  }
+
+  async function submitNewPet() {
+    if (busyPetId) return;
+    setNewPetError(null);
+
+    const name = newPetName.trim();
+    const sex = newPetSex.trim();
+    if (!name) {
+      setNewPetError("Nome do pet e obrigatorio.");
+      return;
+    }
+    if (!sex) {
+      setNewPetError("Sexo e obrigatorio.");
+      return;
+    }
+
+    const birthDate = parseOptionalBirthDate(newPetBirthDate);
+    if (birthDate === null) {
+      setNewPetError("Data de nascimento invalida.");
+      return;
+    }
+    const weightKg = parseOptionalWeight(newPetWeightKg);
+    if (weightKg === null) {
+      setNewPetError("Peso invalido. Use um valor entre 0,1 e 130 kg.");
+      return;
+    }
+
+    const size = newPetSize.trim();
+    const age = ageFromBirthDate(birthDate);
+
     setBusyPetId("new-pet");
     try {
-      const res = await fetch("/api/pets/list", { method: "POST" });
-      const payload = (await res.json().catch(() => null)) as
+      const createRes = await fetch("/api/pets/list", { method: "POST" });
+      const createPayload = (await createRes.json().catch(() => null)) as
         | {
             error?: string;
             requiresUpgrade?: boolean;
@@ -128,22 +243,44 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
             pets?: PetItem[];
           }
         | null;
-      if (!res.ok) {
-        if (payload?.requiresUpgrade) {
-          setOpen(false);
+      if (!createRes.ok) {
+        if (createPayload?.requiresUpgrade) {
+          setShowNewPetModal(false);
           setShowPlanModal(true);
           throw new Error("Plano Free permite apenas 1 pet. Assine o Premium para liberar pets ilimitados.");
         }
-        throw new Error(payload?.error ?? "Nao foi possivel criar novo pet.");
+        throw new Error(createPayload?.error ?? "Nao foi possivel criar novo pet.");
       }
 
-      const nextPets = Array.isArray(payload?.pets) ? preparePetsList(payload.pets as PetItem[]) : pets;
+      const patchRes = await fetch("/api/pets/current", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          birthDate,
+          sex,
+          size: size || undefined,
+          weightKg,
+          age,
+        }),
+      });
+      const patchPayload = (await patchRes.json().catch(() => null)) as { error?: string } | null;
+      if (!patchRes.ok) throw new Error(patchPayload?.error ?? "Falha ao salvar dados do novo pet.");
+
+      const nextPets = Array.isArray(createPayload?.pets) ? preparePetsList(createPayload.pets as PetItem[]) : pets;
       setPets(nextPets);
-      setSelectedPetId(payload?.currentPetId ?? nextPets[0]?.id ?? selectedPetId);
-      setOpen(false);
-      window.location.assign(`/profile?newPet=1&t=${Date.now()}`);
+      setSelectedPetId(createPayload?.currentPetId ?? nextPets[0]?.id ?? selectedPetId);
+      setShowNewPetModal(false);
+
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("_r", String(Date.now()));
+        window.location.assign(url.toString());
+      }
     } catch (error) {
-      setHint(error instanceof Error ? error.message : "Falha ao criar novo pet.");
+      const message = error instanceof Error ? error.message : "Falha ao criar novo pet.";
+      setNewPetError(message);
+      setHint(message);
     } finally {
       setBusyPetId(null);
     }
@@ -199,6 +336,16 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
             className="mt-2 flex w-full items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50/70 px-2 py-2 text-[12px] font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-70"
           >
             {busyPetId === "new-pet" ? "Criando..." : "Novo pet"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setShowAllPetsModal(true);
+            }}
+            className="mt-2 flex w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-2 py-2 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
+          >
+            Ver todos
           </button>
           {hint ? <p className="px-1 pt-2 text-[11px] text-rose-600">{hint}</p> : null}
         </div>
@@ -260,6 +407,191 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
           </section>
         </div>
         , document.body)
+        : null}
+
+      {showNewPetModal && mounted
+        ? createPortal(
+            <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/35 px-3 py-5">
+              <section className="w-full max-w-[440px] rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
+                <h3 className="text-[16px] font-semibold text-zinc-900">Novo pet</h3>
+                <p className="mt-1 text-[12px] text-zinc-600">Preencha os dados para concluir o cadastro.</p>
+
+                <div className="mt-3 space-y-2">
+                  <label className="block">
+                    <span className="text-[11px] font-semibold text-zinc-600">Nome do pet *</span>
+                    <input
+                      value={newPetName}
+                      onChange={(e) => setNewPetName(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
+                      placeholder="Ex.: Luna"
+                      maxLength={50}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-semibold text-zinc-600">Data de nascimento</span>
+                    <input
+                      type="date"
+                      value={newPetBirthDate}
+                      onChange={(e) => setNewPetBirthDate(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-semibold text-zinc-600">Peso (kg)</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={newPetWeightKg}
+                      onChange={(e) => setNewPetWeightKg(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
+                      placeholder="Ex.: 12,4"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-semibold text-zinc-600">Sexo *</span>
+                    <select
+                      value={newPetSex}
+                      onChange={(e) => setNewPetSex(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
+                    >
+                      <option value="">Selecione</option>
+                      <option value="Macho">Macho</option>
+                      <option value="Femea">Femea</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-semibold text-zinc-600">Porte</span>
+                    <select
+                      value={newPetSize}
+                      onChange={(e) => setNewPetSize(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[13px] outline-none focus:border-emerald-400"
+                    >
+                      <option value="">Selecione</option>
+                      <option value="Pequeno">Pequeno</option>
+                      <option value="Medio">Medio</option>
+                      <option value="Grande">Grande</option>
+                    </select>
+                  </label>
+                </div>
+
+                {newPetError ? <p className="mt-2 text-[11px] text-rose-600">{newPetError}</p> : null}
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPetModal(false)}
+                    className="flex-1 rounded-xl border border-zinc-200 bg-white py-2 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                    disabled={Boolean(busyPetId)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submitNewPet()}
+                    className="flex-1 rounded-xl border border-emerald-300 bg-emerald-600 py-2 text-[12px] font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                    disabled={Boolean(busyPetId)}
+                  >
+                    {busyPetId === "new-pet" ? "Salvando..." : "Salvar pet"}
+                  </button>
+                </div>
+                <p className="mt-2 text-[10px] text-zinc-500">* Campos obrigatorios: Nome e Sexo.</p>
+              </section>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {showAllPetsModal && mounted
+        ? createPortal(
+            <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/35 px-3 py-5">
+              <section className="w-full max-w-[480px] rounded-[26px] border border-zinc-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-[16px] font-semibold text-zinc-900">Todos os pets</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllPetsModal(false)}
+                    className="rounded-xl border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                  >
+                    Fechar
+                  </button>
+                </div>
+
+                <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-0.5">
+                  {pets.map((pet) => {
+                    const isCurrent = pet.id === selectedPetId;
+                    const isSwitching = busyPetId === pet.id;
+                    const isDeleting = busyPetId === `delete-${pet.id}`;
+                    return (
+                      <article key={pet.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                            <Image src={getPetImageOrDefault(pet.image)} alt={`Foto de ${pet.name}`} fill className="object-cover" sizes="40px" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[13px] font-semibold text-zinc-800">{pet.name}</p>
+                            <p className="truncate text-[11px] text-zinc-500">{pet.breed || "Sem raca"}</p>
+                          </div>
+                          {isCurrent ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">Atual</span> : null}
+                        </div>
+                        <div className="mt-2 flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            disabled={Boolean(busyPetId) || isCurrent}
+                            onClick={() => void switchPet(pet.id)}
+                            className="rounded-xl border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isSwitching ? "Trocando..." : "Trocar"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={Boolean(busyPetId)}
+                            onClick={() => setPendingDeletePet(pet)}
+                            className="rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isDeleting ? "Excluindo..." : "Excluir"}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {pendingDeletePet && mounted
+        ? createPortal(
+            <div className="fixed inset-0 z-[2300] flex items-center justify-center bg-black/45 px-3 py-5">
+              <section className="w-full max-w-[460px] rounded-[26px] border border-rose-200 bg-white p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.45)]">
+                <h3 className="text-[16px] font-semibold text-rose-700">Area sensivel</h3>
+                <p className="mt-2 text-[12px] leading-relaxed text-zinc-700">
+                  Deseja realmente excluir esse pet? Todos os dados referente a ele sera perdido, incluindo cartao de vacinas e historico de saude.
+                </p>
+                <p className="mt-2 text-[12px] font-semibold text-zinc-900">{pendingDeletePet.name}</p>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPendingDeletePet(null)}
+                    className="flex-1 rounded-xl border border-zinc-200 bg-white py-2 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                    disabled={Boolean(busyPetId)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void deletePet(pendingDeletePet.id)}
+                    className="flex-1 rounded-xl border border-rose-300 bg-rose-600 py-2 text-[12px] font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
+                    disabled={Boolean(busyPetId)}
+                  >
+                    Confirmar exclusao
+                  </button>
+                </div>
+              </section>
+            </div>,
+            document.body,
+          )
         : null}
     </div>
   );

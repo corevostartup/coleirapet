@@ -19,7 +19,7 @@ export default function HomePesoPage() {
 
   return (
     <AppShell tab="home">
-      <TopBar title="Peso" subtitle="Registros e evolucao" leadingAction={back} action={null} />
+      <TopBar title="Peso" subtitle="Registros e evolucao" leadingAction={back} />
       <HealthWeightPanel />
     </AppShell>
   );

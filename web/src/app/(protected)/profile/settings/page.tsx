@@ -52,7 +52,6 @@ export default function ProfileSettingsPage() {
             <IconChevronLeft className="h-5 w-5" aria-hidden />
           </Link>
         }
-        action={null}
       />
 
       <p className="appear-up mt-1 px-0.5 text-[12px] text-zinc-600" style={{ animationDelay: "40ms" }}>

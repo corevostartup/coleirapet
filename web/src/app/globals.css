@@ -544,6 +544,14 @@ html[data-lyka-vet-map-fullscreen] .dados-page-topbar {
 	word-break: break-word;
 }
 
+.lyka-poi-popup-kind {
+	font-size: 0.68rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: #059669;
+}
+
 .lyka-poi-popup-address {
 	font-size: 0.72rem;
 	line-height: 1.4;

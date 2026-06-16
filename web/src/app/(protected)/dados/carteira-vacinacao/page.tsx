@@ -6,7 +6,7 @@ import { VaccinationWalletContent } from "./vaccination-wallet-content";
 import { AUTH_USER_NAME_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserNameCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { pet } from "@/lib/mock";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
@@ -18,19 +18,38 @@ export default async function CarteiraVacinacaoPage() {
   const tutorFallback = parseAuthUserNameCookie(jar.get(AUTH_USER_NAME_COOKIE)?.value) ?? "Tutor(a)";
 
   let currentPet = null;
+  let currentPetId = "";
+  let initialPets: Array<{ id: string; name: string; breed: string; image: string }> = [];
   let tutorName = tutorFallback;
+  let userPlan: "free" | "pro" = "free";
 
   if (uid) {
     try {
-      currentPet = (await getOrCreateCurrentPet(uid)).pet;
+      const owned = await listOwnedPets(uid);
+      currentPetId = owned.currentPetId;
+      initialPets = owned.pets.map((item) => ({
+        id: item.id,
+        name: item.name,
+        breed: item.breed,
+        image: item.image,
+      }));
+      currentPet = owned.pets.find((item) => item.id === owned.currentPetId) ?? owned.pets[0] ?? null;
     } catch {
-      currentPet = null;
+      try {
+        currentPet = (await getOrCreateCurrentPet(uid)).pet;
+        currentPetId = currentPet.id;
+        initialPets = [{ id: currentPet.id, name: currentPet.name, breed: currentPet.breed, image: currentPet.image }];
+      } catch {
+        currentPet = null;
+      }
     }
     try {
       const user = await getOrCreateCurrentUserProfile(uid, { fallbackName: tutorFallback });
       tutorName = user.name?.trim() ? user.name : tutorFallback;
+      userPlan = user.plan === "pro" ? "pro" : "free";
     } catch {
       tutorName = tutorFallback;
+      userPlan = "free";
     }
   }
 
@@ -46,7 +65,6 @@ export default async function CarteiraVacinacaoPage() {
       <TopBar
         title="Carteira de vacinacao"
         subtitle="Registros medicos"
-        action={null}
         leadingAction={
           <Link
             href="/dados"
@@ -59,6 +77,8 @@ export default async function CarteiraVacinacaoPage() {
       />
 
       <VaccinationWalletContent
+        currentPetId={currentPetId}
+        initialPets={initialPets}
         petName={petName}
         petBreed={petBreed}
         petImage={petImage}
@@ -66,6 +86,7 @@ export default async function CarteiraVacinacaoPage() {
         petAge={petAge}
         petWeightKg={petWeightKg}
         tutorName={tutorName}
+        userPlan={userPlan}
       />
     </AppShell>
   );

@@ -5,6 +5,8 @@ export const COLLECTION_VETERINARIANS = "Veterinarians";
 
 /** Produtos exibidos no carrossel da Home (painel admin). */
 export const COLLECTION_CAROUSEL_PRODUCTS = "carouselProducts";
+/** Logs de ações feitas na área administrativa. */
+export const COLLECTION_ADMIN_LOGS = "adminLogs";
 
 /** Subcoleção em `Pets/{petId}`: mensagens de quem encontrou o pet (NFC / pet perdido). */
 export const SUBCOLLECTION_FINDER_MESSAGES = "finderMessages";

@@ -6,7 +6,9 @@ export const ADMIN_BASE_PATH = "/lyka-admin-x7k9m2p4q8r1";
 
 const items: { label: string; href: string }[] = [
   { label: "Visao geral", href: `${ADMIN_BASE_PATH}#admin-overview` },
-  { label: "Usuarios", href: `${ADMIN_BASE_PATH}#admin-usuarios` },
+  { label: "Usuarios", href: `${ADMIN_BASE_PATH}/usuarios` },
+  { label: "Pets", href: `${ADMIN_BASE_PATH}/pets` },
+  { label: "Logs", href: `${ADMIN_BASE_PATH}/logs` },
   { label: "Moderacao", href: `${ADMIN_BASE_PATH}#admin-moderacao` },
   { label: "Suporte", href: `${ADMIN_BASE_PATH}#admin-suporte` },
   { label: "Produtos", href: `${ADMIN_BASE_PATH}/produtos` },
@@ -21,6 +23,9 @@ const items: { label: string; href: string }[] = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const onProdutos = pathname === `${ADMIN_BASE_PATH}/produtos` || pathname?.startsWith(`${ADMIN_BASE_PATH}/produtos/`);
+  const onUsuarios = pathname === `${ADMIN_BASE_PATH}/usuarios` || pathname?.startsWith(`${ADMIN_BASE_PATH}/usuarios/`);
+  const onPets = pathname === `${ADMIN_BASE_PATH}/pets` || pathname?.startsWith(`${ADMIN_BASE_PATH}/pets/`);
+  const onLogs = pathname === `${ADMIN_BASE_PATH}/logs` || pathname?.startsWith(`${ADMIN_BASE_PATH}/logs/`);
 
   return (
     <nav className="sticky top-4 rounded-[24px] border border-zinc-200 bg-white p-3 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.45)]">
@@ -28,7 +33,10 @@ export function AdminSidebar() {
       <ul className="space-y-1">
         {items.map((item) => {
           const isProdutosLink = item.href === `${ADMIN_BASE_PATH}/produtos`;
-          const active = isProdutosLink && onProdutos;
+          const isUsuariosLink = item.href === `${ADMIN_BASE_PATH}/usuarios`;
+          const isPetsLink = item.href === `${ADMIN_BASE_PATH}/pets`;
+          const isLogsLink = item.href === `${ADMIN_BASE_PATH}/logs`;
+          const active = (isProdutosLink && onProdutos) || (isUsuariosLink && onUsuarios) || (isPetsLink && onPets) || (isLogsLink && onLogs);
           return (
             <li key={item.href}>
               <a

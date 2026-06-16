@@ -5,7 +5,7 @@ import { AppShell, TopBar } from "@/components/shell";
 import { MedicationRemindersPanel } from "@/components/medication-reminders-panel";
 import { DadosVeterinaryClinicsMap } from "@/components/dados-veterinary-clinics-map";
 import { VaccinesPanel } from "@/components/vaccines-panel";
-import { IconFile, IconShield } from "@/components/icons";
+import { IconFile, IconPin, IconShield } from "@/components/icons";
 import { pet, records } from "@/lib/mock";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
@@ -118,7 +118,22 @@ export default async function DadosPage() {
 
       <VaccinesPanel animationDelay="120ms" />
 
-      <DadosVeterinaryClinicsMap animationDelay="140ms" />
+      <section
+        data-lyka-shell-span="full"
+        className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
+        style={{ animationDelay: "140ms" }}
+      >
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="text-[14px] font-semibold text-zinc-900">Clínicas veterinárias</h3>
+            <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">
+              Clínicas, hotéis e creches para cachorros na região.
+            </p>
+          </div>
+          <IconPin className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+        </div>
+        <DadosVeterinaryClinicsMap />
+      </section>
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "180ms" }}>
         <div className="mb-3 flex items-center justify-between">

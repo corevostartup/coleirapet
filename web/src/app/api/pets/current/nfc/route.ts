@@ -16,6 +16,15 @@ type PairPayload = {
   nfcId?: string;
 };
 
+function hasFirstPetDataForNfc(pet: { name: string; sex: string | null }) {
+  const name = pet.name.trim().toLowerCase();
+  const sex = (pet.sex ?? "").trim();
+  if (!sex) return false;
+  if (!name) return false;
+  if (name === "nao informado" || name === "não informado") return false;
+  return true;
+}
+
 async function requireAuthContext() {
   const jar = await cookies();
   const session = parseAuthSessionCookie(jar.get(AUTH_SESSION_COOKIE)?.value);
@@ -54,12 +63,33 @@ export async function POST(request: Request) {
   }
 
   if (body.prepareWrite === true) {
+    const { pet } = await getOrCreateCurrentPet(auth.uid);
+    if (!hasFirstPetDataForNfc({ name: pet.name, sex: pet.sex })) {
+      return NextResponse.json(
+        {
+          error: "Adicione seu primeiro pet antes de concluir o pareamento da Tag NFC.",
+          requiresFirstPet: true,
+          redirectTo: "/profile?newPet=1&from=tag-nfc",
+        },
+        { status: 412 },
+      );
+    }
     const { nfcPin } = await regenerateNfcPinForCurrentPet(auth.uid);
     return NextResponse.json({ ok: true, nfcPin });
   }
 
   const db = getFirebaseAdminDb();
   const { petRef, pet } = await getOrCreateCurrentPet(auth.uid);
+  if (!hasFirstPetDataForNfc({ name: pet.name, sex: pet.sex })) {
+    return NextResponse.json(
+      {
+        error: "Adicione seu primeiro pet antes de concluir o pareamento da Tag NFC.",
+        requiresFirstPet: true,
+        redirectTo: "/profile?newPet=1&from=tag-nfc",
+      },
+      { status: 412 },
+    );
+  }
   let nfcPin = pet.nfcPin ?? "";
   if (!nfcPin) {
     const regen = await regenerateNfcPinForCurrentPet(auth.uid);

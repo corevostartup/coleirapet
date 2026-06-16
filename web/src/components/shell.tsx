@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { TopBarNotificationsLink } from "@/components/top-bar-notifications-link";
+import { TopBarUserQuickActions } from "@/components/top-bar-user-quick-actions";
 import { UserAppShellLayout } from "@/components/user-app-shell-layout";
 
 type Tab = "home" | "health" | "location" | "dados" | "profile";
@@ -15,6 +15,7 @@ export function TopBar({
   children,
   action,
   leadingAction,
+  showNotifications = true,
 }: {
   title: string;
   subtitle: string;
@@ -22,9 +23,9 @@ export function TopBar({
   /** Pass `null` para omitir o sino padrao a direita. */
   action?: ReactNode | null;
   leadingAction?: ReactNode;
+  /** Quando false, não renderiza o sino padrão. */
+  showNotifications?: boolean;
 }) {
-  const defaultBell = <TopBarNotificationsLink />;
-
   return (
     <header className="glass-card appear-up relative z-[1800] rounded-[28px] px-4 py-3 md:px-5 md:py-3.5">
       <div className="flex items-center justify-between gap-2">
@@ -35,7 +36,7 @@ export function TopBar({
             <h1 className="mt-0.5 text-[20px] font-semibold tracking-tight text-zinc-900">{title}</h1>
           </div>
         </div>
-        {action !== undefined ? action : defaultBell}
+        {action !== undefined ? action : showNotifications ? <TopBarUserQuickActions /> : null}
       </div>
       {children ? <div className="mt-3">{children}</div> : null}
     </header>

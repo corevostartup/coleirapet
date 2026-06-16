@@ -1,10 +1,17 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
-import { VeterinaryClinicsLeafletMap } from "@/components/veterinary-clinics-leaflet-map";
-import { IconPin } from "@/components/icons";
 import { location } from "@/lib/mock";
+
+const VeterinaryClinicsLeafletMap = dynamic(
+  () => import("@/components/veterinary-clinics-leaflet-map").then((m) => m.VeterinaryClinicsLeafletMap),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full animate-pulse bg-zinc-100" aria-hidden />,
+  },
+);
 
 const DESKTOP_LAYOUT_MQ = "(min-width: 768px)";
 
@@ -12,7 +19,7 @@ const DESKTOP_LAYOUT_MQ = "(min-width: 768px)";
 const MAP_SHELL_HEIGHT =
   "h-[100px] w-full min-h-[100px] sm:h-[120px] sm:min-h-[120px] md:h-[min(26vh,220px)] md:min-h-[160px] lg:h-[200px] lg:min-h-[180px]";
 
-export function DadosVeterinaryClinicsMap({ animationDelay = "140ms" }: { animationDelay?: string }) {
+export function DadosVeterinaryClinicsMap() {
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isDesktopLayout, setIsDesktopLayout] = useState(false);
@@ -84,6 +91,43 @@ export function DadosVeterinaryClinicsMap({ animationDelay = "140ms" }: { animat
 
   const openFullscreen = () => setMapFullscreen(true);
 
+  const mapShell = (
+    <div className={`relative isolate overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 ${MAP_SHELL_HEIGHT}`}>
+      <div className="absolute inset-0 z-0 min-h-0">
+        <VeterinaryClinicsLeafletMap
+          lat={mapCenter.lat}
+          lng={mapCenter.lng}
+          zoom={isDesktopLayout ? 14 : 15}
+          zoomControl={isDesktopLayout}
+          className={`h-full w-full ${MAP_SHELL_HEIGHT}`}
+          onMapClick={isDesktopLayout ? undefined : openFullscreen}
+          ariaLabel="Mapa de clinicas veterinarias"
+        />
+      </div>
+      <div className="pointer-events-none absolute inset-0 z-[1200]">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" aria-hidden />
+        <div className="pointer-events-auto absolute inset-x-3 bottom-3 flex justify-center md:inset-x-4 md:bottom-4">
+          <button
+            type="button"
+            onClick={openFullscreen}
+            className="w-full max-w-[280px] rounded-xl border border-white/30 bg-white/20 px-3 py-2 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/30 sm:text-[12px]"
+          >
+            Clínicas veterinárias
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const mapPlaceholder = (
+    <div
+      className={`relative overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 ${MAP_SHELL_HEIGHT}`}
+      aria-hidden
+    >
+      <div className="h-full w-full animate-pulse bg-zinc-100" />
+    </div>
+  );
+
   const fullscreenOverlay =
     mounted &&
     mapFullscreen &&
@@ -135,45 +179,7 @@ export function DadosVeterinaryClinicsMap({ animationDelay = "140ms" }: { animat
 
   return (
     <>
-      <section
-        data-lyka-shell-span="full"
-        className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
-        style={{ animationDelay }}
-      >
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-[14px] font-semibold text-zinc-900">Clínicas veterinárias</h3>
-            <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">Mapa da regiao para encontrar atendimento.</p>
-          </div>
-          <IconPin className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
-        </div>
-
-        <div className={`relative isolate overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 ${MAP_SHELL_HEIGHT}`}>
-          <div className="absolute inset-0 z-0 min-h-0">
-            <VeterinaryClinicsLeafletMap
-              lat={mapCenter.lat}
-              lng={mapCenter.lng}
-              zoom={isDesktopLayout ? 14 : 15}
-              zoomControl={isDesktopLayout}
-              className={`h-full w-full ${MAP_SHELL_HEIGHT}`}
-              onMapClick={isDesktopLayout ? undefined : openFullscreen}
-              ariaLabel="Mapa de clinicas veterinarias"
-            />
-          </div>
-          <div className="pointer-events-none absolute inset-0 z-[1200]">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" aria-hidden />
-            <div className="pointer-events-auto absolute inset-x-3 bottom-3 flex justify-center md:inset-x-4 md:bottom-4">
-              <button
-                type="button"
-                onClick={openFullscreen}
-                className="w-full max-w-[280px] rounded-xl border border-white/30 bg-white/20 px-3 py-2 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/30 sm:text-[12px]"
-              >
-                Clínicas veterinárias
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      {mounted ? mapShell : mapPlaceholder}
 
       {fullscreenOverlay}
     </>

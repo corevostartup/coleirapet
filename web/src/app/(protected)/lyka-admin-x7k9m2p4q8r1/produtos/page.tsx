@@ -125,6 +125,7 @@ export default function AdminProdutosPage() {
         <TopBar
           title="Produtos do carrossel"
           subtitle="Painel administrativo Lyka"
+          showNotifications={false}
           action={
             <Link
               href={ADMIN_BASE_PATH}

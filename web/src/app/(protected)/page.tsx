@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { NFCPairLink } from "@/components/nfc-pair-link";
 import { HomeLocationSecurityCard } from "@/components/home-location-security-card";
+import { HomeTopBarActions } from "@/components/home-top-bar-actions";
 import { HomeWeightChartSection } from "@/components/home-weight-chart-section";
 import { AppShell, TopBar } from "@/components/shell";
 import { ProductCarousel } from "@/components/product-carousel";
@@ -13,7 +14,7 @@ import type { DocumentReference } from "firebase-admin/firestore";
 import { fetchHomeUpcomingEvents } from "@/lib/home/upcoming-events";
 import { fetchWeeklyActivityLast7Days } from "@/lib/home/weekly-activity";
 import { metrics, pet } from "@/lib/mock";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 function formatPtBrDateTime(iso: string | null | undefined) {
@@ -43,6 +44,7 @@ export default async function Home() {
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
   let currentUser = null;
   let currentPet = null;
+  let petsForSwitcher: Array<{ id: string; name: string; breed: string; image: string }> = [];
   let petRef: DocumentReference | null = null;
   if (uid) {
     try {
@@ -58,6 +60,19 @@ export default async function Home() {
     } catch {
       currentPet = null;
       petRef = null;
+    }
+    try {
+      const owned = await listOwnedPets(uid);
+      petsForSwitcher = owned.pets.map((item) => ({
+        id: item.id,
+        name: item.name,
+        breed: item.breed,
+        image: item.image,
+      }));
+    } catch {
+      petsForSwitcher = currentPet
+        ? [{ id: currentPet.id, name: currentPet.name, breed: currentPet.breed, image: currentPet.image }]
+        : [];
     }
   }
   const nfcIdTrimmed = (currentPet?.nfcId ?? "").trim();
@@ -103,7 +118,26 @@ export default async function Home() {
 
   return (
     <AppShell tab="home">
-      <TopBar title="Monitoramento" subtitle="Lyka">
+      <TopBar
+        title="Monitoramento"
+        subtitle="Lyka"
+        action={
+          <HomeTopBarActions
+            currentPet={
+              currentPet
+                ? {
+                    id: currentPet.id,
+                    name: currentPet.name,
+                    breed: currentPet.breed,
+                    image: currentPet.image,
+                  }
+                : null
+            }
+            initialPets={petsForSwitcher}
+            userPlan={currentUser?.plan === "pro" ? "pro" : "free"}
+          />
+        }
+      >
         {isVet ? (
           <Link
             href="/vet/pets"
@@ -218,6 +252,38 @@ export default async function Home() {
             <IconVaccineWallet className="h-9 w-9 shrink-0 text-emerald-700" aria-hidden />
           </Link>
         </section>
+
+        {currentUser?.plan !== "pro" ? (
+          <section
+            data-lyka-shell-span="full"
+            className="appear-up mt-3 overflow-hidden rounded-[24px] border border-emerald-200 shadow-[0_16px_28px_-22px_rgba(16,94,62,0.28)]"
+            style={{ animationDelay: "220ms" }}
+          >
+            <div className="relative min-h-[210px]">
+              <Image
+                src="/img/premium-space-dog.png"
+                alt="Mascote Premium Lyka"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 640px"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/45 to-black/15" />
+              <div className="relative flex min-h-[210px] flex-col justify-end gap-2 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-100">Conta Free</p>
+                <h3 className="max-w-[240px] text-[17px] font-semibold leading-tight text-white">Assine o plano Premium</h3>
+                <p className="max-w-[280px] text-[12px] leading-relaxed text-emerald-50/90">
+                  Mais pets, histórico completo e recursos exclusivos para cuidar melhor do seu pet.
+                </p>
+                <button
+                  type="button"
+                  className="mt-1 w-full rounded-2xl border border-white/30 bg-white/90 px-3 py-2.5 text-[13px] font-semibold text-emerald-900 backdrop-blur-sm transition hover:bg-white"
+                >
+                  Assinar Premium
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <div
           data-lyka-shell-span="full"

@@ -25,7 +25,6 @@ export default function NotificationSettingsPage() {
             <IconChevronLeft className="h-5 w-5" aria-hidden />
           </Link>
         }
-        action={null}
       />
 
       <p className="appear-up mt-2 px-1 text-[12px] leading-snug text-zinc-600" style={{ animationDelay: "40ms" }}>

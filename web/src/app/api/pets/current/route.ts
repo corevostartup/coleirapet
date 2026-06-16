@@ -6,6 +6,7 @@ import { getOrCreateCurrentPet, invalidateCurrentPetCache } from "@/lib/pets/cur
 
 type UpdateCurrentPetPayload = {
   name?: string;
+  birthDate?: string;
   age?: number;
   weightKg?: number;
   sex?: string;
@@ -41,6 +42,13 @@ function parseOptionalText(value: unknown, maxLength: number) {
   if (!trimmed) return "";
   if (trimmed.length > maxLength) return null;
   return trimmed;
+}
+
+function parseBirthDate(value: unknown) {
+  const date = parseOptionalText(value, 10);
+  if (date === undefined || date === "") return date;
+  if (date === null) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
 }
 
 function parseAge(value: unknown) {
@@ -94,6 +102,7 @@ export async function PATCH(request: Request) {
   }
 
   const age = parseAge(body.age);
+  const birthDate = parseBirthDate(body.birthDate);
   const weightKg = parseWeight(body.weightKg);
   const name = parseOptionalText(body.name, 50);
   const sex = parseOptionalText(body.sex, 20);
@@ -111,6 +120,7 @@ export async function PATCH(request: Request) {
   const publicNotes = parseOptionalBoolean(body.publicFields?.notes);
 
   if (name === null) return NextResponse.json({ error: "Nome invalido" }, { status: 400 });
+  if (birthDate === null) return NextResponse.json({ error: "Data de nascimento invalida" }, { status: 400 });
   if (age === null) return NextResponse.json({ error: "Idade invalida" }, { status: 400 });
   if (weightKg === null) return NextResponse.json({ error: "Peso invalido" }, { status: 400 });
   if (sex === null) return NextResponse.json({ error: "Sexo invalido" }, { status: 400 });
@@ -130,6 +140,7 @@ export async function PATCH(request: Request) {
   const { petRef, pet } = await getOrCreateCurrentPet(auth.uid);
   const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
   if (name !== undefined) updates.name = name === "" ? "Nao informado" : name;
+  if (birthDate !== undefined) updates.birthDate = birthDate;
   if (age !== undefined) updates.age = age;
   if (weightKg !== undefined) updates.weightKg = weightKg;
   if (sex !== undefined) updates.sex = sex;

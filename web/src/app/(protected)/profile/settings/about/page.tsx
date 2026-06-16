@@ -23,7 +23,6 @@ export default function AboutAppPage() {
             <IconChevronLeft className="h-5 w-5" aria-hidden />
           </Link>
         }
-        action={null}
       />
 
       <section

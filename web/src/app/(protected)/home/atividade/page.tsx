@@ -41,7 +41,7 @@ export default async function HomeAtividadePage() {
 
   return (
     <AppShell tab="home">
-      <TopBar title="Atividade" subtitle="Minutos ativos" leadingAction={back} action={null} />
+      <TopBar title="Atividade" subtitle="Minutos ativos" leadingAction={back} />
       <section
         data-lyka-shell-span="full"
         className="appear-up mt-3 overflow-hidden rounded-[28px] bg-gradient-to-br from-emerald-600 via-emerald-600 to-teal-700 p-5 text-white shadow-[0_20px_40px_-28px_rgba(6,78,59,0.65)]"
