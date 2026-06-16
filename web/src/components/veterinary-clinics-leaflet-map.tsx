@@ -27,7 +27,7 @@ type Props = {
 
 const POI_CATEGORIES: PetMapPoiCategory[] = ["veterinary", "dog_hotel", "dog_daycare"];
 
-function buildPinIcons(L: typeof import("leaflet").default) {
+function buildPinIcons(L: typeof import("leaflet")) {
   return Object.fromEntries(
     POI_CATEGORIES.map((category) => [
       category,
