@@ -2,12 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { ProfilePetDetailsEditor } from "@/components/profile-pet-details-editor";
-import { ProfilePetSwitcher } from "@/components/profile-pet-switcher";
 import PetTutorsManager from "@/components/pet-tutors-manager";
 import { ProfileUserDetailsEditor } from "@/components/profile-user-details-editor";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AppShell, TopBar } from "@/components/shell";
-import { IconSettings, IconShield } from "@/components/icons";
+import { IconShield } from "@/components/icons";
 import { AUTH_USER_NAME_COOKIE, AUTH_USER_PHOTO_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserNameCookie, parseAuthUserPhotoCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
@@ -123,39 +122,7 @@ export default async function ProfilePage({
 
   return (
     <AppShell tab="profile">
-      <TopBar
-        title="Perfil do pet"
-        subtitle="Perfil"
-        action={
-          <div className="flex shrink-0 items-center gap-1.5">
-            <Link
-              href="/profile/settings"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200/90 bg-zinc-50/80 text-zinc-600 transition hover:border-zinc-300 hover:bg-white hover:text-zinc-900"
-              aria-label="Configuracoes"
-            >
-              <IconSettings className="h-5 w-5" aria-hidden />
-            </Link>
-            {currentPet && petList ? (
-              <ProfilePetSwitcher
-                currentPet={{
-                  id: currentPet.id,
-                  name: currentPet.name,
-                  breed: currentPet.breed,
-                  image: currentPet.image,
-                }}
-                userPlan={currentUser?.plan ?? "free"}
-                initialPets={petList.pets.map((item) => ({
-                  id: item.id,
-                  name: item.name,
-                  breed: item.breed,
-                  image: item.image,
-                  canDeletePet: item.canDeletePet,
-                }))}
-              />
-            ) : null}
-          </div>
-        }
-      />
+      <TopBar title="Perfil do pet" subtitle="Perfil" />
 
       <ProfilePetDetailsEditor
         key={currentPet?.id ?? `pet-${petData.petIdentity}`}
@@ -255,7 +222,15 @@ export default async function ProfilePage({
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "320ms" }}>
         <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Conta</h3>
-        <SignOutButton />
+        <div className="flex flex-col gap-2">
+          <Link
+            href="/profile/settings"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
+          >
+            Configuracoes
+          </Link>
+          <SignOutButton />
+        </div>
       </section>
     </AppShell>
   );

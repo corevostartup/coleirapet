@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { LykaKeyboard } from "@/components/lyka-keyboard";
 
 type TutorSearchItem = {
   uid: string;
@@ -56,6 +57,7 @@ export default function PetTutorsManager({ petId, currentUserUid, currentTutorCo
   const [actionHint, setActionHint] = useState("");
   const [mounted, setMounted] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+  const [showKeyboard, setShowKeyboard] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -193,12 +195,22 @@ export default function PetTutorsManager({ petId, currentUserUid, currentTutorCo
           </p>
 
           <div className="mt-2 flex gap-2">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Ex.: Ana ou LYK-AB12CD"
-              className="h-10 flex-1 rounded-xl border border-zinc-200 bg-white px-3 text-[12px] text-zinc-800 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
-            />
+            <button
+              type="button"
+              onClick={() => setShowKeyboard(true)}
+              className={[
+                "h-10 flex-1 rounded-xl border bg-white px-3 text-left text-[12px] transition",
+                showKeyboard
+                  ? "border-emerald-400 ring-2 ring-emerald-100"
+                  : "border-zinc-200",
+              ].join(" ")}
+            >
+              {query ? (
+                <span className="font-medium text-zinc-800">{query}</span>
+              ) : (
+                <span className="text-zinc-400">Ex.: Ana ou LYK-AB12CD</span>
+              )}
+            </button>
             <button
               type="button"
               onClick={() => void searchTutors()}
@@ -208,6 +220,16 @@ export default function PetTutorsManager({ petId, currentUserUid, currentTutorCo
               {searchBusy ? "Buscando..." : "Buscar"}
             </button>
           </div>
+
+          {showKeyboard ? (
+            <LykaKeyboard
+              value={query}
+              onChange={setQuery}
+              onSearch={() => void searchTutors()}
+              onClose={() => setShowKeyboard(false)}
+              placeholder="Ex.: Ana ou LYK-AB12CD"
+            />
+          ) : null}
 
           {searchError ? <p className="mt-2 text-[11px] text-rose-600">{searchError}</p> : null}
 

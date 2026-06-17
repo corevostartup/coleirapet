@@ -26,12 +26,18 @@ export function TopBarUserQuickActions() {
   const [pets, setPets] = useState<PetItem[]>([]);
   const [currentPetId, setCurrentPetId] = useState("");
   const [userPlan, setUserPlan] = useState<"free" | "pro">("free");
+  const [mounted, setMounted] = useState(false);
 
   const isHiddenContext =
     pathname?.startsWith("/lyka-admin-x7k9m2p4q8r1") ||
     pathname?.startsWith("/vet") ||
     pathname?.startsWith("/login") ||
     pathname?.startsWith("/criar-conta");
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     if (isHiddenContext) return;
@@ -70,6 +76,7 @@ export function TopBarUserQuickActions() {
     return pets.find((item) => item.id === currentPetId) ?? pets[0];
   }, [currentPetId, pets]);
 
+  if (!mounted) return <div className="flex items-center gap-2" aria-hidden />;
   if (isHiddenContext) return null;
 
   return (

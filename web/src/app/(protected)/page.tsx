@@ -3,7 +3,6 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { NFCPairLink } from "@/components/nfc-pair-link";
 import { HomeLocationSecurityCard } from "@/components/home-location-security-card";
-import { HomeTopBarActions } from "@/components/home-top-bar-actions";
 import { HomeWeightChartSection } from "@/components/home-weight-chart-section";
 import { AppShell, TopBar } from "@/components/shell";
 import { ProductCarousel } from "@/components/product-carousel";
@@ -14,7 +13,7 @@ import type { DocumentReference } from "firebase-admin/firestore";
 import { fetchHomeUpcomingEvents } from "@/lib/home/upcoming-events";
 import { fetchWeeklyActivityLast7Days } from "@/lib/home/weekly-activity";
 import { metrics, pet } from "@/lib/mock";
-import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
+import { getOrCreateCurrentPet } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 function formatPtBrDateTime(iso: string | null | undefined) {
@@ -44,7 +43,6 @@ export default async function Home() {
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
   let currentUser = null;
   let currentPet = null;
-  let petsForSwitcher: Array<{ id: string; name: string; breed: string; image: string }> = [];
   let petRef: DocumentReference | null = null;
   if (uid) {
     try {
@@ -60,19 +58,6 @@ export default async function Home() {
     } catch {
       currentPet = null;
       petRef = null;
-    }
-    try {
-      const owned = await listOwnedPets(uid);
-      petsForSwitcher = owned.pets.map((item) => ({
-        id: item.id,
-        name: item.name,
-        breed: item.breed,
-        image: item.image,
-      }));
-    } catch {
-      petsForSwitcher = currentPet
-        ? [{ id: currentPet.id, name: currentPet.name, breed: currentPet.breed, image: currentPet.image }]
-        : [];
     }
   }
   const nfcIdTrimmed = (currentPet?.nfcId ?? "").trim();
@@ -118,26 +103,7 @@ export default async function Home() {
 
   return (
     <AppShell tab="home">
-      <TopBar
-        title="Monitoramento"
-        subtitle="Lyka"
-        action={
-          <HomeTopBarActions
-            currentPet={
-              currentPet
-                ? {
-                    id: currentPet.id,
-                    name: currentPet.name,
-                    breed: currentPet.breed,
-                    image: currentPet.image,
-                  }
-                : null
-            }
-            initialPets={petsForSwitcher}
-            userPlan={currentUser?.plan === "pro" ? "pro" : "free"}
-          />
-        }
-      >
+      <TopBar title="Monitoramento" subtitle="Lyka">
         {isVet ? (
           <Link
             href="/vet/pets"
