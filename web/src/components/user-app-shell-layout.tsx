@@ -1,9 +1,13 @@
 "use client";
 
-import { Children, type ReactNode, isValidElement } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { Children, useEffect, useMemo, useState, type ReactNode, isValidElement } from "react";
 import { usePathname } from "next/navigation";
+import { ProfilePetSwitcher } from "@/components/profile-pet-switcher";
+import { TopBarNotificationsLink } from "@/components/top-bar-notifications-link";
 import { IconBell, IconFile, IconHeart, IconHome, IconPin, IconUser } from "@/components/icons";
+import { DEFAULT_PET_IMAGE } from "@/lib/pets/image";
 
 const navItems = [
   { key: "home", label: "Home", href: "/home", Icon: IconHome },
@@ -102,5 +106,134 @@ export function UserAppShellLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
     </main>
+  );
+}
+
+type TopBarPetItem = {
+  id: string;
+  name: string;
+  breed: string;
+  image: string;
+  canDeletePet?: boolean;
+};
+
+function TopBarUserQuickActions() {
+  const pathname = usePathname();
+  const [pets, setPets] = useState<TopBarPetItem[]>([]);
+  const [currentPetId, setCurrentPetId] = useState("");
+  const [userPlan, setUserPlan] = useState<"free" | "pro">("free");
+  const [loading, setLoading] = useState(true);
+
+  const isHiddenContext =
+    pathname?.startsWith("/lyka-admin-x7k9m2p4q8r1") ||
+    pathname?.startsWith("/vet") ||
+    pathname?.startsWith("/login") ||
+    pathname?.startsWith("/criar-conta");
+
+  useEffect(() => {
+    if (isHiddenContext) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+
+    async function loadQuickData() {
+      try {
+        const [petsRes, userRes] = await Promise.all([
+          fetch("/api/pets/list", { cache: "no-store" }),
+          fetch("/api/users/current", { cache: "no-store" }),
+        ]);
+
+        if (!cancelled && petsRes.ok) {
+          const payload = (await petsRes.json()) as {
+            currentPetId?: string;
+            pets?: TopBarPetItem[];
+          };
+          const list = Array.isArray(payload.pets)
+            ? payload.pets.map((item) => ({
+                id: item.id,
+                name: item.name,
+                breed: item.breed,
+                image: item.image,
+                canDeletePet: item.canDeletePet,
+              }))
+            : [];
+          setPets(list);
+          setCurrentPetId(typeof payload.currentPetId === "string" ? payload.currentPetId : "");
+        }
+
+        if (!cancelled && userRes.ok) {
+          const payload = (await userRes.json()) as { user?: { plan?: "free" | "pro" } };
+          setUserPlan(payload.user?.plan === "pro" ? "pro" : "free");
+        }
+      } catch {
+        /* noop */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadQuickData();
+    return () => {
+      cancelled = true;
+    };
+  }, [isHiddenContext]);
+
+  const currentPet = useMemo(() => {
+    if (pets.length === 0) return null;
+    return pets.find((item) => item.id === currentPetId) ?? pets[0];
+  }, [currentPetId, pets]);
+
+  if (isHiddenContext) return null;
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <TopBarNotificationsLink />
+      {loading ? (
+        <div className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-zinc-200" aria-hidden />
+      ) : currentPet ? (
+        <ProfilePetSwitcher currentPet={currentPet} initialPets={pets} userPlan={userPlan} />
+      ) : (
+        <Link
+          href="/profile?newPet=1"
+          className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-white shadow-sm"
+          aria-label="Adicionar pet"
+        >
+          <Image src={DEFAULT_PET_IMAGE} alt="Adicionar pet" fill className="object-cover" sizes="44px" />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+export function TopBarClient({
+  title,
+  subtitle,
+  children,
+  action,
+  leadingAction,
+  showNotifications = true,
+}: {
+  title: string;
+  subtitle: string;
+  children?: ReactNode;
+  action?: ReactNode | null;
+  leadingAction?: ReactNode;
+  showNotifications?: boolean;
+}) {
+  return (
+    <header className="glass-card appear-up relative z-[1800] rounded-[28px] px-4 py-3 md:px-5 md:py-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          {leadingAction ? <div className="shrink-0">{leadingAction}</div> : null}
+          <div className="min-w-0">
+            <p className="text-[11px] tracking-wide text-zinc-500">{subtitle}</p>
+            <h1 className="mt-0.5 text-[20px] font-semibold tracking-tight text-zinc-900">{title}</h1>
+          </div>
+        </div>
+        {action !== undefined ? action : showNotifications ? <TopBarUserQuickActions /> : null}
+      </div>
+      {children ? <div className="mt-3">{children}</div> : null}
+    </header>
   );
 }
