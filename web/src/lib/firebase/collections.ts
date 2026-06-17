@@ -11,6 +11,9 @@ export const COLLECTION_ADMIN_LOGS = "adminLogs";
 /** Subcoleção em `Pets/{petId}`: mensagens de quem encontrou o pet (NFC / pet perdido). */
 export const SUBCOLLECTION_FINDER_MESSAGES = "finderMessages";
 
+/** Subcoleção em `Pets/{petId}`: tutores vinculados ao pet (principal/secundário). */
+export const SUBCOLLECTION_PET_MEMBERS = "members";
+
 /** Subcoleção em `Pets/{petId}`: histórico de localizações compartilhadas por leitura NFC. */
 export const SUBCOLLECTION_NFC_ACCESS_LOGS = "nfcAccessLogs";
 
@@ -31,3 +34,6 @@ export const SUBCOLLECTION_VACCINES_LEGACY = "vaccines";
 
 /** Subcoleção em `Veterinarians/{uid}`: registros de prontuário por pet. */
 export const SUBCOLLECTION_VET_MEDICAL_RECORDS = "medicalRecords";
+
+/** Subcoleção em `User/{uid}`: notificações do usuário autenticado. */
+export const SUBCOLLECTION_USER_NOTIFICATIONS = "notifications";

@@ -20,6 +20,23 @@ service cloud.firestore {
         get(/databases/$(database)/documents/Pets/$(petId)).data.ownerId == request.auth.uid;
     }
 
+    function isPetSecondaryMemberById(petId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/Pets/$(petId)/members/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/Pets/$(petId)/members/$(request.auth.uid)).data.status == "active" &&
+        get(/databases/$(database)/documents/Pets/$(petId)/members/$(request.auth.uid)).data.role == "secondary";
+    }
+
+    function canReadPetById(petId) {
+      return isPetOwnerById(petId) || isPetSecondaryMemberById(petId);
+    }
+
+    function canEditPetBasicsById(petId) {
+      return isPetOwnerById(petId) ||
+        (isPetSecondaryMemberById(petId) &&
+          get(/databases/$(database)/documents/Pets/$(petId)/members/$(request.auth.uid)).data.permissions.editBasicData == true);
+    }
+
     // Perfil do tutor e toda arvore sob User/{uid} (ex.: vacinas legado em User/{uid}/vaccines)
     match /User/{uid} {
       allow read, write: if isOwner(uid);
@@ -32,12 +49,24 @@ service cloud.firestore {
     // weightEntries, medicationReminders, finderMessages, nfcAccessLogs, etc.
     match /Pets/{petId} {
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow read, delete: if isPetOwner();
+      allow read: if canReadPetById(petId);
+      allow delete: if isPetOwner();
       // Impede transferir o pet para outro dono
-      allow update: if isPetOwner() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if canEditPetBasicsById(petId) && request.resource.data.ownerId == resource.data.ownerId;
 
-      match /{path=**} {
-        allow read, write: if isPetOwnerById(petId);
+      match /members/{memberUid} {
+        allow read: if isPetOwnerById(petId) || (isSignedIn() && request.auth.uid == memberUid);
+        allow create, update: if isPetOwnerById(petId);
+        allow delete: if isPetOwnerById(petId) || (isSignedIn() && request.auth.uid == memberUid);
+      }
+
+      match /{collectionId}/{docId} {
+        allow read: if collectionId != "members" && canReadPetById(petId);
+        allow write: if collectionId != "members" && canEditPetBasicsById(petId);
+        match /{path=**} {
+          allow read: if collectionId != "members" && canReadPetById(petId);
+          allow write: if collectionId != "members" && canEditPetBasicsById(petId);
+        }
       }
     }
 

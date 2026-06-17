@@ -11,6 +11,7 @@ type PetItem = {
   name: string;
   breed: string;
   image: string;
+  canDeletePet?: boolean;
 };
 
 type Props = {
@@ -118,6 +119,11 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
 
   async function deletePet(petId: string) {
     if (!petId || busyPetId) return;
+    const target = pets.find((item) => item.id === petId);
+    if (target && target.canDeletePet === false) {
+      setHint("Tutor secundario nao pode excluir pet.");
+      return;
+    }
     setHint(null);
     setBusyPetId(`delete-${petId}`);
     try {
@@ -542,14 +548,16 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
                           >
                             {isSwitching ? "Trocando..." : "Trocar"}
                           </button>
-                          <button
-                            type="button"
-                            disabled={Boolean(busyPetId)}
-                            onClick={() => setPendingDeletePet(pet)}
-                            className="rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {isDeleting ? "Excluindo..." : "Excluir"}
-                          </button>
+                          {pet.canDeletePet !== false ? (
+                            <button
+                              type="button"
+                              disabled={Boolean(busyPetId)}
+                              onClick={() => setPendingDeletePet(pet)}
+                              className="rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {isDeleting ? "Excluindo..." : "Excluir"}
+                            </button>
+                          ) : null}
                         </div>
                       </article>
                     );

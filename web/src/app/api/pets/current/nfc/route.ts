@@ -64,6 +64,9 @@ export async function POST(request: Request) {
 
   if (body.prepareWrite === true) {
     const { pet } = await getOrCreateCurrentPet(auth.uid);
+    if (!pet.canPairNfc) {
+      return NextResponse.json({ error: "Apenas tutor principal pode parear NFC." }, { status: 403 });
+    }
     if (!hasFirstPetDataForNfc({ name: pet.name, sex: pet.sex })) {
       return NextResponse.json(
         {
@@ -80,6 +83,9 @@ export async function POST(request: Request) {
 
   const db = getFirebaseAdminDb();
   const { petRef, pet } = await getOrCreateCurrentPet(auth.uid);
+  if (!pet.canPairNfc) {
+    return NextResponse.json({ error: "Apenas tutor principal pode parear NFC." }, { status: 403 });
+  }
   if (!hasFirstPetDataForNfc({ name: pet.name, sex: pet.sex })) {
     return NextResponse.json(
       {
@@ -126,5 +132,8 @@ export async function GET() {
   const auth = await requireAuthContext();
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   const { pet } = await getOrCreateCurrentPet(auth.uid);
+  if (!pet.canPairNfc) {
+    return NextResponse.json({ error: "Apenas tutor principal pode visualizar o PIN NFC." }, { status: 403 });
+  }
   return NextResponse.json({ ok: true, petId: pet.id, nfcPin: pet.nfcPin ?? "" });
 }

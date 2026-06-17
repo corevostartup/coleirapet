@@ -4,6 +4,7 @@ import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants"
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_PETS, COLLECTION_USER } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
+import { getPetAccessById } from "@/lib/pets/access";
 import { createOwnedPet, listOwnedPets, setCurrentPet } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
@@ -98,12 +99,15 @@ export async function DELETE(request: Request) {
   if (!petId) return NextResponse.json({ error: "Pet invalido" }, { status: 400 });
 
   const db = getFirebaseAdminDb();
-  const petRef = db.collection(COLLECTION_PETS).doc(petId);
-  const petSnap = await petRef.get();
-  const petData = petSnap.data() as { ownerId?: string } | undefined;
-  if (!petSnap.exists || petData?.ownerId !== auth.uid) {
+  const petAccess = await getPetAccessById(auth.uid, petId);
+  if (!petAccess) {
     return NextResponse.json({ error: "Pet nao encontrado" }, { status: 404 });
   }
+  if (!petAccess.access.canDeletePet) {
+    return NextResponse.json({ error: "Tutor secundario nao pode excluir pet." }, { status: 403 });
+  }
+
+  const petRef = db.collection(COLLECTION_PETS).doc(petId);
 
   await deleteDocTree(petRef);
 

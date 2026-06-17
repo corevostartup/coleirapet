@@ -1,34 +1,76 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell, TopBar } from "@/components/shell";
 import { IconBell } from "@/components/icons";
-import { notifications as notificationItems } from "@/lib/mock";
-import {
-  ensureReadIdsInitialized,
-  loadReadNotificationIds,
-  markNotificationIdsRead,
-  unreadNotificationCount,
-} from "@/lib/notifications-read";
+type NotificationItem = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  status: string;
+  unread: boolean;
+  when: string;
+};
 
-function kindDotClass(kind: "info" | "warning" | "success") {
+function kindDotClass(kind: string) {
   if (kind === "warning") return "bg-amber-500";
-  if (kind === "success") return "bg-emerald-500";
+  if (kind === "success" || kind === "accepted") return "bg-emerald-500";
+  if (kind === "cancelled") return "bg-zinc-400";
   return "bg-blue-500";
 }
 
 export default function NotificationsPage() {
-  const allIds = useMemo(() => notificationItems.map((n) => n.id), []);
-  const [readIds, setReadIds] = useState<Set<string>>(() => new Set(allIds));
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  useLayoutEffect(() => {
-    ensureReadIdsInitialized(notificationItems);
-    markNotificationIdsRead(allIds);
-    setReadIds(loadReadNotificationIds());
-  }, [allIds]);
+  async function loadNotifications() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/notifications", { cache: "no-store" });
+      const payload = (await res.json().catch(() => null)) as
+        | { notifications?: NotificationItem[]; unreadCount?: number; error?: string }
+        | null;
+      if (!res.ok) throw new Error(payload?.error ?? "Falha ao carregar notificacoes.");
+      setItems(Array.isArray(payload?.notifications) ? payload.notifications : []);
+      setUnreadCount(typeof payload?.unreadCount === "number" ? payload.unreadCount : 0);
+      await fetch("/api/notifications", { method: "POST" });
+    } catch (err) {
+      setItems([]);
+      setUnreadCount(0);
+      setError(err instanceof Error ? err.message : "Falha ao carregar notificacoes.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const unreadCount = unreadNotificationCount(notificationItems, readIds);
+  useEffect(() => {
+    void loadNotifications();
+  }, []);
+
+  async function respondInvite(notificationId: string, action: "accept" | "cancel") {
+    setBusyId(notificationId);
+    setError("");
+    try {
+      const res = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId, action }),
+      });
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(payload?.error ?? "Falha ao processar notificacao.");
+      await loadNotifications();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao processar notificacao.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <AppShell tab="home">
@@ -58,19 +100,20 @@ export default function NotificationsPage() {
               {unreadCount === 1 ? "1 nova notificacao" : `${unreadCount} novas notificacoes`}
             </p>
           </div>
-          <p className="mt-1.5 text-[11px] leading-snug text-emerald-800/90">
-            Resumo dos alertas recentes da coleira e da conta.
-          </p>
+          <p className="mt-1.5 text-[11px] leading-snug text-emerald-800/90">Resumo dos alertas recentes da conta e tutoria.</p>
         </section>
       ) : null}
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "90ms" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[14px] font-semibold text-zinc-900">Todas</h2>
-          <span className="text-[11px] text-zinc-500">{notificationItems.length} itens</span>
+          <span className="text-[11px] text-zinc-500">{items.length} itens</span>
         </div>
+        {error ? <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700">{error}</p> : null}
 
-        {notificationItems.length === 0 ? (
+        {loading ? (
+          <p className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-4 text-center text-[12px] text-zinc-500">Carregando notificacoes...</p>
+        ) : items.length === 0 ? (
           <div className="flex flex-col items-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-4 py-10 text-center">
             <IconBell className="h-10 w-10 text-zinc-300" aria-hidden />
             <p className="mt-3 text-[14px] font-semibold text-zinc-800">Nenhuma notificacao</p>
@@ -80,8 +123,9 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {notificationItems.map((item, index) => {
-              const isUnread = !readIds.has(item.id);
+            {items.map((item, index) => {
+              const isUnread = item.unread;
+              const isPendingInvite = item.type === "secondary_tutor_invite" && item.status === "pending";
               return (
                 <li key={item.id}>
                   <article
@@ -93,7 +137,7 @@ export default function NotificationsPage() {
                     style={{ animationDelay: `${120 + index * 40}ms` }}
                   >
                     <div className="flex items-start gap-2.5">
-                      <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${kindDotClass(item.kind)}`} aria-hidden />
+                      <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${kindDotClass(item.status)}`} aria-hidden />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
                           <p className="text-[13px] font-semibold text-zinc-900">{item.title}</p>
@@ -104,6 +148,26 @@ export default function NotificationsPage() {
                           <span className="mt-2 inline-flex rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
                             Nova
                           </span>
+                        ) : null}
+                        {isPendingInvite ? (
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              disabled={busyId === item.id}
+                              onClick={() => void respondInvite(item.id, "accept")}
+                              className="rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {busyId === item.id ? "Processando..." : "Aceitar"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busyId === item.id}
+                              onClick={() => void respondInvite(item.id, "cancel")}
+                              className="rounded-xl border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
                         ) : null}
                       </div>
                     </div>

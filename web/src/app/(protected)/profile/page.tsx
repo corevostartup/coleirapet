@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { ProfilePetDetailsEditor } from "@/components/profile-pet-details-editor";
 import { ProfilePetSwitcher } from "@/components/profile-pet-switcher";
+import PetTutorsManager from "@/components/pet-tutors-manager";
 import { ProfileUserDetailsEditor } from "@/components/profile-user-details-editor";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AppShell, TopBar } from "@/components/shell";
@@ -58,6 +59,12 @@ export default async function ProfilePage({
       currentVeterinarian = null;
     }
   }
+
+  if (!currentPet && petList?.pets?.length) {
+    const fallbackPet = petList.pets.find((item) => item.id === petList?.currentPetId) ?? petList.pets[0];
+    currentPet = fallbackPet ?? null;
+  }
+
   const petData = currentPet
     ? {
         name: isNewPetFlow ? "" : currentPet.name,
@@ -144,6 +151,7 @@ export default async function ProfilePage({
                     name: item.name,
                     breed: item.breed,
                     image: item.image,
+                    canDeletePet: item.canDeletePet,
                   })),
                 )}
               />
@@ -170,6 +178,15 @@ export default async function ProfilePage({
         initialPublicFields={petData.publicFields}
         sharePublicUrl={sharePublicUrl}
       />
+
+      {uid && currentPet ? (
+        <PetTutorsManager
+          petId={currentPet.id}
+          currentUserUid={uid}
+          currentTutorCode={currentUser?.tutorCode ?? ""}
+          userPlan={currentUser?.plan ?? "free"}
+        />
+      ) : null}
 
       <div className="appear-up flex flex-col gap-3" style={{ animationDelay: "170ms" }}>
         <section className="overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]">

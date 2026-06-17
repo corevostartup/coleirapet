@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { COLLECTION_USER } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 
@@ -17,6 +18,8 @@ type UserDoc = {
   birthDate?: string;
   userType?: UserType;
   plan?: UserPlan;
+  tutorCode?: string;
+  searchName?: string;
 };
 
 export type UserProfile = {
@@ -28,6 +31,7 @@ export type UserProfile = {
   birthDate: string;
   userType: UserType;
   plan: UserPlan;
+  tutorCode: string;
 };
 
 const CURRENT_USER_CACHE_TTL_MS = 45_000;
@@ -68,6 +72,36 @@ function parseText(value: unknown, fallback = "") {
   return trimmed || fallback;
 }
 
+function parseTutorCode(value: unknown) {
+  if (typeof value !== "string") return "";
+  const normalized = value.trim().toUpperCase();
+  if (!/^LYK-[A-Z0-9]{6}$/.test(normalized)) return "";
+  return normalized;
+}
+
+function randomTutorCodeSuffix() {
+  return randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
+}
+
+async function generateUniqueTutorCode(db: ReturnType<typeof getFirebaseAdminDb>) {
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const candidate = `LYK-${randomTutorCodeSuffix()}`;
+    const duplicated = await db.collection(COLLECTION_USER).where("tutorCode", "==", candidate).limit(1).get();
+    if (duplicated.empty) return candidate;
+  }
+  throw new Error("Nao foi possivel gerar tutorCode unico.");
+}
+
+export function normalizeNameForSearch(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function parseUserType(value: unknown): UserType {
   if (typeof value !== "string") return "Tutor";
   const normalized = value.trim().toLowerCase();
@@ -91,6 +125,7 @@ function toUserProfile(uid: string, data: UserDoc): UserProfile {
     birthDate: parseText(data.birthDate),
     userType: parseUserType(data.userType),
     plan: parseUserPlan(data.plan),
+    tutorCode: parseTutorCode(data.tutorCode),
   };
 }
 
@@ -109,6 +144,8 @@ export async function getOrCreateCurrentUserProfile(uid: string, options?: Ensur
   const nowIso = new Date().toISOString();
 
   if (!userSnap.exists) {
+    const tutorCode = await generateUniqueTutorCode(db);
+    const resolvedName = parseText(options?.fallbackName);
     const created: UserDoc = {
       uid,
       userId: uid,
@@ -116,12 +153,14 @@ export async function getOrCreateCurrentUserProfile(uid: string, options?: Ensur
       createdAt: nowIso,
       CreatedAt: nowIso,
       updatedAt: nowIso,
-      name: parseText(options?.fallbackName),
+      name: resolvedName,
       email: parseText(options?.fallbackEmail),
       phone: "",
       birthDate: "",
       userType: "Tutor",
       plan: "free",
+      tutorCode,
+      searchName: normalizeNameForSearch(resolvedName),
     };
     await userRef.set(created, { merge: true });
     const next = toUserProfile(uid, created);
@@ -161,6 +200,17 @@ export async function getOrCreateCurrentUserProfile(uid: string, options?: Ensur
     patch.plan = "free";
   } else if (raw.plan !== normalizedPlan) {
     patch.plan = normalizedPlan;
+  }
+
+  const tutorCode = parseTutorCode(raw.tutorCode);
+  if (!tutorCode) {
+    patch.tutorCode = await generateUniqueTutorCode(db);
+  }
+
+  const baseName = parseText((patch.name ?? raw.name) as unknown);
+  const normalizedSearchName = normalizeNameForSearch(baseName);
+  if (raw.searchName !== normalizedSearchName) {
+    patch.searchName = normalizedSearchName;
   }
 
   if (Object.keys(patch).length > 0) {

@@ -1,27 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { IconBell } from "@/components/icons";
-import { notifications as notificationItems } from "@/lib/mock";
-import {
-  ensureReadIdsInitialized,
-  loadReadNotificationIds,
-  subscribeNotificationReadState,
-  unreadNotificationCount,
-} from "@/lib/notifications-read";
-
-function getUnreadCount(): number {
-  ensureReadIdsInitialized(notificationItems);
-  return unreadNotificationCount(notificationItems, loadReadNotificationIds());
-}
 
 export function TopBarNotificationsLink() {
-  const unread = useSyncExternalStore(
-    subscribeNotificationReadState,
-    getUnreadCount,
-    () => 0
-  );
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadUnread() {
+      try {
+        const res = await fetch("/api/notifications", { cache: "no-store" });
+        const payload = (await res.json().catch(() => null)) as { unreadCount?: number } | null;
+        if (!cancelled && res.ok) {
+          setUnread(typeof payload?.unreadCount === "number" ? payload.unreadCount : 0);
+        }
+      } catch {
+        if (!cancelled) setUnread(0);
+      }
+    }
+
+    void loadUnread();
+    const id = window.setInterval(() => {
+      void loadUnread();
+    }, 20000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   return (
     <Link

@@ -138,6 +138,9 @@ export async function PATCH(request: Request) {
   if (publicNotes === null) return NextResponse.json({ error: "Flag publica de observacoes invalida" }, { status: 400 });
 
   const { petRef, pet } = await getOrCreateCurrentPet(auth.uid);
+  if (!pet.canEditBasicData) {
+    return NextResponse.json({ error: "Tutor sem permissao para editar dados basicos deste pet." }, { status: 403 });
+  }
   const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
   if (name !== undefined) updates.name = name === "" ? "Nao informado" : name;
   if (birthDate !== undefined) updates.birthDate = birthDate;

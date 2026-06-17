@@ -7,6 +7,7 @@ import {
   SUBCOLLECTION_VACCINES_LEGACY,
 } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
+import { ensurePrimaryMemberRecord, getPetAccessById, listSecondaryPetIdsForUser, type PetAccessRole } from "@/lib/pets/access";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 import { isLegacyUiDemoPetName } from "@/lib/pets/legacy-ui-demo-pets";
 
@@ -104,6 +105,10 @@ export type PetProfile = {
   finderShareToken: string;
   publicPageSlug: string;
   publicPagePath: string;
+  accessRole: PetAccessRole;
+  canEditBasicData: boolean;
+  canDeletePet: boolean;
+  canPairNfc: boolean;
 };
 
 const CURRENT_PET_CACHE_TTL_MS = 45_000;
@@ -222,6 +227,20 @@ function toPetProfile(petId: string, data: PetDoc): PetProfile {
     finderShareToken: parseString(data.finderShareToken) ?? "",
     publicPageSlug,
     publicPagePath: `/pet/${publicPageSlug}`,
+    accessRole: "primary",
+    canEditBasicData: true,
+    canDeletePet: true,
+    canPairNfc: true,
+  };
+}
+
+function withAccess(pet: PetProfile, access: { role: PetAccessRole; canEditBasicData: boolean; canDeletePet: boolean; canPairNfc: boolean }) {
+  return {
+    ...pet,
+    accessRole: access.role,
+    canEditBasicData: access.canEditBasicData,
+    canDeletePet: access.canDeletePet,
+    canPairNfc: access.canPairNfc,
   };
 }
 
@@ -421,34 +440,59 @@ export async function getOrCreateCurrentPet(uid: string) {
   const rawDefaultId = typeof userData.defaultPetId === "string" ? userData.defaultPetId.trim() : "";
   const candidatePetId = rawDefaultId && isDemoPetId(rawDefaultId) ? "" : rawDefaultId;
   if (candidatePetId) {
-    const petRef = petsRoot.doc(candidatePetId);
-    const petSnap = await petRef.get();
-    const data = petSnap.data() as PetDoc | undefined;
-    if (petSnap.exists && data?.ownerId === uid) {
-      const result = await finalizePetProfile(petRef, petSnap.id, data);
-      writeCachedCurrentPet(uid, result.pet);
-      return result;
+    const access = await getPetAccessById(uid, candidatePetId);
+    if (access) {
+      const result = await finalizePetProfile(access.petRef, candidatePetId, access.petData as PetDoc);
+      const pet = withAccess(result.pet, access.access);
+      writeCachedCurrentPet(uid, pet);
+      return { petRef: result.petRef, pet };
     }
   }
 
-  const owned = await petsRoot.where("ownerId", "==", uid).get();
-  const firstReal = owned.docs.find(
-    (doc) => !isDemoPetDocContent(doc.data() as PetDoc, doc.id),
-  );
-  if (firstReal) {
-    const doc = firstReal;
+  const [owned, secondaryPetIds] = await Promise.all([
+    petsRoot.where("ownerId", "==", uid).get(),
+    listSecondaryPetIdsForUser(uid),
+  ]);
+
+  const ownedDocs = owned.docs.filter((doc) => !isDemoPetDocContent(doc.data() as PetDoc, doc.id));
+  if (ownedDocs.length > 0) {
+    const doc = ownedDocs[0];
+    await ensurePrimaryMemberRecord(doc.id, uid);
     await userRef.set({ defaultPetId: doc.id }, { merge: true });
     const result = await finalizePetProfile(doc.ref, doc.id, doc.data() as PetDoc);
-    writeCachedCurrentPet(uid, result.pet);
-    return result;
+    const pet = withAccess(result.pet, {
+      role: "primary",
+      canEditBasicData: true,
+      canDeletePet: true,
+      canPairNfc: true,
+    });
+    writeCachedCurrentPet(uid, pet);
+    return { petRef: result.petRef, pet };
+  }
+
+  for (const petId of secondaryPetIds) {
+    const access = await getPetAccessById(uid, petId);
+    if (!access) continue;
+    const result = await finalizePetProfile(access.petRef, petId, access.petData as PetDoc);
+    const pet = withAccess(result.pet, access.access);
+    await userRef.set({ defaultPetId: petId }, { merge: true });
+    writeCachedCurrentPet(uid, pet);
+    return { petRef: result.petRef, pet };
   }
 
   const created = await petsRoot.add(defaultPetDoc(uid));
+  await ensurePrimaryMemberRecord(created.id, uid);
   await userRef.set({ defaultPetId: created.id }, { merge: true });
   const createdSnap = await created.get();
   const result = await finalizePetProfile(created, createdSnap.id, createdSnap.data() as PetDoc);
-  writeCachedCurrentPet(uid, result.pet);
-  return result;
+  const pet = withAccess(result.pet, {
+    role: "primary",
+    canEditBasicData: true,
+    canDeletePet: true,
+    canPairNfc: true,
+  });
+  writeCachedCurrentPet(uid, pet);
+  return { petRef: result.petRef, pet };
 }
 
 export async function listOwnedPets(uid: string) {
@@ -459,26 +503,51 @@ export async function listOwnedPets(uid: string) {
   const userSnap = await userRef.get();
   const userData = (userSnap.data() ?? {}) as UserDoc;
 
-  const owned = await db.collection(COLLECTION_PETS).where("ownerId", "==", uid).get();
-  const realDocs = owned.docs.filter(
-    (doc) => !isDemoPetDocContent(doc.data() as PetDoc, doc.id),
-  );
-  if (realDocs.length === 0) {
+  const [owned, secondaryPetIds] = await Promise.all([
+    db.collection(COLLECTION_PETS).where("ownerId", "==", uid).get(),
+    listSecondaryPetIdsForUser(uid),
+  ]);
+
+  const petsMap = new Map<string, PetProfile>();
+
+  for (const doc of owned.docs) {
+    const data = doc.data() as PetDoc;
+    if (isDemoPetDocContent(data, doc.id)) continue;
+    await ensurePrimaryMemberRecord(doc.id, uid);
+    const withToken = await ensureFinderShareToken(doc.ref, data);
+    const normalized = await ensurePublicPageSlug(doc.ref, withToken);
+    const withIdentity = await ensurePetIdentity(doc.ref, normalized);
+    petsMap.set(
+      doc.id,
+      withAccess(toPetProfile(doc.id, withIdentity), {
+        role: "primary",
+        canEditBasicData: true,
+        canDeletePet: true,
+        canPairNfc: true,
+      }),
+    );
+  }
+
+  for (const petId of secondaryPetIds) {
+    if (petsMap.has(petId)) continue;
+    const access = await getPetAccessById(uid, petId);
+    if (!access) continue;
+    const data = access.petData as PetDoc;
+    if (isDemoPetDocContent(data, petId)) continue;
+    const withToken = await ensureFinderShareToken(access.petRef, data);
+    const normalized = await ensurePublicPageSlug(access.petRef, withToken);
+    const withIdentity = await ensurePetIdentity(access.petRef, normalized);
+    petsMap.set(petId, withAccess(toPetProfile(petId, withIdentity), access.access));
+  }
+
+  const pets = Array.from(petsMap.values());
+  if (pets.length === 0) {
     const created = await getOrCreateCurrentPet(uid);
     return {
       currentPetId: created.pet.id,
       pets: [created.pet],
     };
   }
-
-  const pets = await Promise.all(
-    realDocs.map(async (doc) => {
-      const withToken = await ensureFinderShareToken(doc.ref, doc.data() as PetDoc);
-      const normalized = await ensurePublicPageSlug(doc.ref, withToken);
-      const withIdentity = await ensurePetIdentity(doc.ref, normalized);
-      return toPetProfile(doc.id, withIdentity);
-    }),
-  );
 
   const defaultPetId = typeof userData.defaultPetId === "string" ? userData.defaultPetId.trim() : "";
   const currentPetId = pets.some((item) => item.id === defaultPetId) ? defaultPetId : pets[0]?.id ?? "";
@@ -491,22 +560,20 @@ export async function listOwnedPets(uid: string) {
 }
 
 export async function setCurrentPet(uid: string, petId: string) {
-  const db = getFirebaseAdminDb();
   const normalizedPetId = petId.trim();
   if (!normalizedPetId) return null;
 
   if (isDemoPetId(normalizedPetId)) return null;
-  const petRef = db.collection(COLLECTION_PETS).doc(normalizedPetId);
-  const petSnap = await petRef.get();
-  const petData = petSnap.data() as PetDoc | undefined;
-  if (!petSnap.exists || petData?.ownerId !== uid) return null;
-  if (isDemoPetDocContent(petData, normalizedPetId)) return null;
+  const access = await getPetAccessById(uid, normalizedPetId);
+  if (!access) return null;
+  if (isDemoPetDocContent(access.petData as PetDoc, normalizedPetId)) return null;
 
+  const db = getFirebaseAdminDb();
   await db.collection(COLLECTION_USER).doc(uid).set({ defaultPetId: normalizedPetId }, { merge: true });
-  const normalized = await ensureFinderShareToken(petRef, petData);
-  const withPublicPage = await ensurePublicPageSlug(petRef, normalized);
-  const withIdentity = await ensurePetIdentity(petRef, withPublicPage);
-  const next = toPetProfile(normalizedPetId, withIdentity);
+  const normalized = await ensureFinderShareToken(access.petRef, access.petData as PetDoc);
+  const withPublicPage = await ensurePublicPageSlug(access.petRef, normalized);
+  const withIdentity = await ensurePetIdentity(access.petRef, withPublicPage);
+  const next = withAccess(toPetProfile(normalizedPetId, withIdentity), access.access);
   writeCachedCurrentPet(uid, next);
   return next;
 }
@@ -515,13 +582,20 @@ export async function createOwnedPet(uid: string) {
   const db = getFirebaseAdminDb();
   const petsRoot = db.collection(COLLECTION_PETS);
   const createdRef = await petsRoot.add(defaultPetDoc(uid));
+  await ensurePrimaryMemberRecord(createdRef.id, uid);
 
   await db.collection(COLLECTION_USER).doc(uid).set({ defaultPetId: createdRef.id }, { merge: true });
 
   const createdSnap = await createdRef.get();
   const result = await finalizePetProfile(createdRef, createdSnap.id, (createdSnap.data() ?? {}) as PetDoc);
-  writeCachedCurrentPet(uid, result.pet);
-  return result;
+  const pet = withAccess(result.pet, {
+    role: "primary",
+    canEditBasicData: true,
+    canDeletePet: true,
+    canPairNfc: true,
+  });
+  writeCachedCurrentPet(uid, pet);
+  return { petRef: result.petRef, pet };
 }
 
 export async function getPublicPetBySlug(publicSlug: string) {

@@ -8,10 +8,10 @@ import {
   USER_PROFILE_EMAIL_PLACEHOLDER,
 } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserNameCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
-import { COLLECTION_PETS, COLLECTION_USER, COLLECTION_VETERINARIANS } from "@/lib/firebase/collections";
+import { COLLECTION_PETS, COLLECTION_USER, COLLECTION_VETERINARIANS, SUBCOLLECTION_PET_MEMBERS } from "@/lib/firebase/collections";
 import { getFirebaseAdminAuth, getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { invalidateCurrentPetCache } from "@/lib/pets/current";
-import { getOrCreateCurrentUserProfile, invalidateCurrentUserProfileCache } from "@/lib/users/current";
+import { getOrCreateCurrentUserProfile, invalidateCurrentUserProfileCache, normalizeNameForSearch } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile, upsertCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
 
 type UpdateCurrentUserPayload = {
@@ -175,6 +175,7 @@ export async function PATCH(request: Request) {
     UserID: auth.uid,
   };
   if (name !== undefined) updates.name = name;
+  if (name !== undefined) updates.searchName = normalizeNameForSearch(name);
   if (email !== undefined) updates.email = email;
   if (phone !== undefined) updates.phone = phone;
   if (birthDate !== undefined) updates.birthDate = birthDate;
@@ -209,6 +210,19 @@ export async function DELETE() {
 
   for (const petDoc of petsSnapshot.docs) {
     await deleteDocTree(petDoc.ref);
+  }
+
+  const secondaryMemberships = await db
+    .collectionGroup(SUBCOLLECTION_PET_MEMBERS)
+    .where("uid", "==", auth.uid)
+    .where("role", "==", "secondary")
+    .get();
+  if (!secondaryMemberships.empty) {
+    const batch = db.batch();
+    for (const membership of secondaryMemberships.docs) {
+      batch.delete(membership.ref);
+    }
+    await batch.commit();
   }
 
   await db.collection(COLLECTION_VETERINARIANS).doc(auth.uid).delete().catch(() => null);
