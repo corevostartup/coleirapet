@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { AppShell, TopBar } from "@/components/shell";
 import { HealthActivityMinutesPanel } from "@/components/health-activity-minutes-panel";
@@ -9,7 +8,6 @@ import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import { heartTrend, metrics, pet } from "@/lib/mock";
 import { getOrCreateCurrentPet, type PetProfile } from "@/lib/pets/current";
-import { getPetImageOrDefault } from "@/lib/pets/image";
 
 export default async function HealthPage() {
   const jar = await cookies();
@@ -26,7 +24,6 @@ export default async function HealthPage() {
     typeof currentPet?.name === "string" && currentPet.name.trim().length > 0
       ? currentPet.name.trim()
       : pet.name;
-  const petImageSrc = getPetImageOrDefault(currentPet?.image ?? pet.image);
 
   const maxBpm = Math.max(...heartTrend.map((item) => item.bpm));
   const avgBpm = Math.round(heartTrend.reduce((sum, item) => sum + item.bpm, 0) / heartTrend.length);
@@ -35,19 +32,7 @@ export default async function HealthPage() {
 
   return (
     <AppShell tab="health">
-      <TopBar
-        title={`Saude de ${petName}`}
-        subtitle="Dados em tempo real"
-        action={
-          <Link
-            href="/profile"
-            className="relative flex h-11 w-11 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100"
-            aria-label="Perfil do pet"
-          >
-            <Image src={petImageSrc} alt={`Foto de ${petName}`} fill className="object-cover" sizes="44px" />
-          </Link>
-        }
-      />
+      <TopBar title={`Saude de ${petName}`} subtitle="Dados em tempo real" />
 
       <section
         data-lyka-shell-span="full"

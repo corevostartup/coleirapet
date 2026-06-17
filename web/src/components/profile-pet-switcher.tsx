@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { getPetImageOrDefault } from "@/lib/pets/image";
-import { filterLegacyUiDemoPetsFromSwitcherList } from "@/lib/pets/legacy-ui-demo-pets";
 
 type PetItem = {
   id: string;
@@ -34,7 +33,7 @@ function dedupePetsByIdentity(pets: PetItem[]): PetItem[] {
 }
 
 function preparePetsList(pets: PetItem[]) {
-  return filterLegacyUiDemoPetsFromSwitcherList(dedupePetsByIdentity(pets));
+  return dedupePetsByIdentity(pets);
 }
 
 export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props) {

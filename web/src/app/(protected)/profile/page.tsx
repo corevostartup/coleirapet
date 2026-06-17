@@ -11,7 +11,6 @@ import { IconSettings, IconShield } from "@/components/icons";
 import { AUTH_USER_NAME_COOKIE, AUTH_USER_PHOTO_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserNameCookie, parseAuthUserPhotoCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
-import { filterLegacyUiDemoPetsFromSwitcherList } from "@/lib/pets/legacy-ui-demo-pets";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
 import { absolutePublicUrl } from "@/lib/site/public-url";
@@ -145,15 +144,13 @@ export default async function ProfilePage({
                   image: currentPet.image,
                 }}
                 userPlan={currentUser?.plan ?? "free"}
-                initialPets={filterLegacyUiDemoPetsFromSwitcherList(
-                  petList.pets.map((item) => ({
-                    id: item.id,
-                    name: item.name,
-                    breed: item.breed,
-                    image: item.image,
-                    canDeletePet: item.canDeletePet,
-                  })),
-                )}
+                initialPets={petList.pets.map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  breed: item.breed,
+                  image: item.image,
+                  canDeletePet: item.canDeletePet,
+                }))}
               />
             ) : null}
           </div>

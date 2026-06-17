@@ -74,20 +74,7 @@ export default function NotificationsPage() {
 
   return (
     <AppShell tab="home">
-      <TopBar
-        title="Notificacoes"
-        subtitle="Alertas da conta"
-        action={
-          <Link
-            prefetch
-            href="/notifications/settings"
-            className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:text-zinc-900"
-            aria-label="Configuracao de notificacoes"
-          >
-            <IconBell className="h-5 w-5" />
-          </Link>
-        }
-      />
+      <TopBar title="Notificacoes" subtitle="Alertas da conta" />
 
       {unreadCount > 0 ? (
         <section
@@ -107,7 +94,16 @@ export default function NotificationsPage() {
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "90ms" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[14px] font-semibold text-zinc-900">Todas</h2>
-          <span className="text-[11px] text-zinc-500">{items.length} itens</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-zinc-500">{items.length} itens</span>
+            <Link
+              prefetch
+              href="/notifications/settings"
+              className="rounded-xl border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 transition hover:bg-zinc-100"
+            >
+              Configurar
+            </Link>
+          </div>
         </div>
         {error ? <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700">{error}</p> : null}
 
