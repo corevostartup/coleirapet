@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { TopBarClient, UserAppShellLayout } from "@/components/user-app-shell-layout";
 
