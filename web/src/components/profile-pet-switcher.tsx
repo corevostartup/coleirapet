@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 
@@ -51,6 +51,9 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
   const [newPetSize, setNewPetSize] = useState("");
   const [newPetError, setNewPetError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [pets, setPets] = useState(() => preparePetsList(initialPets));
   const [selectedPetId, setSelectedPetId] = useState(currentPet.id);
 
@@ -59,9 +62,50 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
   }, [initialPets]);
 
   useEffect(() => {
+    setSelectedPetId(currentPet.id);
+  }, [currentPet.id]);
+
+  useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) {
+      setMenuPos(null);
+      return;
+    }
+    function updateMenuPos() {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMenuPos({ top: rect.bottom + 8, right: Math.max(12, window.innerWidth - rect.right) });
+    }
+    updateMenuPos();
+    window.addEventListener("resize", updateMenuPos);
+    window.addEventListener("scroll", updateMenuPos, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPos);
+      window.removeEventListener("scroll", updateMenuPos, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (pets.length === 0) return;
@@ -74,6 +118,62 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
   }, [pets, selectedPetId, currentPet.id]);
 
   const selectedPet = useMemo(() => pets.find((item) => item.id === selectedPetId) ?? currentPet, [currentPet, pets, selectedPetId]);
+
+  const switchMenu = (
+    <div
+      ref={menuRef}
+      className="fixed z-[2100] w-[min(300px,calc(100vw-2rem))] rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-[0_22px_40px_-28px_rgba(15,23,42,0.45)]"
+      style={menuPos ? { top: menuPos.top, right: menuPos.right } : undefined}
+    >
+      <p className="px-1 pb-2 text-[11px] font-medium text-zinc-500">Trocar pet</p>
+      <ul className="space-y-1.5">
+        {pets.map((pet) => {
+          const active = pet.id === selectedPetId;
+          const isSaving = busyPetId === pet.id;
+          return (
+            <li key={pet.id}>
+              <button
+                type="button"
+                onClick={() => void switchPet(pet.id)}
+                disabled={Boolean(busyPetId)}
+                className={`flex w-full items-center gap-2 rounded-xl border px-2 py-2 text-left transition ${
+                  active ? "border-emerald-200 bg-emerald-50/70" : "border-zinc-200 bg-zinc-50/70 hover:bg-zinc-100"
+                }`}
+              >
+                <span className="relative h-9 w-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
+                  <Image src={getPetImageOrDefault(pet.image)} alt={`Foto de ${pet.name}`} fill className="object-cover" sizes="36px" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[12px] font-semibold text-zinc-800">{pet.name}</span>
+                  <span className="block truncate text-[11px] text-zinc-500">{pet.breed || "Sem raca"}</span>
+                </span>
+                <span className="ml-auto text-[10px] font-semibold text-emerald-700">{isSaving ? "..." : active ? "Atual" : ""}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <button
+        type="button"
+        onClick={() => void createNewPet()}
+        disabled={Boolean(busyPetId)}
+        className="mt-2 flex w-full items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50/70 px-2 py-2 text-[12px] font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-70"
+      >
+        {busyPetId === "new-pet" ? "Criando..." : "Novo pet"}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(false);
+          setShowAllPetsModal(true);
+        }}
+        className="mt-2 flex w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-2 py-2 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
+      >
+        Ver todos
+      </button>
+      {hint ? <p className="px-1 pt-2 text-[11px] text-rose-600">{hint}</p> : null}
+    </div>
+  );
 
   async function switchPet(petId: string) {
     if (petId === selectedPetId || busyPetId) {
@@ -294,67 +394,17 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
   return (
     <div className="relative z-[1900]">
       <button
+        ref={triggerRef}
         type="button"
-        aria-label="Selecionar outro pet"
-        className="relative h-11 w-11 overflow-hidden rounded-full border border-zinc-200 bg-white shadow-sm"
+        aria-label={`Trocar pet · ${selectedPet.name}`}
+        aria-expanded={open}
+        className="relative h-11 w-11 overflow-hidden rounded-full border border-zinc-200 bg-white shadow-sm transition hover:border-emerald-300"
         onClick={() => setOpen((value) => !value)}
       >
-        <Image src={getPetImageOrDefault(selectedPet.image)} alt={`Foto de ${selectedPet.name}`} fill className="object-cover" sizes="44px" />
+        <Image src={getPetImageOrDefault(selectedPet.image)} alt={`Foto de ${selectedPet.name}`} fill className="object-cover" sizes="44px" unoptimized />
       </button>
 
-      {open ? (
-        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-[2000] w-[min(300px,calc(100vw-2rem))] rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-[0_22px_40px_-28px_rgba(15,23,42,0.45)]">
-          <p className="px-1 pb-2 text-[11px] font-medium text-zinc-500">Trocar pet</p>
-          <ul className="space-y-1.5">
-            {pets.map((pet) => {
-              const active = pet.id === selectedPetId;
-              const isSaving = busyPetId === pet.id;
-              return (
-                <li key={pet.id}>
-                  <button
-                    type="button"
-                    onClick={() => void switchPet(pet.id)}
-                    disabled={Boolean(busyPetId)}
-                    className={`flex w-full items-center gap-2 rounded-xl border px-2 py-2 text-left transition ${
-                      active ? "border-emerald-200 bg-emerald-50/70" : "border-zinc-200 bg-zinc-50/70 hover:bg-zinc-100"
-                    }`}
-                  >
-                    <span className="relative h-9 w-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-                      <Image src={getPetImageOrDefault(pet.image)} alt={`Foto de ${pet.name}`} fill className="object-cover" sizes="36px" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[12px] font-semibold text-zinc-800">{pet.name}</span>
-                      <span className="block truncate text-[11px] text-zinc-500">
-                        {pet.breed || "Sem raca"}
-                      </span>
-                    </span>
-                    <span className="ml-auto text-[10px] font-semibold text-emerald-700">{isSaving ? "..." : active ? "Atual" : ""}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <button
-            type="button"
-            onClick={() => void createNewPet()}
-            disabled={Boolean(busyPetId)}
-            className="mt-2 flex w-full items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50/70 px-2 py-2 text-[12px] font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-70"
-          >
-            {busyPetId === "new-pet" ? "Criando..." : "Novo pet"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              setShowAllPetsModal(true);
-            }}
-            className="mt-2 flex w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-2 py-2 text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
-          >
-            Ver todos
-          </button>
-          {hint ? <p className="px-1 pt-2 text-[11px] text-rose-600">{hint}</p> : null}
-        </div>
-      ) : null}
+      {open && mounted && menuPos ? createPortal(switchMenu, document.body) : null}
 
       {showPlanModal && mounted
         ? createPortal(
