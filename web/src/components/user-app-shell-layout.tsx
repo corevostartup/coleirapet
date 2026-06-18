@@ -41,6 +41,7 @@ export function UserAppShellLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "";
   const mainSlots = Children.toArray(children);
   const [headSlot, ...bodySlots] = mainSlots;
+  const isLocationPage = pathname === "/location" || pathname.startsWith("/location/");
 
   return (
     <main className="ios-safe-top min-h-dvh px-3 py-4 pb-28 sm:px-6 md:py-6 md:pb-6 lg:px-8">
@@ -81,7 +82,11 @@ export function UserAppShellLayout({ children }: { children: ReactNode }) {
               ) : null}
 
               {bodySlots.length > 0 ? (
-                <div className="columns-1 [column-fill:balance] md:columns-2 md:gap-x-6 lg:gap-x-8">
+                <div
+                  className={`columns-1 [column-fill:balance] md:gap-x-6 lg:gap-x-8 ${
+                    isLocationPage ? "md:columns-1" : "md:columns-2"
+                  }`}
+                >
                   {bodySlots.map((node, index) => {
                     const full = shellSlotSpansFull(node);
                     return (

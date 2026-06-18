@@ -24,5 +24,30 @@ export async function resolveUserOwnerIdAliases(authUid: string): Promise<string
     }
   }
 
+  await Promise.all(
+    Array.from(aliases).map(async (alias) => {
+      const [byUserId, byLegacyId, byUid] = await Promise.all([
+        db.collection(COLLECTION_USER).where("userId", "==", alias).limit(8).get(),
+        db.collection(COLLECTION_USER).where("UserID", "==", alias).limit(8).get(),
+        db.collection(COLLECTION_USER).where("uid", "==", alias).limit(8).get(),
+      ]);
+      for (const snap of [byUserId, byLegacyId, byUid]) {
+        for (const doc of snap.docs) {
+          aliases.add(doc.id);
+          const data = doc.data() ?? {};
+          for (const value of [data.userId, data.UserID, data.uid]) {
+            const nested = parseText(value);
+            if (nested) aliases.add(nested);
+          }
+        }
+      }
+    }),
+  );
+
   return Array.from(aliases);
+}
+
+/** Todos os documentos em `User` que representam o mesmo tutor (notificacoes legadas). */
+export async function resolveUserDocumentIds(authUid: string): Promise<string[]> {
+  return resolveUserOwnerIdAliases(authUid);
 }

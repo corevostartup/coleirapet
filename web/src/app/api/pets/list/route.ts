@@ -4,8 +4,8 @@ import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants"
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_PETS, COLLECTION_USER } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { getPetAccessById } from "@/lib/pets/access";
-import { createOwnedPet, listOwnedPets, setCurrentPet } from "@/lib/pets/current";
+import { getPetAccessById, countPrimaryOwnedPetsForUser } from "@/lib/pets/access";
+import { createOwnedPet, invalidateCurrentPetCache, listOwnedPets, setCurrentPet } from "@/lib/pets/current";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 type SwitchPetPayload = {
@@ -83,7 +83,8 @@ export async function POST() {
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
 
   const user = await getOrCreateCurrentUserProfile(auth.uid);
-  if (user.plan !== "pro") {
+  const primaryOwnedCount = await countPrimaryOwnedPetsForUser(auth.uid);
+  if (user.plan !== "pro" && primaryOwnedCount >= 1) {
     return NextResponse.json(
       {
         error: "Plano Free permite apenas 1 pet. Assine o Premium para liberar pets ilimitados.",

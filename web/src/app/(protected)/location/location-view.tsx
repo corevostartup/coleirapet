@@ -318,14 +318,17 @@ export function LocationView({ quickPetSeed }: { quickPetSeed?: TopBarQuickPetSe
   return (
     <AppShell tab="location">
       {!mapFullscreen ? (
-        <>
+        <div className="location-page-topbar w-full min-w-0">
           <TopBar title="Localizacao" subtitle="Rastreamento inteligente" quickPetSeed={quickPetSeed} />
+        </div>
+      ) : null}
 
-          <div
-            data-lyka-shell-span="full"
-            className="appear-up flex flex-col gap-3 md:grid md:grid-cols-12 md:items-start md:gap-4 lg:gap-6"
-            style={{ animationDelay: "80ms" }}
-          >
+      {!mapFullscreen ? (
+        <div
+          data-lyka-shell-span="full"
+          className="location-page-content appear-up w-full min-w-0 flex flex-col gap-3 md:grid md:grid-cols-12 md:items-start md:gap-4 lg:gap-6"
+          style={{ animationDelay: "80ms" }}
+        >
             <section className="min-w-0 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)] md:col-span-7 lg:col-span-8">
               <div className="relative isolate h-[200px] w-full overflow-hidden sm:h-[240px] md:h-[min(52vh,440px)] md:min-h-[320px] lg:h-[400px] lg:min-h-[360px]">
                 <div className="absolute inset-0 z-0 min-h-0">
@@ -482,8 +485,7 @@ export function LocationView({ quickPetSeed }: { quickPetSeed?: TopBarQuickPetSe
                 </ul>
               )}
             </section>
-          </div>
-        </>
+        </div>
       ) : null}
 
       {fullscreenOverlay}

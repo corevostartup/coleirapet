@@ -251,6 +251,19 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
       setSelectedPetId(payload?.currentPetId ?? petId);
       if (Array.isArray(payload?.pets)) setPets(preparePetsList(payload.pets as PetItem[]));
       setOpen(false);
+
+      const nextPetId = payload?.currentPetId ?? petId;
+      const nextPet = Array.isArray(payload?.pets)
+        ? (payload.pets as PetItem[]).find((item) => item.id === nextPetId)
+        : undefined;
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("lyka-current-pet-changed", {
+            detail: { petId: nextPetId, petName: nextPet?.name ?? "" },
+          }),
+        );
+      }
+
       /** Recarrega a pagina para o RSC buscar o pet atual no servidor (foto e dados). `router.refresh()` sozinho nao remonta estado local do editor. */
       if (typeof window !== "undefined") {
         const url = new URL(window.location.href);

@@ -258,7 +258,7 @@ export async function POST(request: Request) {
     { merge: true },
   );
 
-  await db.collection(COLLECTION_USER).doc(targetDoc.id).collection(SUBCOLLECTION_USER_NOTIFICATIONS).add({
+  await db.collection(COLLECTION_USER).doc(targetUid).collection(SUBCOLLECTION_USER_NOTIFICATIONS).add({
     type: "secondary_tutor_invite",
     title: "Convite para tutor secundario",
     body: `Voce foi adicionado como tutor secundario de ${petName} por ${actorName}.`,

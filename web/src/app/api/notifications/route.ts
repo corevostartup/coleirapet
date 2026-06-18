@@ -1,10 +1,13 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_PETS, COLLECTION_USER, SUBCOLLECTION_PET_MEMBERS, SUBCOLLECTION_USER_NOTIFICATIONS } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { getPetAccessById } from "@/lib/pets/access";
+import { getPetAccessById, countPrimaryOwnedPetsForUser } from "@/lib/pets/access";
+import { invalidateCurrentPetCache } from "@/lib/pets/current";
+import { resolveUserOwnerIdAliases } from "@/lib/pets/user-owner-aliases";
 
 type NotificationDoc = {
   type?: string;
@@ -145,8 +148,23 @@ export async function PATCH(request: Request) {
   }
 
   const petRef = db.collection(COLLECTION_PETS).doc(petId);
-  const memberRef = petRef.collection(SUBCOLLECTION_PET_MEMBERS).doc(auth.uid);
-  const memberSnap = await memberRef.get();
+  const memberAliases = await resolveUserOwnerIdAliases(auth.uid);
+  let memberRef = petRef.collection(SUBCOLLECTION_PET_MEMBERS).doc(auth.uid);
+  let memberSnap = await memberRef.get();
+
+  if (!memberSnap.exists) {
+    for (const alias of memberAliases) {
+      if (alias === auth.uid) continue;
+      const candidateRef = petRef.collection(SUBCOLLECTION_PET_MEMBERS).doc(alias);
+      const candidateSnap = await candidateRef.get();
+      if (candidateSnap.exists) {
+        memberRef = candidateRef;
+        memberSnap = candidateSnap;
+        break;
+      }
+    }
+  }
+
   if (!memberSnap.exists) {
     await notificationRef.set({ status: "cancelled", unread: false, respondedAt: nowIso, readAt: nowIso }, { merge: true });
     return NextResponse.json({ ok: true, status: "cancelled" });
@@ -160,23 +178,38 @@ export async function PATCH(request: Request) {
 
   const petAccess = await getPetAccessById(auth.uid, petId);
   if (petAccess) {
+    await db.collection(COLLECTION_USER).doc(auth.uid).set({ secondaryPetIds: FieldValue.arrayUnion(petId) }, { merge: true });
+    invalidateCurrentPetCache(auth.uid);
     await notificationRef.set({ status: "accepted", unread: false, respondedAt: nowIso, readAt: nowIso }, { merge: true });
     return NextResponse.json({ ok: true, status: "accepted" });
   }
 
   const memberStatus = parseText(memberSnap.data()?.status).toLowerCase();
   if (memberStatus !== "pending") {
+    await db.collection(COLLECTION_USER).doc(auth.uid).set({ secondaryPetIds: FieldValue.arrayUnion(petId) }, { merge: true });
+    invalidateCurrentPetCache(auth.uid);
     await notificationRef.set({ status: "accepted", unread: false, respondedAt: nowIso, readAt: nowIso }, { merge: true });
     return NextResponse.json({ ok: true, status: "accepted" });
   }
 
-  await memberRef.set({ status: "active", updatedAt: nowIso }, { merge: true });
+  await memberRef.set(
+    {
+      uid: auth.uid,
+      role: "secondary",
+      status: "active",
+      updatedAt: nowIso,
+    },
+    { merge: true },
+  );
   const userRef = db.collection(COLLECTION_USER).doc(auth.uid);
   const userSnap = await userRef.get();
   const defaultPetId = parseText(userSnap.data()?.defaultPetId);
-  if (!defaultPetId) {
+  const primaryOwnedCount = await countPrimaryOwnedPetsForUser(auth.uid);
+  await userRef.set({ secondaryPetIds: FieldValue.arrayUnion(petId) }, { merge: true });
+  if (!defaultPetId || primaryOwnedCount === 0) {
     await userRef.set({ defaultPetId: petId }, { merge: true });
   }
+  invalidateCurrentPetCache(auth.uid);
 
   await notificationRef.set({ status: "accepted", unread: false, respondedAt: nowIso, readAt: nowIso }, { merge: true });
   return NextResponse.json({ ok: true, status: "accepted" });

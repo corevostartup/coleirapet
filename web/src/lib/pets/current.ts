@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DocumentReference, Firestore } from "firebase-admin/firestore";
+import { FieldValue } from "firebase-admin/firestore";
 import {
   COLLECTION_PETS,
   COLLECTION_USER,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { ensurePrimaryMemberRecord, getPetAccessById, listAccessiblePetIdsForUser, type PetAccessRole } from "@/lib/pets/access";
+import { listSecondaryPetIdsForUserWithFallbacks } from "@/lib/pets/secondary-member-pets";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 import { isLegacyUiDemoPetName } from "@/lib/pets/legacy-ui-demo-pets";
 
@@ -441,6 +443,48 @@ async function loadPetProfileForUser(uid: string, petId: string): Promise<PetPro
   return withAccess(toPetProfile(petId, withIdentity), access.access);
 }
 
+function isEmptyShellPet(pet: Pick<PetProfile, "name">) {
+  const name = pet.name.trim().toLowerCase();
+  return name === "nao informado" || name === "não informado";
+}
+
+function pickCurrentPetId(pets: PetProfile[], defaultPetId: string) {
+  if (defaultPetId && pets.some((item) => item.id === defaultPetId)) {
+    const selected = pets.find((item) => item.id === defaultPetId);
+    if (selected?.accessRole === "secondary") return defaultPetId;
+    if (selected && !isEmptyShellPet(selected)) return defaultPetId;
+  }
+
+  const primaryPets = pets.filter((item) => item.accessRole === "primary");
+  const secondaryPets = pets.filter((item) => item.accessRole === "secondary");
+
+  if (primaryPets.length === 0 && secondaryPets.length > 0) {
+    return secondaryPets[0]?.id ?? "";
+  }
+
+  const meaningful = pets.filter((item) => !isEmptyShellPet(item));
+  if (meaningful.length > 0) {
+    if (defaultPetId && meaningful.some((item) => item.id === defaultPetId)) return defaultPetId;
+    return meaningful[0]?.id ?? "";
+  }
+
+  return pets[0]?.id ?? "";
+}
+
+async function loadFirstAccessiblePet(uid: string, petIds: string[]) {
+  for (const petId of petIds) {
+    const pet = await loadPetProfileForUser(uid, petId);
+    if (pet) return pet;
+  }
+  return null;
+}
+
+async function loadSecondaryOnlyPet(uid: string) {
+  const secondaryPetIds = await listSecondaryPetIdsForUserWithFallbacks(uid);
+  if (secondaryPetIds.length === 0) return null;
+  return loadFirstAccessiblePet(uid, secondaryPetIds);
+}
+
 export async function getOrCreateCurrentPet(uid: string) {
   const cached = readCachedCurrentPet(uid);
   if (cached) {
@@ -465,18 +509,36 @@ export async function getOrCreateCurrentPet(uid: string) {
   if (candidatePetId) {
     const pet = await loadPetProfileForUser(uid, candidatePetId);
     if (pet) {
+      if (isEmptyShellPet(pet)) {
+        const accessiblePetIds = await listAccessiblePetIdsForUser(uid);
+        const betterPet = await loadFirstAccessiblePet(
+          uid,
+          accessiblePetIds.filter((id) => id !== candidatePetId),
+        );
+        if (betterPet) {
+          await userRef.set({ defaultPetId: betterPet.id }, { merge: true });
+          writeCachedCurrentPet(uid, betterPet);
+          return { petRef: db.collection(COLLECTION_PETS).doc(betterPet.id), pet: betterPet };
+        }
+      }
       writeCachedCurrentPet(uid, pet);
       return { petRef: db.collection(COLLECTION_PETS).doc(candidatePetId), pet };
     }
   }
 
   const accessiblePetIds = await listAccessiblePetIdsForUser(uid);
-  for (const petId of accessiblePetIds) {
-    const pet = await loadPetProfileForUser(uid, petId);
-    if (!pet) continue;
-    await userRef.set({ defaultPetId: petId }, { merge: true });
-    writeCachedCurrentPet(uid, pet);
-    return { petRef: db.collection(COLLECTION_PETS).doc(petId), pet };
+  const accessiblePet = await loadFirstAccessiblePet(uid, accessiblePetIds);
+  if (accessiblePet) {
+    await userRef.set({ defaultPetId: accessiblePet.id }, { merge: true });
+    writeCachedCurrentPet(uid, accessiblePet);
+    return { petRef: db.collection(COLLECTION_PETS).doc(accessiblePet.id), pet: accessiblePet };
+  }
+
+  const secondaryOnlyPet = await loadSecondaryOnlyPet(uid);
+  if (secondaryOnlyPet) {
+    await userRef.set({ defaultPetId: secondaryOnlyPet.id }, { merge: true });
+    writeCachedCurrentPet(uid, secondaryOnlyPet);
+    return { petRef: db.collection(COLLECTION_PETS).doc(secondaryOnlyPet.id), pet: secondaryOnlyPet };
   }
 
   const created = await petsRoot.add(defaultPetDoc(uid));
@@ -521,10 +583,15 @@ export async function listOwnedPets(uid: string) {
   }
 
   const defaultPetId = typeof userData.defaultPetId === "string" ? userData.defaultPetId.trim() : "";
-  const currentPetId = pets.some((item) => item.id === defaultPetId) ? defaultPetId : pets[0]?.id ?? "";
+  const currentPetId = pickCurrentPetId(pets, defaultPetId);
 
   if (currentPetId && currentPetId !== defaultPetId) {
     await userRef.set({ defaultPetId: currentPetId }, { merge: true });
+  }
+
+  const secondaryIds = pets.filter((item) => item.accessRole === "secondary").map((item) => item.id);
+  if (secondaryIds.length > 0) {
+    await userRef.set({ secondaryPetIds: FieldValue.arrayUnion(...secondaryIds) }, { merge: true });
   }
 
   return { currentPetId, pets };

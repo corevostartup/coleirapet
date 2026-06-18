@@ -29,6 +29,7 @@ type PetTutorMember = {
 
 type Props = {
   petId: string;
+  petName?: string;
   currentUserUid: string;
   currentTutorCode: string;
   userPlan: "free" | "pro";
@@ -41,7 +42,7 @@ function initialsFromName(name: string) {
   return `${first}${second}`.toUpperCase();
 }
 
-export default function PetTutorsManager({ petId, currentUserUid, currentTutorCode, userPlan }: Props) {
+export default function PetTutorsManager({ petId, petName, currentUserUid, currentTutorCode, userPlan }: Props) {
   const [members, setMembers] = useState<PetTutorMember[]>([]);
   const [currentRole, setCurrentRole] = useState<"primary" | "secondary" | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,6 +92,15 @@ export default function PetTutorsManager({ petId, currentUserUid, currentTutorCo
 
   useEffect(() => {
     void loadMembers();
+  }, [petId]);
+
+  useEffect(() => {
+    setQuery("");
+    setSearchResults([]);
+    setSearchError("");
+    setActionError("");
+    setActionHint("");
+    setShowKeyboard(false);
   }, [petId]);
 
   async function searchTutors() {
@@ -176,7 +186,12 @@ export default function PetTutorsManager({ petId, currentUserUid, currentTutorCo
   return (
     <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "210ms" }}>
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-[14px] font-semibold text-zinc-900">Tutores do pet</h3>
+        <div className="min-w-0">
+          <h3 className="text-[14px] font-semibold text-zinc-900">Tutores do pet</h3>
+          {petName?.trim() ? (
+            <p className="mt-0.5 truncate text-[11px] text-zinc-500">Pet selecionado: {petName.trim()}</p>
+          ) : null}
+        </div>
         <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700">
           {loading ? "Carregando" : `${secondaryCount} secundario(s)`}
         </span>

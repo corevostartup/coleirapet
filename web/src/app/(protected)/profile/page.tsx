@@ -2,8 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { ProfilePetDetailsEditor } from "@/components/profile-pet-details-editor";
-import { ProfilePetSwitcherStrip } from "@/components/profile-pet-switcher-strip";
-import PetTutorsManager from "@/components/pet-tutors-manager";
+import { ProfilePetTutorsSection } from "@/components/profile-pet-tutors-section";
 import { ProfileUserDetailsEditor } from "@/components/profile-user-details-editor";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AppShell } from "@/components/shell";
@@ -11,7 +10,7 @@ import TopBar from "@/components/top-bar";
 import { IconShield } from "@/components/icons";
 import { AUTH_USER_NAME_COOKIE, AUTH_USER_PHOTO_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserNameCookie, parseAuthUserPhotoCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
-import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
+import { getOrCreateCurrentPet, listOwnedPets, type PetProfile } from "@/lib/pets/current";
 import { loadTopBarQuickPetSeed } from "@/lib/pets/load-top-bar-quick-pet-seed";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
@@ -33,21 +32,26 @@ export default async function ProfilePage({
   const tutorPhoto =
     parseAuthUserPhotoCookie(jar.get(AUTH_USER_PHOTO_COOKIE)?.value) ??
     "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fm=jpg&fit=crop&w=700&q=80";
-  let currentPet = null;
-  let petList = null;
+  let currentPet: PetProfile | null = null;
+  let petList: Awaited<ReturnType<typeof listOwnedPets>> | null = null;
   let currentUser = null;
   let currentVeterinarian = null;
 
   if (uid) {
     try {
-      currentPet = (await getOrCreateCurrentPet(uid)).pet;
-    } catch {
-      currentPet = null;
-    }
-    try {
       petList = await listOwnedPets(uid);
     } catch {
       petList = null;
+    }
+    if (petList?.pets?.length) {
+      currentPet = petList.pets.find((item) => item.id === petList?.currentPetId) ?? petList.pets[0] ?? null;
+    }
+    if (!currentPet) {
+      try {
+        currentPet = (await getOrCreateCurrentPet(uid)).pet;
+      } catch {
+        currentPet = null;
+      }
     }
     try {
       currentUser = await getOrCreateCurrentUserProfile(uid, { fallbackName: tutorName });
@@ -59,11 +63,6 @@ export default async function ProfilePage({
     } catch {
       currentVeterinarian = null;
     }
-  }
-
-  if (!currentPet && petList?.pets?.length) {
-    const fallbackPet = petList.pets.find((item) => item.id === petList?.currentPetId) ?? petList.pets[0];
-    currentPet = fallbackPet ?? null;
   }
 
   const petData = currentPet
@@ -124,13 +123,10 @@ export default async function ProfilePage({
   const sharePublicUrl = currentPet ? await absolutePublicUrl(currentPet.publicPagePath) : null;
 
   const quickPetSeed = uid ? await loadTopBarQuickPetSeed(uid) : undefined;
-  const userPlan = currentUser?.plan === "pro" ? "pro" : "free";
 
   return (
     <AppShell tab="profile">
       <TopBar title="Perfil do pet" subtitle="Perfil" quickPetSeed={quickPetSeed} />
-
-      <ProfilePetSwitcherStrip seed={quickPetSeed} userPlan={userPlan} />
 
       <ProfilePetDetailsEditor
         key={currentPet?.id ?? `pet-${petData.petIdentity}`}
@@ -152,8 +148,9 @@ export default async function ProfilePage({
       />
 
       {uid && currentPet ? (
-        <PetTutorsManager
-          petId={currentPet.id}
+        <ProfilePetTutorsSection
+          initialPetId={currentPet.id}
+          initialPetName={currentPet.name}
           currentUserUid={uid}
           currentTutorCode={currentUser?.tutorCode ?? ""}
           userPlan={currentUser?.plan ?? "free"}

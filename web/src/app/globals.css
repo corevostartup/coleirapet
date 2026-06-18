@@ -449,6 +449,30 @@ html[data-lyka-vet-map-fullscreen] .dados-page-topbar {
 	display: none;
 }
 
+/* Local: TopBar (pet + notificacoes) acima do mapa Leaflet; respiro antes dos cards */
+.location-page-topbar {
+	position: relative;
+	z-index: 1900;
+	width: 100%;
+}
+
+.location-page-content {
+	width: 100%;
+	max-width: none;
+	padding-top: 0.75rem;
+}
+
+@media (min-width: 768px) {
+	.location-page-content {
+		padding-top: 1rem;
+	}
+}
+
+.lyka-shell-tile:has(.location-page-content) {
+	width: 100%;
+	column-span: all;
+}
+
 /* Pins POI estilo Locus (balao neutro + icone colorido) */
 .lyka-poi-marker {
 	background: none !important;

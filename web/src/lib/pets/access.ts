@@ -1,5 +1,6 @@
 import { COLLECTION_PETS, SUBCOLLECTION_PET_MEMBERS } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
+import { listSecondaryPetIdsForUserWithFallbacks } from "@/lib/pets/secondary-member-pets";
 import { resolveUserOwnerIdAliases } from "@/lib/pets/user-owner-aliases";
 
 type PetDoc = {
@@ -49,7 +50,7 @@ function normalizeRole(value: unknown): PetAccessRole | null {
 
 function isMemberActive(value: unknown) {
   const normalized = parseText(value).toLowerCase();
-  return normalized === "active";
+  return normalized === "active" || normalized === "accepted";
 }
 
 export async function ensurePrimaryMemberRecord(petId: string, ownerId: string) {
@@ -114,13 +115,17 @@ export async function getPetAccessById(uid: string, petId: string): Promise<PetA
     };
   }
 
-  const memberSnap = await petRef.collection(SUBCOLLECTION_PET_MEMBERS).doc(normalizedUid).get();
-  if (!memberSnap.exists) return null;
-  const member = (memberSnap.data() ?? {}) as PetMemberDoc;
-  if (!isMemberActive(member.status)) return null;
+  const memberMatch = await findActiveMemberForUser(petRef, normalizedUid);
+  if (!memberMatch) return null;
+  const { snap: memberSnap, member } = memberMatch;
+  if (!parseText(member.uid)) {
+    await memberSnap.ref.set({ uid: normalizedUid, updatedAt: new Date().toISOString() }, { merge: true });
+    member.uid = normalizedUid;
+  }
   let role = normalizeRole(member.role);
-  if (!role && memberSnap.id === normalizedUid) {
-    role = "primary";
+  const memberUid = parseText(member.uid) || memberSnap.id;
+  if (!role) {
+    role = ownerAliases.includes(memberUid) || (ownerId && memberUid === ownerId) ? "primary" : "secondary";
   }
 
   if (role === "primary") {
@@ -157,6 +162,48 @@ export async function getPetAccessById(uid: string, petId: string): Promise<PetA
   }
 
   return null;
+}
+
+async function findActiveMemberForUser(
+  petRef: FirebaseFirestore.DocumentReference,
+  uid: string,
+): Promise<{ snap: FirebaseFirestore.DocumentSnapshot; member: PetMemberDoc } | null> {
+  const aliases = await resolveUserOwnerIdAliases(uid);
+  const membersCol = petRef.collection(SUBCOLLECTION_PET_MEMBERS);
+
+  for (const alias of aliases) {
+    const direct = await membersCol.doc(alias).get();
+    if (!direct.exists) continue;
+    const member = (direct.data() ?? {}) as PetMemberDoc;
+    if (isMemberActive(member.status)) return { snap: direct, member };
+  }
+
+  for (const alias of aliases) {
+    const byField = await membersCol.where("uid", "==", alias).limit(10).get();
+    for (const doc of byField.docs) {
+      const member = (doc.data() ?? {}) as PetMemberDoc;
+      if (isMemberActive(member.status)) return { snap: doc, member };
+    }
+  }
+
+  return null;
+}
+
+/** Pets em que o usuario e tutor principal (ownerId), sem contar compartilhados. */
+export async function countPrimaryOwnedPetsForUser(uid: string): Promise<number> {
+  const normalizedUid = parseText(uid);
+  if (!normalizedUid) return 0;
+
+  const db = getFirebaseAdminDb();
+  const ownerAliases = await resolveUserOwnerIdAliases(normalizedUid);
+  const seen = new Set<string>();
+
+  for (const alias of ownerAliases) {
+    const snapshot = await db.collection(COLLECTION_PETS).where("ownerId", "==", alias).get();
+    for (const doc of snapshot.docs) seen.add(doc.id);
+  }
+
+  return seen.size;
 }
 
 function memberDocsToPetIds(snapshot: FirebaseFirestore.QuerySnapshot) {
@@ -223,12 +270,14 @@ export async function listAccessiblePetIdsForUser(uid: string) {
   const db = getFirebaseAdminDb();
   const ownerAliases = await resolveUserOwnerIdAliases(normalizedUid);
 
-  const [ownedSnapshots, primaryMemberPetIds, secondaryPetIds, activeMemberPetIds] = await Promise.all([
-    Promise.all(ownerAliases.map((alias) => db.collection(COLLECTION_PETS).where("ownerId", "==", alias).get())),
-    safeMemberPetIds(() => listPrimaryPetIdsForUser(normalizedUid)),
-    safeMemberPetIds(() => listSecondaryPetIdsForUser(normalizedUid)),
-    safeMemberPetIds(() => listActiveMemberPetIdsForUser(normalizedUid)),
-  ]);
+  const [ownedSnapshots, primaryMemberPetIds, secondaryPetIds, activeMemberPetIds, fallbackSecondaryPetIds] =
+    await Promise.all([
+      Promise.all(ownerAliases.map((alias) => db.collection(COLLECTION_PETS).where("ownerId", "==", alias).get())),
+      safeMemberPetIds(() => listPrimaryPetIdsForUser(normalizedUid)),
+      safeMemberPetIds(() => listSecondaryPetIdsForUser(normalizedUid)),
+      safeMemberPetIds(() => listActiveMemberPetIdsForUser(normalizedUid)),
+      listSecondaryPetIdsForUserWithFallbacks(normalizedUid),
+    ]);
 
   const petIds = new Set<string>();
   for (const snapshot of ownedSnapshots) {
@@ -237,5 +286,6 @@ export async function listAccessiblePetIdsForUser(uid: string) {
   for (const petId of primaryMemberPetIds) petIds.add(petId);
   for (const petId of secondaryPetIds) petIds.add(petId);
   for (const petId of activeMemberPetIds) petIds.add(petId);
+  for (const petId of fallbackSecondaryPetIds) petIds.add(petId);
   return Array.from(petIds);
 }
