@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { IconCollar, IconShield } from "@/components/icons";
 import { pet } from "@/lib/mock";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";

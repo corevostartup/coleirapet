@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { HealthWeightPanel } from "@/components/health-weight-panel";
 import { IconChevronLeft } from "@/components/icons";
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminSidebar, ADMIN_BASE_PATH } from "@/components/admin-sidebar";
-import { TopBar } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import type { CarouselProduct } from "@/lib/carousel-products/types";
 
 export default function AdminProdutosPage() {

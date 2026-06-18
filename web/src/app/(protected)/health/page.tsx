@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { cookies } from "next/headers";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { HealthActivityMinutesPanel } from "@/components/health-activity-minutes-panel";
 import { HealthWeightPanel } from "@/components/health-weight-panel";
 import { IconHeart, IconMoon, IconTemp, IconWave } from "@/components/icons";
@@ -8,6 +9,7 @@ import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import { heartTrend, metrics, pet } from "@/lib/mock";
 import { getOrCreateCurrentPet, type PetProfile } from "@/lib/pets/current";
+import { loadTopBarQuickPetSeed } from "@/lib/pets/load-top-bar-quick-pet-seed";
 
 export default async function HealthPage() {
   const jar = await cookies();
@@ -30,9 +32,11 @@ export default async function HealthPage() {
   const minBpm = Math.min(...heartTrend.map((item) => item.bpm));
   const bpmRange = Math.max(maxBpm - minBpm, 1);
 
+  const quickPetSeed = uid ? await loadTopBarQuickPetSeed(uid) : undefined;
+
   return (
     <AppShell tab="health">
-      <TopBar title={`Saude de ${petName}`} subtitle="Dados em tempo real" />
+      <TopBar title={`Saude de ${petName}`} subtitle="Dados em tempo real" quickPetSeed={quickPetSeed} />
 
       <section
         data-lyka-shell-span="full"

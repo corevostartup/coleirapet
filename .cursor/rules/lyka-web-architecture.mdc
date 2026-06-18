@@ -1,0 +1,65 @@
+---
+description: Arquitetura Lyka web — TopBar, shell, login e troca de pet
+alwaysApply: true
+---
+
+# Lyka Web — regras de arquitetura (Next.js 16 + Webpack)
+
+## Problema conhecido: `Element type is invalid. Received a promise that resolves to: undefined`
+
+No Next.js 16 com Webpack, **não** usar cadeias Server → Client → Client nem reexports nomeados de Client Components.
+
+### Padrão correto
+
+| Componente | Arquivo | Tipo | Export |
+|---|---|---|---|
+| `AppShell` | `web/src/components/shell.tsx` | Server | named `AppShell` |
+| `UserAppShellLayout` | `web/src/components/user-app-shell-layout.tsx` | Client | named |
+| `TopBar` | `web/src/components/top-bar.tsx` | Client | **default** |
+| `LoginPage` | `web/src/app/login/page.tsx` | Client | reexport default de `login-screen` |
+| `LoginScreen` | `web/src/components/login/login-screen.tsx` | Client | **default** |
+| `ProfilePetSwitcher` | `web/src/components/profile-pet-switcher.tsx` | Client | named |
+
+### Imports nas páginas
+
+```tsx
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar"; // default import
+```
+
+### Login / criar conta
+
+```tsx
+// web/src/app/login/page.tsx
+"use client";
+export { default } from "@/components/login/login-screen";
+```
+
+### Nunca fazer
+
+- `TopBar` dentro de `shell.tsx` (Server ou Client wrapper)
+- `TopBarClient` reexportado de `user-app-shell-layout.tsx`
+- `login-screen-loader.tsx` ou `create-account-screen-loader.tsx` intermediários
+- Server page importando Client com named export (`CreateAccountScreenLoader`)
+- `dynamic(..., { ssr: false })` dentro de Server Component para TopBar
+- `next/dynamic` para componentes já client no mesmo bundle
+
+## TopBar — miniatura do pet
+
+- `TopBar` renderiza `TopBarNotificationsLink` + `ProfilePetSwitcher`
+- Dados vêm de `/api/pets/list` e `/api/users/current` no client
+- Foto real: `PetAvatarImage` (`<img>` nativo) em `ProfilePetSwitcher` — não usar `next/image` para URLs ImgBB
+- Prop opcional `quickPetSeed` no TopBar para foto imediata vinda do servidor (Home, Saúde, Local, Dados, Perfil)
+- Menu de troca via portal (`createPortal`) — não usar `position:absolute` dentro do header
+
+## Telas com TopBar padrão (sino + pet)
+
+Home, Saúde, Local, Dados, Perfil — usar `<TopBar title="..." subtitle="..." />` sem `action`.
+
+Admin/vet: `action={null} showNotifications={false}`.
+
+## Tutores secundários
+
+- API: `/api/pets/members`, `/api/users/tutor-search`, `/api/notifications`
+- Apenas Pro adiciona tutores; secundários veem pets sem ser Pro
+- Teclado visual Lyka: `web/src/components/lyka-keyboard.tsx` no campo de busca de tutor

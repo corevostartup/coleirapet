@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { IconBell } from "@/components/icons";
 type NotificationItem = {
   id: string;

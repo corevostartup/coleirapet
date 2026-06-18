@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { HealthActivityMinutesPanel } from "@/components/health-activity-minutes-panel";
 import { IconChevronLeft } from "@/components/icons";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";

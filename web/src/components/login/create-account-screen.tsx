@@ -1,7 +1,7 @@
 "use client";
 
-import { LoginScreen } from "./login-screen";
+import LoginScreen from "./login-screen";
 
-export function CreateAccountScreen() {
+export default function CreateAccountScreen() {
   return <LoginScreen variant="signup" />;
 }

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IconCollar, IconFile, IconHome, IconPin, IconUser } from "@/components/icons";
-import { TopBar } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 
 export function VetShell({
   children,

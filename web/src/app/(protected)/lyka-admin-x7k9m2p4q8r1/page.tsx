@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { TopBar } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { AdminSidebar } from "@/components/admin-sidebar";
 
 const kpiCards = [

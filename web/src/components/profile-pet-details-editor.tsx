@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { PetAvatarImage } from "@/components/pet-avatar-image";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 import { PET_PROFILE_PHOTO_INPUT_ID } from "@/lib/pets/profile-photo-input-id";
 
@@ -258,6 +259,10 @@ export function ProfilePetDetailsEditor({
     Boolean(petIdentity?.trim()) && petIdentity.trim() !== "Nao disponivel";
 
   useEffect(() => {
+    setPhotoUrl(getPetImageOrDefault(petImage));
+  }, [petImage]);
+
+  useEffect(() => {
     return () => {
       if (identityCopyTimerRef.current) clearTimeout(identityCopyTimerRef.current);
       if (shareHintTimerRef.current) clearTimeout(shareHintTimerRef.current);
@@ -411,6 +416,7 @@ export function ProfilePetDetailsEditor({
         | null;
       if (!res.ok) throw new Error(payload?.error ?? "Falha ao enviar foto do pet.");
       setPhotoUrl(getPetImageOrDefault(payload?.image ?? ""));
+      window.dispatchEvent(new CustomEvent("lyka-pet-data-updated"));
       setPhotoState("idle");
     } catch (error) {
       setPhotoState("error");
@@ -424,14 +430,10 @@ export function ProfilePetDetailsEditor({
     <>
       <section className="appear-up mt-3 mb-3 overflow-hidden rounded-[26px] border border-zinc-200 bg-white shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
         <div className="relative h-[220px]">
-          {/* eslint-disable-next-line @next/next/no-img-element -- evita default export de next/image vir undefined no Webpack/RSC */}
-          <img
+          <PetAvatarImage
             src={photoUrl}
             alt="Foto do pet no perfil"
             className="absolute inset-0 h-full w-full object-cover"
-            width={440}
-            height={220}
-            decoding="async"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           <div className="absolute bottom-4 left-4">

@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getPetImageOrDefault } from "@/lib/pets/image";
+import { PetAvatarImage } from "@/components/pet-avatar-image";
 
 type PetItem = {
   id: string;
@@ -36,6 +36,15 @@ function preparePetsList(pets: PetItem[]) {
   return dedupePetsByIdentity(pets);
 }
 
+function computeMenuPos(trigger: HTMLButtonElement | null) {
+  const rect = trigger?.getBoundingClientRect();
+  if (!rect) return { top: 72, right: 16 };
+  return { top: rect.bottom + 8, right: Math.max(12, window.innerWidth - rect.right) };
+}
+
+const PET_SWITCHER_TRIGGER_CLASS =
+  "relative h-11 w-11 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-white shadow-sm";
+
 export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props) {
   const [open, setOpen] = useState(false);
   const [busyPetId, setBusyPetId] = useState<string | null>(null);
@@ -51,9 +60,10 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
   const [newPetSize, setNewPetSize] = useState("");
   const [newPetError, setNewPetError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 72, right: 16 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const outsideListenerRef = useRef<((event: PointerEvent) => void) | null>(null);
   const [pets, setPets] = useState(() => preparePetsList(initialPets));
   const [selectedPetId, setSelectedPetId] = useState(currentPet.id);
 
@@ -70,17 +80,12 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
     return () => setMounted(false);
   }, []);
 
-  useEffect(() => {
-    if (!open || !triggerRef.current) {
-      setMenuPos(null);
-      return;
-    }
+  useLayoutEffect(() => {
+    if (!open) return;
+    setMenuPos(computeMenuPos(triggerRef.current));
     function updateMenuPos() {
-      const rect = triggerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setMenuPos({ top: rect.bottom + 8, right: Math.max(12, window.innerWidth - rect.right) });
+      setMenuPos(computeMenuPos(triggerRef.current));
     }
-    updateMenuPos();
     window.addEventListener("resize", updateMenuPos);
     window.addEventListener("scroll", updateMenuPos, true);
     return () => {
@@ -91,18 +96,28 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
 
   useEffect(() => {
     if (!open) return;
-    function onPointerDown(event: PointerEvent) {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
-      setOpen(false);
-    }
+
+    const timer = window.setTimeout(() => {
+      function onPointerDown(event: PointerEvent) {
+        const target = event.target as Node;
+        if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+        setOpen(false);
+      }
+      outsideListenerRef.current = onPointerDown;
+      document.addEventListener("pointerdown", onPointerDown);
+    }, 0);
+
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
-    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+
     return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
+      window.clearTimeout(timer);
+      if (outsideListenerRef.current) {
+        document.removeEventListener("pointerdown", outsideListenerRef.current);
+        outsideListenerRef.current = null;
+      }
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
@@ -119,11 +134,44 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
 
   const selectedPet = useMemo(() => pets.find((item) => item.id === selectedPetId) ?? currentPet, [currentPet, pets, selectedPetId]);
 
+  async function refreshPetsFromApi() {
+    try {
+      const res = await fetch("/api/pets/list", { cache: "no-store" });
+      if (!res.ok) return;
+      const payload = (await res.json()) as {
+        currentPetId?: string;
+        pets?: PetItem[];
+      };
+      if (!Array.isArray(payload.pets) || payload.pets.length === 0) return;
+      const nextPets = preparePetsList(payload.pets);
+      setPets(nextPets);
+      const nextCurrentId =
+        typeof payload.currentPetId === "string" && nextPets.some((item) => item.id === payload.currentPetId)
+          ? payload.currentPetId
+          : nextPets.some((item) => item.id === selectedPetId)
+            ? selectedPetId
+            : nextPets[0]?.id ?? selectedPetId;
+      setSelectedPetId(nextCurrentId);
+    } catch {
+      /* noop */
+    }
+  }
+
+  function toggleMenu() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setMenuPos(computeMenuPos(triggerRef.current));
+    void refreshPetsFromApi();
+    setOpen(true);
+  }
+
   const switchMenu = (
     <div
       ref={menuRef}
-      className="fixed z-[2100] w-[min(300px,calc(100vw-2rem))] rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-[0_22px_40px_-28px_rgba(15,23,42,0.45)]"
-      style={menuPos ? { top: menuPos.top, right: menuPos.right } : undefined}
+      className="fixed z-[9999] w-[min(300px,calc(100vw-2rem))] rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-[0_22px_40px_-28px_rgba(15,23,42,0.45)]"
+      style={{ top: menuPos.top, right: menuPos.right }}
     >
       <p className="px-1 pb-2 text-[11px] font-medium text-zinc-500">Trocar pet</p>
       <ul className="space-y-1.5">
@@ -141,7 +189,7 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
                 }`}
               >
                 <span className="relative h-9 w-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-                  <Image src={getPetImageOrDefault(pet.image)} alt={`Foto de ${pet.name}`} fill className="object-cover" sizes="36px" />
+                  <PetAvatarImage src={pet.image} alt={`Foto de ${pet.name}`} className="absolute inset-0 h-full w-full object-cover" />
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-[12px] font-semibold text-zinc-800">{pet.name}</span>
@@ -393,18 +441,34 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
 
   return (
     <div className="relative z-[1900]">
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-label={`Trocar pet · ${selectedPet.name}`}
-        aria-expanded={open}
-        className="relative h-11 w-11 overflow-hidden rounded-full border border-zinc-200 bg-white shadow-sm transition hover:border-emerald-300"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Image src={getPetImageOrDefault(selectedPet.image)} alt={`Foto de ${selectedPet.name}`} fill className="object-cover" sizes="44px" unoptimized />
-      </button>
+      {!mounted ? (
+        <div className={PET_SWITCHER_TRIGGER_CLASS} aria-hidden>
+          <PetAvatarImage
+            src={selectedPet.image}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ) : (
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-label={`Trocar pet · ${selectedPet.name}`}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          className={`${PET_SWITCHER_TRIGGER_CLASS} cursor-pointer transition hover:border-emerald-300 [&_img]:pointer-events-none`}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={toggleMenu}
+        >
+          <PetAvatarImage
+            src={selectedPet.image}
+            alt={`Foto de ${selectedPet.name}`}
+            className="h-full w-full object-cover"
+          />
+        </button>
+      )}
 
-      {open && mounted && menuPos ? createPortal(switchMenu, document.body) : null}
+      {open && mounted ? createPortal(switchMenu, document.body) : null}
 
       {showPlanModal && mounted
         ? createPortal(
@@ -580,7 +644,7 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
                       <article key={pet.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                            <Image src={getPetImageOrDefault(pet.image)} alt={`Foto de ${pet.name}`} fill className="object-cover" sizes="40px" />
+                            <PetAvatarImage src={pet.image} alt={`Foto de ${pet.name}`} className="absolute inset-0 h-full w-full object-cover" />
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[13px] font-semibold text-zinc-800">{pet.name}</p>
@@ -653,3 +717,5 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
     </div>
   );
 }
+
+export default ProfilePetSwitcher;

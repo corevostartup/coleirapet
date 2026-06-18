@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AdminSidebar } from "@/components/admin-sidebar";
-import { TopBar } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 
 type AdminLog = {
   id: string;

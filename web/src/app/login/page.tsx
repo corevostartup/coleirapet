@@ -1,13 +1,3 @@
-import type { Metadata } from "next";
+"use client";
 
-import { LoginScreenLoader } from "./login-screen-loader";
-
-export const dynamic = "force-dynamic";
-
-export const metadata: Metadata = {
-  title: "Entrar · Lyka",
-};
-
-export default function LoginPage() {
-  return <LoginScreenLoader />;
-}
+export { default } from "@/components/login/login-screen";

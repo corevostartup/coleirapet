@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 import { NFCPairLink } from "@/components/nfc-pair-link";
 import { HomeLocationSecurityCard } from "@/components/home-location-security-card";
 import { HomeWeightChartSection } from "@/components/home-weight-chart-section";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { ProductCarousel } from "@/components/product-carousel";
 import { IconCollar, IconStethoscope, IconVaccineWallet, IconWave } from "@/components/icons";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
@@ -13,7 +14,8 @@ import type { DocumentReference } from "firebase-admin/firestore";
 import { fetchHomeUpcomingEvents } from "@/lib/home/upcoming-events";
 import { fetchWeeklyActivityLast7Days } from "@/lib/home/weekly-activity";
 import { metrics, pet } from "@/lib/mock";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
+import { toTopBarQuickPetSeed } from "@/lib/pets/top-bar-seed";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 function formatPtBrDateTime(iso: string | null | undefined) {
@@ -44,6 +46,7 @@ export default async function Home() {
   let currentUser = null;
   let currentPet = null;
   let petRef: DocumentReference | null = null;
+  let petList = null;
   if (uid) {
     try {
       currentUser = await getOrCreateCurrentUserProfile(uid);
@@ -59,7 +62,13 @@ export default async function Home() {
       currentPet = null;
       petRef = null;
     }
+    try {
+      petList = await listOwnedPets(uid);
+    } catch {
+      petList = null;
+    }
   }
+  const quickPetSeed = toTopBarQuickPetSeed(petList);
   const nfcIdTrimmed = (currentPet?.nfcId ?? "").trim();
   const nfcPairedCookie = jar.get(NFC_PAIRED_COOKIE)?.value === "1";
   const isNfcPaired = Boolean(nfcIdTrimmed) || nfcPairedCookie;
@@ -103,7 +112,7 @@ export default async function Home() {
 
   return (
     <AppShell tab="home">
-      <TopBar title="Monitoramento" subtitle="Lyka">
+      <TopBar title="Monitoramento" subtitle="Lyka" quickPetSeed={quickPetSeed}>
         {isVet ? (
           <Link
             href="/vet/pets"

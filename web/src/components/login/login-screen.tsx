@@ -503,7 +503,7 @@ function LoginAuthFormSection({
   );
 }
 
-export function LoginScreen({ variant = "login" }: { variant?: "login" | "signup" }) {
+export default function LoginScreen({ variant = "login" }: { variant?: "login" | "signup" }) {
   const isSignup = variant === "signup";
   const router = useRouter();
   const [authBusy, setAuthBusy] = useState<LoginAuthBusy | null>(null);

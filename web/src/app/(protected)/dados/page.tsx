@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { MedicationRemindersPanel } from "@/components/medication-reminders-panel";
 import { DadosVeterinaryClinicsMap } from "@/components/dados-veterinary-clinics-map";
 import { VaccinesPanel } from "@/components/vaccines-panel";
@@ -11,6 +12,7 @@ import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import { getOrCreateCurrentPet } from "@/lib/pets/current";
 import { getPetImageOrDefault } from "@/lib/pets/image";
+import { loadTopBarQuickPetSeed } from "@/lib/pets/load-top-bar-quick-pet-seed";
 
 export default async function DadosPage() {
   const jar = await cookies();
@@ -55,10 +57,12 @@ export default async function DadosPage() {
     return true;
   });
 
+  const quickPetSeed = uid ? await loadTopBarQuickPetSeed(uid) : undefined;
+
   return (
     <AppShell tab="dados">
       <div className="dados-page-topbar">
-        <TopBar title="Registros medicos" subtitle="Historico clinico" />
+        <TopBar title="Registros medicos" subtitle="Historico clinico" quickPetSeed={quickPetSeed} />
       </div>
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>

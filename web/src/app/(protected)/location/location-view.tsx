@@ -4,7 +4,9 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { LocationLeafletMap } from "@/components/location-leaflet-map";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
+import type { TopBarQuickPetSeed } from "@/lib/pets/top-bar-seed";
 import { IconCollar, IconMessages, IconPin, IconShield } from "@/components/icons";
 import { location, locationPageDevices } from "@/lib/mock";
 
@@ -65,7 +67,7 @@ function LocationAddressCard({ point }: { point: CurrentPetLocation }) {
 
 const DESKTOP_LAYOUT_MQ = "(min-width: 768px)";
 
-export function LocationView() {
+export function LocationView({ quickPetSeed }: { quickPetSeed?: TopBarQuickPetSeed }) {
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isDesktopLayout, setIsDesktopLayout] = useState(false);
@@ -317,7 +319,7 @@ export function LocationView() {
     <AppShell tab="location">
       {!mapFullscreen ? (
         <>
-          <TopBar title="Localizacao" subtitle="Rastreamento inteligente" />
+          <TopBar title="Localizacao" subtitle="Rastreamento inteligente" quickPetSeed={quickPetSeed} />
 
           <div
             data-lyka-shell-span="full"

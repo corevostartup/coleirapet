@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminSidebar } from "@/components/admin-sidebar";
-import { TopBar } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 
 type PetNfcStatus = "pareado" | "nao_pareado";
 

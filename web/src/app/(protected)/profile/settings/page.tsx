@@ -1,9 +1,14 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { DeleteAccountButton } from "@/components/delete-account-button";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { IconBell, IconChevronLeft, IconNotificationSettings } from "@/components/icons";
+import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
+import { parseAuthUserUidCookie } from "@/lib/auth/session";
+import { loadTopBarQuickPetSeed } from "@/lib/pets/load-top-bar-quick-pet-seed";
 
 export const metadata: Metadata = {
   title: "Configuracoes · Lyka",
@@ -37,12 +42,17 @@ function SettingsRow({
   );
 }
 
-export default function ProfileSettingsPage() {
+export default async function ProfileSettingsPage() {
+  const jar = await cookies();
+  const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
+  const quickPetSeed = await loadTopBarQuickPetSeed(uid);
+
   return (
     <AppShell tab="profile">
       <TopBar
         title="Configuracoes"
         subtitle="Conta"
+        quickPetSeed={quickPetSeed}
         leadingAction={
           <Link
             href="/profile"

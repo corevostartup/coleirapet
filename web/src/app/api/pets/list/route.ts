@@ -35,12 +35,26 @@ async function requireAuthContext() {
   return { uid };
 }
 
+function serializePetsListResponse(data: Awaited<ReturnType<typeof listOwnedPets>>, extra?: Record<string, unknown>) {
+  return {
+    ...extra,
+    currentPetId: data.currentPetId,
+    pets: data.pets.map((pet) => ({
+      id: pet.id,
+      name: pet.name,
+      breed: pet.breed,
+      image: pet.image,
+      canDeletePet: pet.canDeletePet,
+    })),
+  };
+}
+
 export async function GET() {
   const auth = await requireAuthContext();
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
 
   const data = await listOwnedPets(auth.uid);
-  return NextResponse.json(data);
+  return NextResponse.json(serializePetsListResponse(data));
 }
 
 export async function PATCH(request: Request) {
@@ -61,7 +75,7 @@ export async function PATCH(request: Request) {
   if (!pet) return NextResponse.json({ error: "Pet nao encontrado" }, { status: 404 });
 
   const data = await listOwnedPets(auth.uid);
-  return NextResponse.json({ ok: true, ...data });
+  return NextResponse.json(serializePetsListResponse(data, { ok: true }));
 }
 
 export async function POST() {
@@ -81,7 +95,7 @@ export async function POST() {
 
   await createOwnedPet(auth.uid);
   const data = await listOwnedPets(auth.uid);
-  return NextResponse.json({ ok: true, ...data }, { status: 201 });
+  return NextResponse.json(serializePetsListResponse(data, { ok: true }), { status: 201 });
 }
 
 export async function DELETE(request: Request) {
@@ -119,5 +133,5 @@ export async function DELETE(request: Request) {
   }
 
   const data = await listOwnedPets(auth.uid);
-  return NextResponse.json({ ok: true, ...data });
+  return NextResponse.json(serializePetsListResponse(data, { ok: true }));
 }

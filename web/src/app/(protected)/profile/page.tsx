@@ -2,14 +2,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { ProfilePetDetailsEditor } from "@/components/profile-pet-details-editor";
+import { ProfilePetSwitcherStrip } from "@/components/profile-pet-switcher-strip";
 import PetTutorsManager from "@/components/pet-tutors-manager";
 import { ProfileUserDetailsEditor } from "@/components/profile-user-details-editor";
 import { SignOutButton } from "@/components/sign-out-button";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 import { IconShield } from "@/components/icons";
 import { AUTH_USER_NAME_COOKIE, AUTH_USER_PHOTO_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserNameCookie, parseAuthUserPhotoCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
+import { loadTopBarQuickPetSeed } from "@/lib/pets/load-top-bar-quick-pet-seed";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
 import { absolutePublicUrl } from "@/lib/site/public-url";
@@ -120,9 +123,14 @@ export default async function ProfilePage({
 
   const sharePublicUrl = currentPet ? await absolutePublicUrl(currentPet.publicPagePath) : null;
 
+  const quickPetSeed = uid ? await loadTopBarQuickPetSeed(uid) : undefined;
+  const userPlan = currentUser?.plan === "pro" ? "pro" : "free";
+
   return (
     <AppShell tab="profile">
-      <TopBar title="Perfil do pet" subtitle="Perfil" />
+      <TopBar title="Perfil do pet" subtitle="Perfil" quickPetSeed={quickPetSeed} />
+
+      <ProfilePetSwitcherStrip seed={quickPetSeed} userPlan={userPlan} />
 
       <ProfilePetDetailsEditor
         key={currentPet?.id ?? `pet-${petData.petIdentity}`}

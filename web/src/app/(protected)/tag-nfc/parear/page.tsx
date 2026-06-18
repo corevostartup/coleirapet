@@ -4,7 +4,8 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { IconChevronLeft, IconCollar, IconShield } from "@/components/icons";
-import { AppShell, TopBar } from "@/components/shell";
+import { AppShell } from "@/components/shell";
+import TopBar from "@/components/top-bar";
 
 type NativeWindow = Window & {
   __LYKA_IOS_APP__?: boolean;

@@ -7,7 +7,7 @@ import {
   SUBCOLLECTION_VACCINES_LEGACY,
 } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { ensurePrimaryMemberRecord, getPetAccessById, listSecondaryPetIdsForUser, type PetAccessRole } from "@/lib/pets/access";
+import { ensurePrimaryMemberRecord, getPetAccessById, listAccessiblePetIdsForUser, type PetAccessRole } from "@/lib/pets/access";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 import { isLegacyUiDemoPetName } from "@/lib/pets/legacy-ui-demo-pets";
 
@@ -418,6 +418,29 @@ async function finalizePetProfile(petRef: DocumentReference, petId: string, raw:
   return { petRef, pet: toPetProfile(petId, withIdentity) };
 }
 
+async function loadPetProfileForUser(uid: string, petId: string): Promise<PetProfile | null> {
+  if (isDemoPetId(petId)) return null;
+
+  const access = await getPetAccessById(uid, petId);
+  if (!access) return null;
+
+  const data = access.petData as PetDoc;
+  if (isDemoPetDocContent(data, petId)) return null;
+
+  if (access.access.role === "primary" && parseString(data.ownerId) !== uid) {
+    await access.petRef.set({ ownerId: uid, updatedAt: new Date().toISOString() }, { merge: true });
+  }
+
+  if (access.access.role === "primary") {
+    await ensurePrimaryMemberRecord(petId, uid);
+  }
+
+  const withToken = await ensureFinderShareToken(access.petRef, data);
+  const normalized = await ensurePublicPageSlug(access.petRef, withToken);
+  const withIdentity = await ensurePetIdentity(access.petRef, normalized);
+  return withAccess(toPetProfile(petId, withIdentity), access.access);
+}
+
 export async function getOrCreateCurrentPet(uid: string) {
   const cached = readCachedCurrentPet(uid);
   if (cached) {
@@ -440,44 +463,20 @@ export async function getOrCreateCurrentPet(uid: string) {
   const rawDefaultId = typeof userData.defaultPetId === "string" ? userData.defaultPetId.trim() : "";
   const candidatePetId = rawDefaultId && isDemoPetId(rawDefaultId) ? "" : rawDefaultId;
   if (candidatePetId) {
-    const access = await getPetAccessById(uid, candidatePetId);
-    if (access) {
-      const result = await finalizePetProfile(access.petRef, candidatePetId, access.petData as PetDoc);
-      const pet = withAccess(result.pet, access.access);
+    const pet = await loadPetProfileForUser(uid, candidatePetId);
+    if (pet) {
       writeCachedCurrentPet(uid, pet);
-      return { petRef: result.petRef, pet };
+      return { petRef: db.collection(COLLECTION_PETS).doc(candidatePetId), pet };
     }
   }
 
-  const [owned, secondaryPetIds] = await Promise.all([
-    petsRoot.where("ownerId", "==", uid).get(),
-    listSecondaryPetIdsForUser(uid),
-  ]);
-
-  const ownedDocs = owned.docs.filter((doc) => !isDemoPetDocContent(doc.data() as PetDoc, doc.id));
-  if (ownedDocs.length > 0) {
-    const doc = ownedDocs[0];
-    await ensurePrimaryMemberRecord(doc.id, uid);
-    await userRef.set({ defaultPetId: doc.id }, { merge: true });
-    const result = await finalizePetProfile(doc.ref, doc.id, doc.data() as PetDoc);
-    const pet = withAccess(result.pet, {
-      role: "primary",
-      canEditBasicData: true,
-      canDeletePet: true,
-      canPairNfc: true,
-    });
-    writeCachedCurrentPet(uid, pet);
-    return { petRef: result.petRef, pet };
-  }
-
-  for (const petId of secondaryPetIds) {
-    const access = await getPetAccessById(uid, petId);
-    if (!access) continue;
-    const result = await finalizePetProfile(access.petRef, petId, access.petData as PetDoc);
-    const pet = withAccess(result.pet, access.access);
+  const accessiblePetIds = await listAccessiblePetIdsForUser(uid);
+  for (const petId of accessiblePetIds) {
+    const pet = await loadPetProfileForUser(uid, petId);
+    if (!pet) continue;
     await userRef.set({ defaultPetId: petId }, { merge: true });
     writeCachedCurrentPet(uid, pet);
-    return { petRef: result.petRef, pet };
+    return { petRef: db.collection(COLLECTION_PETS).doc(petId), pet };
   }
 
   const created = await petsRoot.add(defaultPetDoc(uid));
@@ -503,44 +502,16 @@ export async function listOwnedPets(uid: string) {
   const userSnap = await userRef.get();
   const userData = (userSnap.data() ?? {}) as UserDoc;
 
-  const [owned, secondaryPetIds] = await Promise.all([
-    db.collection(COLLECTION_PETS).where("ownerId", "==", uid).get(),
-    listSecondaryPetIdsForUser(uid),
-  ]);
+  const petIds = await listAccessiblePetIdsForUser(uid);
+  const pets: PetProfile[] = [];
 
-  const petsMap = new Map<string, PetProfile>();
-
-  for (const doc of owned.docs) {
-    const data = doc.data() as PetDoc;
-    if (isDemoPetDocContent(data, doc.id)) continue;
-    await ensurePrimaryMemberRecord(doc.id, uid);
-    const withToken = await ensureFinderShareToken(doc.ref, data);
-    const normalized = await ensurePublicPageSlug(doc.ref, withToken);
-    const withIdentity = await ensurePetIdentity(doc.ref, normalized);
-    petsMap.set(
-      doc.id,
-      withAccess(toPetProfile(doc.id, withIdentity), {
-        role: "primary",
-        canEditBasicData: true,
-        canDeletePet: true,
-        canPairNfc: true,
-      }),
-    );
+  for (const petId of petIds) {
+    const pet = await loadPetProfileForUser(uid, petId);
+    if (pet) pets.push(pet);
   }
 
-  for (const petId of secondaryPetIds) {
-    if (petsMap.has(petId)) continue;
-    const access = await getPetAccessById(uid, petId);
-    if (!access) continue;
-    const data = access.petData as PetDoc;
-    if (isDemoPetDocContent(data, petId)) continue;
-    const withToken = await ensureFinderShareToken(access.petRef, data);
-    const normalized = await ensurePublicPageSlug(access.petRef, withToken);
-    const withIdentity = await ensurePetIdentity(access.petRef, normalized);
-    petsMap.set(petId, withAccess(toPetProfile(petId, withIdentity), access.access));
-  }
+  pets.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
 
-  const pets = Array.from(petsMap.values());
   if (pets.length === 0) {
     const created = await getOrCreateCurrentPet(uid);
     return {
