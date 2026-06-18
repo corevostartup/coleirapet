@@ -101,13 +101,18 @@ export async function listSecondaryPetIdsFromAcceptedInvites(uid: string): Promi
   const petIds = new Set<string>();
 
   for (const userDocId of userDocIds) {
-    const snapshot = await db
-      .collection(COLLECTION_USER)
-      .doc(userDocId)
-      .collection(SUBCOLLECTION_USER_NOTIFICATIONS)
-      .orderBy("createdAt", "desc")
-      .limit(120)
-      .get();
+    let snapshot: FirebaseFirestore.QuerySnapshot;
+    try {
+      snapshot = await db
+        .collection(COLLECTION_USER)
+        .doc(userDocId)
+        .collection(SUBCOLLECTION_USER_NOTIFICATIONS)
+        .orderBy("createdAt", "desc")
+        .limit(120)
+        .get();
+    } catch {
+      continue;
+    }
 
     for (const doc of snapshot.docs) {
       const data = doc.data() ?? {};

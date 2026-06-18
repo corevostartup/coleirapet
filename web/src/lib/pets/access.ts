@@ -276,7 +276,7 @@ export async function listAccessiblePetIdsForUser(uid: string) {
       safeMemberPetIds(() => listPrimaryPetIdsForUser(normalizedUid)),
       safeMemberPetIds(() => listSecondaryPetIdsForUser(normalizedUid)),
       safeMemberPetIds(() => listActiveMemberPetIdsForUser(normalizedUid)),
-      listSecondaryPetIdsForUserWithFallbacks(normalizedUid),
+      safeMemberPetIds(() => listSecondaryPetIdsForUserWithFallbacks(normalizedUid)),
     ]);
 
   const petIds = new Set<string>();

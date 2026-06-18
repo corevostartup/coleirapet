@@ -44,6 +44,32 @@ const NFC_PAIRED_COOKIE = "cp_nfc_paired";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  try {
+    return await HomePageContent();
+  } catch (error) {
+    console.error("[lyka] home render failed", error);
+    return (
+      <AppShell tab="home">
+        <TopBar title="Monitoramento" subtitle="Lyka" />
+        <section
+          data-lyka-shell-span="full"
+          className="appear-up mt-3 rounded-[26px] border border-amber-200 bg-amber-50 p-4 text-center"
+        >
+          <p className="text-[14px] font-semibold text-amber-950">Nao foi possivel carregar a Home agora</p>
+          <p className="mt-2 text-[12px] text-amber-900/90">Atualize a pagina. Se continuar, tente sair e entrar de novo.</p>
+          <Link
+            href="/home"
+            className="mt-4 inline-flex rounded-2xl bg-emerald-600 px-4 py-2.5 text-[13px] font-semibold text-white"
+          >
+            Tentar novamente
+          </Link>
+        </section>
+      </AppShell>
+    );
+  }
+}
+
+async function HomePageContent() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
   let currentUser: UserProfile | null = null;
@@ -58,7 +84,7 @@ export default async function Home() {
       currentUser = null;
     }
     try {
-      petList = await listOwnedPets(uid);
+      petList = await listOwnedPets(uid, { readOnly: true });
       const currentPetId = petList.currentPetId;
       const selected = petList.pets.find((item) => item.id === currentPetId) ?? petList.pets[0] ?? null;
       currentPet = selected;

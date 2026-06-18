@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /** Evita empacotar firebase-admin no lambda da Netlify (quebra runtime com protos/binarios). */
+  serverExternalPackages: ["firebase-admin", "@google-cloud/firestore"],
   async headers() {
     return [
       {

@@ -420,7 +420,11 @@ async function finalizePetProfile(petRef: DocumentReference, petId: string, raw:
   return { petRef, pet: toPetProfile(petId, withIdentity) };
 }
 
-async function loadPetProfileForUser(uid: string, petId: string): Promise<PetProfile | null> {
+async function loadPetProfileForUser(
+  uid: string,
+  petId: string,
+  options?: { ensureMetadata?: boolean },
+): Promise<PetProfile | null> {
   if (isDemoPetId(petId)) return null;
 
   const access = await getPetAccessById(uid, petId);
@@ -435,6 +439,10 @@ async function loadPetProfileForUser(uid: string, petId: string): Promise<PetPro
 
   if (access.access.role === "primary") {
     await ensurePrimaryMemberRecord(petId, uid);
+  }
+
+  if (options?.ensureMetadata === false) {
+    return withAccess(toPetProfile(petId, data), access.access);
   }
 
   const withToken = await ensureFinderShareToken(access.petRef, data);
@@ -556,9 +564,12 @@ export async function getOrCreateCurrentPet(uid: string) {
   return { petRef: result.petRef, pet };
 }
 
-export async function listOwnedPets(uid: string) {
+export async function listOwnedPets(uid: string, options?: { readOnly?: boolean }) {
   const db = getFirebaseAdminDb();
-  await migrateLegacyPetsSubcollection(db, uid);
+  const readOnly = options?.readOnly === true;
+  if (!readOnly) {
+    await migrateLegacyPetsSubcollection(db, uid);
+  }
 
   const userRef = db.collection(COLLECTION_USER).doc(uid);
   const userSnap = await userRef.get();
@@ -568,13 +579,16 @@ export async function listOwnedPets(uid: string) {
   const pets: PetProfile[] = [];
 
   for (const petId of petIds) {
-    const pet = await loadPetProfileForUser(uid, petId);
+    const pet = await loadPetProfileForUser(uid, petId, { ensureMetadata: !readOnly });
     if (pet) pets.push(pet);
   }
 
   pets.sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
 
   if (pets.length === 0) {
+    if (readOnly) {
+      return { currentPetId: "", pets: [] };
+    }
     const created = await getOrCreateCurrentPet(uid);
     return {
       currentPetId: created.pet.id,
@@ -585,16 +599,18 @@ export async function listOwnedPets(uid: string) {
   const defaultPetId = typeof userData.defaultPetId === "string" ? userData.defaultPetId.trim() : "";
   const currentPetId = pickCurrentPetId(pets, defaultPetId);
 
-  if (currentPetId && currentPetId !== defaultPetId) {
+  if (!readOnly && currentPetId && currentPetId !== defaultPetId) {
     await userRef.set({ defaultPetId: currentPetId }, { merge: true });
   }
 
-  const secondaryIds = pets.filter((item) => item.accessRole === "secondary").map((item) => item.id);
-  if (secondaryIds.length > 0) {
-    try {
-      await userRef.set({ secondaryPetIds: FieldValue.arrayUnion(...secondaryIds) }, { merge: true });
-    } catch {
-      // Nao bloqueia listagem se o campo legado tiver tipo invalido ou Firestore estiver indisponivel.
+  if (!readOnly) {
+    const secondaryIds = pets.filter((item) => item.accessRole === "secondary").map((item) => item.id);
+    if (secondaryIds.length > 0) {
+      try {
+        await userRef.set({ secondaryPetIds: FieldValue.arrayUnion(...secondaryIds) }, { merge: true });
+      } catch {
+        // Nao bloqueia listagem se o campo legado tiver tipo invalido ou Firestore estiver indisponivel.
+      }
     }
   }
 
