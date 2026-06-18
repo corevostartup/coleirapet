@@ -114,7 +114,8 @@ export default async function Home() {
 
   const maxActivity = Math.max(...weeklyActivityData.map((item) => item.activeMinutes), 1);
   const avgActivity = Math.round(
-    weeklyActivityData.reduce((total, item) => total + item.activeMinutes, 0) / weeklyActivityData.length,
+    weeklyActivityData.reduce((total, item) => total + item.activeMinutes, 0) /
+      Math.max(weeklyActivityData.length, 1),
   );
 
   return (
