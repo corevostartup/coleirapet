@@ -730,5 +730,3 @@ export function ProfilePetSwitcher({ currentPet, initialPets, userPlan }: Props)
     </div>
   );
 }
-
-export default ProfilePetSwitcher;

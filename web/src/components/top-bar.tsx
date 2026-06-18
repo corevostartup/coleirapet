@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { PetAvatarImage } from "@/components/pet-avatar-image";
-import ProfilePetSwitcher from "@/components/profile-pet-switcher";
+import { ProfilePetSwitcher } from "@/components/profile-pet-switcher";
 import { TopBarNotificationsLink } from "@/components/top-bar-notifications-link";
 import { DEFAULT_PET_IMAGE, getPetImageOrDefault } from "@/lib/pets/image";
 import type { TopBarQuickPetItem, TopBarQuickPetSeed } from "@/lib/pets/top-bar-seed";
