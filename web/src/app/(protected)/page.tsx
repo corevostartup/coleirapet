@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { NFCPairLink } from "@/components/nfc-pair-link";
 import { HomeLocationSecurityCard } from "@/components/home-location-security-card";
 import { HomeWeightChartSection } from "@/components/home-weight-chart-section";
+import { PetCoverImage } from "@/components/pet-cover-image";
 import { AppShell } from "@/components/shell";
 import TopBar from "@/components/top-bar";
 import { ProductCarousel } from "@/components/product-carousel";
@@ -11,12 +12,14 @@ import { IconCollar, IconStethoscope, IconVaccineWallet, IconWave } from "@/comp
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import type { DocumentReference } from "firebase-admin/firestore";
+import { COLLECTION_PETS } from "@/lib/firebase/collections";
+import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { fetchHomeUpcomingEvents } from "@/lib/home/upcoming-events";
 import { fetchWeeklyActivityLast7Days } from "@/lib/home/weekly-activity";
 import { metrics, pet } from "@/lib/mock";
-import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
+import { listOwnedPets, type PetProfile } from "@/lib/pets/current";
 import { toTopBarQuickPetSeed } from "@/lib/pets/top-bar-seed";
-import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
+import { getOrCreateCurrentUserProfile, type UserProfile } from "@/lib/users/current";
 
 function formatPtBrDateTime(iso: string | null | undefined) {
   if (!iso) return null;
@@ -43,10 +46,10 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
-  let currentUser = null;
-  let currentPet = null;
+  let currentUser: UserProfile | null = null;
+  let currentPet: PetProfile | null = null;
   let petRef: DocumentReference | null = null;
-  let petList = null;
+  let petList: Awaited<ReturnType<typeof listOwnedPets>> | null = null;
   if (uid) {
     try {
       currentUser = await getOrCreateCurrentUserProfile(uid);
@@ -55,16 +58,20 @@ export default async function Home() {
       currentUser = null;
     }
     try {
-      const result = await getOrCreateCurrentPet(uid);
-      currentPet = result.pet;
-      petRef = result.petRef;
+      petList = await listOwnedPets(uid);
+      const currentPetId = petList.currentPetId;
+      const selected = petList.pets.find((item) => item.id === currentPetId) ?? petList.pets[0] ?? null;
+      currentPet = selected;
+      if (selected) {
+        try {
+          petRef = getFirebaseAdminDb().collection(COLLECTION_PETS).doc(selected.id);
+        } catch {
+          petRef = null;
+        }
+      }
     } catch {
       currentPet = null;
       petRef = null;
-    }
-    try {
-      petList = await listOwnedPets(uid);
-    } catch {
       petList = null;
     }
   }
@@ -163,13 +170,11 @@ export default async function Home() {
           style={{ animationDelay: "60ms" }}
         >
           <div className="relative h-[260px]">
-            <Image
+            <PetCoverImage
               src={cardPet.image}
               alt="Pet com coleira inteligente"
-              fill
               priority
-              className="object-cover"
-                    sizes="(max-width: 767px) 100vw, min(50vw, 520px)"
+              className="absolute inset-0 h-full w-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">

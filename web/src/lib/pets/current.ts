@@ -591,7 +591,11 @@ export async function listOwnedPets(uid: string) {
 
   const secondaryIds = pets.filter((item) => item.accessRole === "secondary").map((item) => item.id);
   if (secondaryIds.length > 0) {
-    await userRef.set({ secondaryPetIds: FieldValue.arrayUnion(...secondaryIds) }, { merge: true });
+    try {
+      await userRef.set({ secondaryPetIds: FieldValue.arrayUnion(...secondaryIds) }, { merge: true });
+    } catch {
+      // Nao bloqueia listagem se o campo legado tiver tipo invalido ou Firestore estiver indisponivel.
+    }
   }
 
   return { currentPetId, pets };
