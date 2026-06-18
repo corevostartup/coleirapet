@@ -8,7 +8,9 @@ import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import type { DocumentReference } from "firebase-admin/firestore";
 import { fetchWeeklyActivityLast7Days } from "@/lib/home/weekly-activity";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { listOwnedPets } from "@/lib/pets/current";
+import { COLLECTION_PETS } from "@/lib/firebase/collections";
+import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,21 @@ export default async function HomeAtividadePage() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
   let petRef: DocumentReference | null = null;
+  let currentPetId = "";
+  let currentPetName = "";
   if (uid) {
     try {
-      petRef = (await getOrCreateCurrentPet(uid)).petRef;
+      const owned = await listOwnedPets(uid, { readOnly: true });
+      currentPetId = owned.currentPetId || owned.pets[0]?.id || "";
+      const selected = owned.pets.find((item) => item.id === currentPetId) ?? owned.pets[0] ?? null;
+      if (selected) {
+        currentPetName = selected.name;
+        try {
+          petRef = getFirebaseAdminDb().collection(COLLECTION_PETS).doc(selected.id);
+        } catch {
+          petRef = null;
+        }
+      }
     } catch {
       petRef = null;
     }
@@ -57,7 +71,7 @@ export default async function HomeAtividadePage() {
           Meta sugerida: 60 minutos de movimento por dia.
         </p>
       </section>
-      <HealthActivityMinutesPanel />
+      <HealthActivityMinutesPanel initialPetId={currentPetId} initialPetName={currentPetName} />
     </AppShell>
   );
 }

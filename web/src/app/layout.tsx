@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import { LykaKeyboardProvider } from "@/components/lyka-keyboard-provider";
 import { SplashScreenRoot } from "@/components/splash-screen-root";
 import "./globals.css";
 
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" className={geist.variable}>
       <body className="font-[family-name:var(--font-geist-sans)]">
         <SplashScreenRoot />
+        <LykaKeyboardProvider />
         {children}
       </body>
     </html>

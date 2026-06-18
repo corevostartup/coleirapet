@@ -4,7 +4,7 @@ import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants"
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { SUBCOLLECTION_MEDICATION_REMINDERS } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb, getFirestoreFieldValue } from "@/lib/firebase/admin";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { readPetIdFromRequestUrl, resolvePetContextForUser } from "@/lib/pets/resolve-pet-context";
 
 /** Persistência: `Pets/{petId}/medicationReminders/{docId}` (Firebase Admin SDK; não depende do cliente). */
 
@@ -28,6 +28,7 @@ type CreateMedicationReminderPayload = {
   name?: string;
   dose?: string;
   time?: string;
+  petId?: string;
 };
 
 type UpdateMedicationReminderPayload = CreateMedicationReminderPayload & {
@@ -47,12 +48,12 @@ async function requireAuthContext() {
   return { uid };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireAuthContext();
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
 
   try {
-    const { petRef } = await getOrCreateCurrentPet(auth.uid);
+    const { petRef } = await resolvePetContextForUser(auth.uid, readPetIdFromRequestUrl(request));
     /** Sem `orderBy` no servidor: evita falha por índice ausente e inclui docs legados sem `createdAt`. Ordenação no processo. */
     const snapshot = await petRef.collection(SUBCOLLECTION_MEDICATION_REMINDERS).limit(120).get();
     const sorted = [...snapshot.docs].sort((a, b) =>
@@ -106,7 +107,8 @@ export async function POST(request: Request) {
   if (!/^\d{2}:\d{2}$/.test(time)) return NextResponse.json({ error: "Horario invalido" }, { status: 400 });
 
   try {
-    const { petRef } = await getOrCreateCurrentPet(auth.uid);
+    const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
+    const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
     const ref = await petRef.collection(SUBCOLLECTION_MEDICATION_REMINDERS).add({
       name: name.slice(0, 80),
       dose: dose.slice(0, 80),
@@ -169,7 +171,8 @@ export async function PATCH(request: Request) {
   if (!/^\d{2}:\d{2}$/.test(time)) return NextResponse.json({ error: "Horario invalido" }, { status: 400 });
 
   try {
-    const { petRef } = await getOrCreateCurrentPet(auth.uid);
+    const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
+    const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
     const docRef = petRef.collection(SUBCOLLECTION_MEDICATION_REMINDERS).doc(id);
     const snap = await docRef.get();
     if (!snap.exists) {

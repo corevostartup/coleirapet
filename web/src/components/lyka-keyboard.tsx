@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 type Props = {
@@ -9,6 +9,9 @@ type Props = {
   onSearch?: () => void;
   onClose: () => void;
   placeholder?: string;
+  initialMode?: "alpha" | "num";
+  maskValue?: boolean;
+  multiline?: boolean;
 };
 
 const ROWS_ALPHA = [
@@ -23,9 +26,25 @@ const ROWS_NUM = [
   ["#", "$", "%", "&", "*", "(", ")", "/", "DEL"],
 ];
 
-export function LykaKeyboard({ value, onChange, onSearch, onClose, placeholder }: Props) {
+function displayValue(value: string, maskValue: boolean, multiline: boolean) {
+  if (!value) return "";
+  if (maskValue) return "•".repeat(Math.min(value.length, 24));
+  if (multiline && value.length > 80) return `${value.slice(0, 80)}…`;
+  return value;
+}
+
+export function LykaKeyboard({
+  value,
+  onChange,
+  onSearch,
+  onClose,
+  placeholder,
+  initialMode = "alpha",
+  maskValue = false,
+  multiline = false,
+}: Props) {
   const [caps, setCaps] = useState(false);
-  const [mode, setMode] = useState<"alpha" | "num">("alpha");
+  const [mode, setMode] = useState<"alpha" | "num">(initialMode);
   const [pressedKey, setPressedKey] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -33,6 +52,11 @@ export function LykaKeyboard({ value, onChange, onSearch, onClose, placeholder }
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  useEffect(() => {
+    setMode(initialMode);
+    setCaps(false);
+  }, [initialMode]);
 
   function press(key: string) {
     setPressedKey(key);
@@ -55,27 +79,24 @@ export function LykaKeyboard({ value, onChange, onSearch, onClose, placeholder }
   }
 
   const rows = mode === "alpha" ? ROWS_ALPHA : ROWS_NUM;
+  const preview = displayValue(value, maskValue, multiline);
 
   if (!mounted) return null;
 
   return createPortal(
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-[2100] bg-black/20"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-[2100] bg-black/20" onClick={onClose} />
 
-      {/* Keyboard sheet */}
       <div
         className="fixed bottom-0 left-0 right-0 z-[2200] animate-slide-up rounded-t-[28px] bg-zinc-100 pb-safe px-2 pt-3 shadow-[0_-8px_40px_-8px_rgba(0,0,0,0.18)]"
         style={{ animation: "slideUp 0.28s cubic-bezier(0.32,0.72,0,1) both" }}
       >
-        {/* Input preview bar */}
         <div className="mb-3 flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2 shadow-sm">
           <div className="min-w-0 flex-1">
-            {value ? (
-              <p className="truncate text-[14px] font-medium text-zinc-800">{value}</p>
+            {preview ? (
+              <p className={`truncate text-[14px] font-medium text-zinc-800 ${multiline ? "whitespace-pre-wrap" : ""}`}>
+                {preview}
+              </p>
             ) : (
               <p className="text-[14px] text-zinc-400">{placeholder ?? "Digite..."}</p>
             )}
@@ -92,16 +113,20 @@ export function LykaKeyboard({ value, onChange, onSearch, onClose, placeholder }
               </svg>
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => { onSearch?.(); onClose(); }}
-            className="shrink-0 rounded-xl bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition active:bg-emerald-700"
-          >
-            Buscar
-          </button>
+          {onSearch ? (
+            <button
+              type="button"
+              onClick={() => {
+                onSearch();
+                onClose();
+              }}
+              className="shrink-0 rounded-xl bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition active:bg-emerald-700"
+            >
+              Buscar
+            </button>
+          ) : null}
         </div>
 
-        {/* Key rows */}
         <div className="space-y-1.5">
           {rows.map((row, rowIdx) => (
             <div key={rowIdx} className="flex justify-center gap-1">
@@ -115,9 +140,7 @@ export function LykaKeyboard({ value, onChange, onSearch, onClose, placeholder }
                     onPointerDown={() => press(key)}
                     className={[
                       "flex min-w-0 items-center justify-center rounded-[10px] py-3 text-[14px] font-semibold shadow-[0_2px_0_rgba(0,0,0,0.15)] transition-all select-none",
-                      isSpecial
-                        ? "flex-[1.4] bg-zinc-300 text-zinc-600"
-                        : "flex-1 bg-white text-zinc-800",
+                      isSpecial ? "flex-[1.4] bg-zinc-300 text-zinc-600" : "flex-1 bg-white text-zinc-800",
                       isPressed ? "scale-95 brightness-90 shadow-none" : "",
                     ].join(" ")}
                     style={{ minWidth: isSpecial ? 44 : 28 }}
@@ -148,9 +171,7 @@ export function LykaKeyboard({ value, onChange, onSearch, onClose, placeholder }
             </div>
           ))}
 
-          {/* Bottom row */}
           <div className="flex gap-1">
-            {/* Mode toggle */}
             <button
               type="button"
               onPointerDown={() => setMode((prev) => (prev === "alpha" ? "num" : "alpha"))}
@@ -159,7 +180,6 @@ export function LykaKeyboard({ value, onChange, onSearch, onClose, placeholder }
               {mode === "alpha" ? "123" : "ABC"}
             </button>
 
-            {/* Lyka brand spacebar */}
             <button
               type="button"
               onPointerDown={() => press("SPACE")}
@@ -169,7 +189,6 @@ export function LykaKeyboard({ value, onChange, onSearch, onClose, placeholder }
               <span className="text-[11px] text-zinc-400">espaço</span>
             </button>
 
-            {/* Return / close */}
             <button
               type="button"
               onPointerDown={onClose}
@@ -180,7 +199,6 @@ export function LykaKeyboard({ value, onChange, onSearch, onClose, placeholder }
           </div>
         </div>
 
-        {/* Safe-area bottom padding */}
         <div className="h-2" />
       </div>
 

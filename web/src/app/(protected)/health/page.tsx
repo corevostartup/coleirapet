@@ -8,24 +8,25 @@ import { IconHeart, IconMoon, IconTemp, IconWave } from "@/components/icons";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import { heartTrend, metrics, pet } from "@/lib/mock";
-import { getOrCreateCurrentPet, type PetProfile } from "@/lib/pets/current";
+import { listOwnedPets } from "@/lib/pets/current";
 import { loadTopBarQuickPetSeed } from "@/lib/pets/load-top-bar-quick-pet-seed";
 
 export default async function HealthPage() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
-  let currentPet: PetProfile | null = null;
+  let currentPetId = "";
+  let currentPetName = pet.name;
   if (uid) {
     try {
-      currentPet = (await getOrCreateCurrentPet(uid)).pet;
+      const owned = await listOwnedPets(uid, { readOnly: true });
+      currentPetId = owned.currentPetId || owned.pets[0]?.id || "";
+      const selected = owned.pets.find((item) => item.id === currentPetId) ?? owned.pets[0] ?? null;
+      if (selected?.name?.trim()) currentPetName = selected.name.trim();
     } catch {
-      currentPet = null;
+      currentPetId = "";
     }
   }
-  const petName =
-    typeof currentPet?.name === "string" && currentPet.name.trim().length > 0
-      ? currentPet.name.trim()
-      : pet.name;
+  const petName = currentPetName;
 
   const maxBpm = Math.max(...heartTrend.map((item) => item.bpm));
   const avgBpm = Math.round(heartTrend.reduce((sum, item) => sum + item.bpm, 0) / heartTrend.length);
@@ -131,9 +132,9 @@ export default async function HealthPage() {
         </div>
       </section>
 
-      <HealthActivityMinutesPanel />
+      <HealthActivityMinutesPanel initialPetId={currentPetId} initialPetName={currentPetName} />
 
-      <HealthWeightPanel />
+      <HealthWeightPanel initialPetId={currentPetId} initialPetName={currentPetName} />
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "200ms" }}>
         <h3 className="mb-3 text-[14px] font-semibold text-zinc-900">Resumo clinico</h3>

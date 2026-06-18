@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { IconPill } from "@/components/icons";
+import { petMetricsQuery, useSelectedPet } from "@/lib/pets/use-selected-pet";
 
 type ReminderItem = {
   id: string;
@@ -12,7 +13,17 @@ type ReminderItem = {
   timeLabel: string;
 };
 
-export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animationDelay?: string }) {
+export function MedicationRemindersPanel({
+  animationDelay = "220ms",
+  initialPetId,
+  initialPetName,
+}: {
+  animationDelay?: string;
+  initialPetId?: string;
+  initialPetName?: string;
+}) {
+  const { petId, petName } = useSelectedPet({ petId: initialPetId, petName: initialPetName });
+  const displayPetName = petName || initialPetName || "";
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,13 +42,18 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
   }, []);
 
   useEffect(() => {
+    if (!petId) {
+      setReminders([]);
+      setLoading(false);
+      return;
+    }
     let active = true;
 
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/pets/medication-reminders");
+        const res = await fetch(`/api/pets/medication-reminders${petMetricsQuery(petId)}`);
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(payload?.error ?? "Falha ao carregar lembretes.");
@@ -55,7 +71,7 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
     return () => {
       active = false;
     };
-  }, []);
+  }, [petId]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -104,6 +120,10 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!petId) {
+      setModalError("Selecione um pet para cadastrar lembretes.");
+      return;
+    }
     setSaving(true);
     setModalError(null);
     try {
@@ -111,7 +131,9 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
       const res = await fetch("/api/pets/medication-reminders", {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isEdit ? { id: editingId, name, dose, time } : { name, dose, time }),
+        body: JSON.stringify(
+          isEdit ? { id: editingId, name, dose, time, petId } : { name, dose, time, petId },
+        ),
       });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -136,7 +158,12 @@ export function MedicationRemindersPanel({ animationDelay = "220ms" }: { animati
   return (
     <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay }}>
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="min-w-0 text-[14px] font-semibold leading-snug text-zinc-900">Lembrete de medicacao</h3>
+        <div className="min-w-0">
+          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Lembrete de medicacao</h3>
+          {displayPetName ? (
+            <p className="mt-0.5 truncate text-[11px] text-zinc-500">Pet: {displayPetName}</p>
+          ) : null}
+        </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"

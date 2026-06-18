@@ -3,11 +3,17 @@ import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { SUBCOLLECTION_WEIGHT_ENTRIES } from "@/lib/firebase/collections";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import {
+  normalizeWeightKg,
+  todayIsoDateInSaoPaulo,
+  upsertPetWeightEntry,
+} from "@/lib/pets/weight-entries";
+import { readPetIdFromRequestUrl, resolvePetContextForUser } from "@/lib/pets/resolve-pet-context";
 
 type CreatePayload = {
   date?: string;
   weightKg?: number;
+  petId?: string;
 };
 
 async function requireAuthContext() {
@@ -24,26 +30,33 @@ function formatPtBrDate(isoDate: string) {
   return `${day}/${month}/${year}`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireAuthContext();
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
 
-  const { petRef } = await getOrCreateCurrentPet(auth.uid);
-  const snapshot = await petRef.collection(SUBCOLLECTION_WEIGHT_ENTRIES).orderBy("date", "desc").limit(30).get();
+  try {
+    const { petRef } = await resolvePetContextForUser(auth.uid, readPetIdFromRequestUrl(request));
+    const snapshot = await petRef.collection(SUBCOLLECTION_WEIGHT_ENTRIES).orderBy("date", "desc").limit(30).get();
 
-  const entries = snapshot.docs.map((doc) => {
-    const data = doc.data() as { date?: string; weightKg?: number };
-    const date = typeof data.date === "string" ? data.date : "";
-    const weightKg = typeof data.weightKg === "number" && Number.isFinite(data.weightKg) ? data.weightKg : 0;
-    return {
-      id: doc.id,
-      date,
-      dateLabel: formatPtBrDate(date),
-      weightKg,
-    };
-  });
+    const entries = snapshot.docs.map((doc) => {
+      const data = doc.data() as { date?: string; weightKg?: number };
+      const date = typeof data.date === "string" ? data.date : "";
+      const weightKg = typeof data.weightKg === "number" && Number.isFinite(data.weightKg) ? data.weightKg : 0;
+      return {
+        id: doc.id,
+        date,
+        dateLabel: formatPtBrDate(date),
+        weightKg,
+      };
+    });
 
-  return NextResponse.json({ entries });
+    return NextResponse.json({ entries });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Falha ao carregar peso." },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -66,35 +79,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Peso invalido (use kg entre 0 e 500)" }, { status: 400 });
   }
 
-  const { petRef } = await getOrCreateCurrentPet(auth.uid);
-  const nowIso = new Date().toISOString();
-  const docId = date;
-  const snap = await petRef.collection(SUBCOLLECTION_WEIGHT_ENTRIES).doc(docId).get();
-  const createdAt =
-    snap.exists && typeof (snap.data() as { createdAt?: string })?.createdAt === "string"
-      ? (snap.data() as { createdAt: string }).createdAt
-      : nowIso;
+  try {
+    const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
+    const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
+    await upsertPetWeightEntry(petRef, date, weightKg);
+    const normalized = normalizeWeightKg(weightKg);
 
-  await petRef.collection(SUBCOLLECTION_WEIGHT_ENTRIES).doc(docId).set(
-    {
-      date,
-      weightKg: Math.round(weightKg * 1000) / 1000,
-      updatedAt: nowIso,
-      createdAt,
-    },
-    { merge: true },
-  );
-
-  return NextResponse.json(
-    {
-      ok: true,
-      entry: {
-        id: docId,
-        date,
-        dateLabel: formatPtBrDate(date),
-        weightKg: Math.round(weightKg * 1000) / 1000,
+    return NextResponse.json(
+      {
+        ok: true,
+        entry: {
+          id: date,
+          date,
+          dateLabel: formatPtBrDate(date),
+          weightKg: normalized,
+        },
       },
-    },
-    { status: 201 },
-  );
+      { status: 201 },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Falha ao salvar peso." },
+      { status: 500 },
+    );
+  }
 }

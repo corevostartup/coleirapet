@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HealthWeightSevenDayChart } from "@/components/health-weight-seven-day-chart";
 import { LykaDateCalendarPicker } from "@/components/lyka-date-calendar-picker";
+import { petMetricsQuery, useSelectedPet } from "@/lib/pets/use-selected-pet";
+import { WEIGHT_ENTRIES_UPDATED_EVENT } from "@/lib/pets/weight-entries";
 
 type Entry = {
   id: string;
@@ -33,7 +35,15 @@ function formatKgKg(value: number) {
   return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg`;
 }
 
-export function HealthWeightPanel() {
+export function HealthWeightPanel({
+  initialPetId,
+  initialPetName,
+}: {
+  initialPetId?: string;
+  initialPetName?: string;
+} = {}) {
+  const { petId, petName } = useSelectedPet({ petId: initialPetId, petName: initialPetName });
+  const displayPetName = petName || initialPetName || "";
   const maxDateIso = todayIso();
   const minDateIso = useMemo(() => minWeightDateIso(), []);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -46,6 +56,7 @@ export function HealthWeightPanel() {
   const [date, setDate] = useState(todayIso());
   const [weightKg, setWeightKg] = useState<string>("5,0");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const savingRef = useRef(saving);
   useEffect(() => {
     savingRef.current = saving;
@@ -58,13 +69,26 @@ export function HealthWeightPanel() {
   }, []);
 
   useEffect(() => {
+    function onWeightEntriesUpdated() {
+      setReloadToken((value) => value + 1);
+    }
+    window.addEventListener(WEIGHT_ENTRIES_UPDATED_EVENT, onWeightEntriesUpdated);
+    return () => window.removeEventListener(WEIGHT_ENTRIES_UPDATED_EVENT, onWeightEntriesUpdated);
+  }, []);
+
+  useEffect(() => {
+    if (!petId) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
 
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/pets/weight-entries");
+        const res = await fetch(`/api/pets/weight-entries${petMetricsQuery(petId)}`);
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(payload?.error ?? "Falha ao carregar registros de peso.");
@@ -82,7 +106,7 @@ export function HealthWeightPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [petId, reloadToken]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -146,7 +170,7 @@ export function HealthWeightPanel() {
       const res = await fetch("/api/pets/weight-entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, weightKg: parsed }),
+        body: JSON.stringify({ date, weightKg: parsed, petId }),
       });
       const payload = (await res.json().catch(() => null)) as { error?: string; entry?: Entry } | null;
       if (!res.ok) throw new Error(payload?.error ?? "Falha ao salvar peso.");
@@ -173,9 +197,15 @@ export function HealthWeightPanel() {
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Peso</h3>
+          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">
+            Peso{displayPetName ? ` · ${displayPetName}` : ""}
+          </h3>
           <p className="mt-0.5 text-[12px] text-zinc-500">
-            {latestWeight != null ? `Ultimo: ${formatKgKg(latestWeight)}` : "Registre o peso do pet por data."}
+            {latestWeight != null
+              ? `Ultimo: ${formatKgKg(latestWeight)}`
+              : displayPetName
+                ? `Registre o peso de ${displayPetName} por data.`
+                : "Registre o peso do pet por data."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">

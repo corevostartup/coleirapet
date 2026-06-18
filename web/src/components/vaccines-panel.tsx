@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { VaccineDetailsModal } from "@/components/vaccine-details-modal";
 import { IconCalendar, IconVaccineWallet } from "@/components/icons";
+import { petMetricsQuery, useSelectedPet } from "@/lib/pets/use-selected-pet";
 import type { VaccineItem, VaccineStatus } from "@/lib/vaccines/vaccine-item";
 
 type VaccinesResponse = {
@@ -19,7 +20,17 @@ type UpdateVaccineStatusResponse = {
   vaccine: VaccineItem;
 };
 
-export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: string }) {
+export function VaccinesPanel({
+  animationDelay = "80ms",
+  initialPetId,
+  initialPetName,
+}: {
+  animationDelay?: string;
+  initialPetId?: string;
+  initialPetName?: string;
+}) {
+  const { petId, petName } = useSelectedPet({ petId: initialPetId, petName: initialPetName });
+  const displayPetName = petName || initialPetName || "";
   const [vaccines, setVaccines] = useState<VaccineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,13 +53,18 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
   }, []);
 
   useEffect(() => {
+    if (!petId) {
+      setVaccines([]);
+      setLoading(false);
+      return;
+    }
     let active = true;
 
     async function loadVaccines() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/vaccines", { method: "GET" });
+        const res = await fetch(`/api/vaccines${petMetricsQuery(petId)}`, { method: "GET" });
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(payload?.error ?? "Falha ao carregar vacinas.");
@@ -69,7 +85,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
     return () => {
       active = false;
     };
-  }, []);
+  }, [petId]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -107,6 +123,10 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!petId) {
+      setModalError("Selecione um pet para cadastrar vacinas.");
+      return;
+    }
     setSaving(true);
     setModalError(null);
 
@@ -121,6 +141,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
           veterinarian: veterinarian.trim() || undefined,
           clinic: clinic.trim() || undefined,
           notes: notes.trim() || undefined,
+          petId,
         }),
       });
 
@@ -141,6 +162,10 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
   }
 
   async function handleToggleStatus(vaccine: VaccineItem) {
+    if (!petId) {
+      setError("Selecione um pet para alterar vacinas.");
+      return;
+    }
     if (!vaccine.canOwnerEditStatus) {
       setError("Apenas o veterinario que cadastrou esta vacina pode alterar o status.");
       return;
@@ -155,7 +180,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
       const res = await fetch("/api/vaccines", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: vaccine.id, status: nextStatus }),
+        body: JSON.stringify({ id: vaccine.id, status: nextStatus, petId }),
       });
 
       if (!res.ok) {
@@ -179,7 +204,12 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
       style={{ animationDelay }}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Vacinas</h3>
+        <div className="min-w-0">
+          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Vacinas</h3>
+          {displayPetName ? (
+            <p className="mt-0.5 truncate text-[11px] text-zinc-500">Pet: {displayPetName}</p>
+          ) : null}
+        </div>
         <div className="flex shrink-0 items-center gap-1">
           <Link
             prefetch
@@ -227,6 +257,7 @@ export function VaccinesPanel({ animationDelay = "80ms" }: { animationDelay?: st
 
       <VaccineDetailsModal
         vaccine={detailVaccine}
+        petId={petId}
         open={detailVaccine !== null}
         onClose={() => setDetailVaccine(null)}
         onUpdated={(v) => {

@@ -112,7 +112,7 @@ export function DadosVeterinaryClinicsMap() {
             onClick={openFullscreen}
             className="w-full max-w-[280px] rounded-xl border border-white/30 bg-white/20 px-3 py-2 text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/30 sm:text-[12px]"
           >
-            Clínicas veterinárias
+            Clínicas e Serviços
           </button>
         </div>
       </div>

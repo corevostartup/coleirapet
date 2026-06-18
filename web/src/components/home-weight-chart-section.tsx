@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { HealthWeightSevenDayChart } from "@/components/health-weight-seven-day-chart";
+import { petMetricsQuery, useSelectedPet } from "@/lib/pets/use-selected-pet";
+import { WEIGHT_ENTRIES_UPDATED_EVENT } from "@/lib/pets/weight-entries";
 
 function formatKgKg(value: number) {
   return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg`;
@@ -17,22 +19,39 @@ type WeightEntry = {
 export function HomeWeightChartSection({
   animationDelay = "270ms",
   compact = false,
+  initialPetId,
 }: {
   animationDelay?: string;
   /** Card quadrado na Home, ao lado de Atividade. */
   compact?: boolean;
+  initialPetId?: string;
 }) {
+  const { petId } = useSelectedPet({ petId: initialPetId });
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
+    function onWeightEntriesUpdated() {
+      setReloadToken((value) => value + 1);
+    }
+    window.addEventListener(WEIGHT_ENTRIES_UPDATED_EVENT, onWeightEntriesUpdated);
+    return () => window.removeEventListener(WEIGHT_ENTRIES_UPDATED_EVENT, onWeightEntriesUpdated);
+  }, []);
+
+  useEffect(() => {
+    if (!petId) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
 
     async function load() {
       setError(null);
       try {
-        const res = await fetch("/api/pets/weight-entries");
+        const res = await fetch(`/api/pets/weight-entries${petMetricsQuery(petId)}`);
         if (!res.ok) {
           if (!cancelled) setEntries([]);
           return;
@@ -50,7 +69,7 @@ export function HomeWeightChartSection({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [petId, reloadToken]);
 
   const chartEntries = useMemo(
     () => entries.map((e) => ({ date: e.date, weightKg: e.weightKg })),

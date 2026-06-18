@@ -65,12 +65,12 @@ export default async function CarteiraVacinacaoPage() {
     <AppShell tab="dados">
       <TopBar
         title="Carteira de vacinacao"
-        subtitle="Registros medicos"
+        subtitle="Registros Médicos"
         leadingAction={
           <Link
             href="/dados"
             className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 transition hover:bg-zinc-50 hover:text-zinc-900"
-            aria-label="Voltar para registros medicos"
+            aria-label="Voltar para Registros Médicos"
           >
             <IconChevronLeft className="h-5 w-5" />
           </Link>

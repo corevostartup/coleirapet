@@ -18,11 +18,13 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export function VaccineDetailsModal({
   vaccine,
+  petId,
   open,
   onClose,
   onUpdated,
 }: {
   vaccine: VaccineItem | null;
+  petId?: string;
   open: boolean;
   onClose: () => void;
   onUpdated?: (v: VaccineItem) => void;
@@ -79,6 +81,7 @@ export function VaccineDetailsModal({
         clinic,
         notes,
       };
+      if (petId) payload.petId = petId;
       if (vaccine.canOwnerEditStatus) {
         payload.status = status;
       }

@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { getOrCreateCurrentPet, invalidateCurrentPetCache } from "@/lib/pets/current";
+import {
+  hasPetWeightChanged,
+  todayIsoDateInSaoPaulo,
+  upsertPetWeightEntry,
+} from "@/lib/pets/weight-entries";
 
 type UpdateCurrentPetPayload = {
   name?: string;
@@ -171,6 +176,15 @@ export async function PATCH(request: Request) {
   updates.publicFields = nextPublicFields;
 
   await petRef.set(updates, { merge: true });
+
+  if (weightKg !== undefined && hasPetWeightChanged(pet.weightKg, weightKg)) {
+    try {
+      await upsertPetWeightEntry(petRef, todayIsoDateInSaoPaulo(), weightKg);
+    } catch (error) {
+      console.error("[lyka] falha ao sincronizar registro de peso do perfil", error);
+    }
+  }
+
   invalidateCurrentPetCache(auth.uid);
   const refreshed = await petRef.get();
   return NextResponse.json({

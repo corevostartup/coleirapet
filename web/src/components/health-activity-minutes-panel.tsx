@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IconWave } from "@/components/icons";
+import { petMetricsQuery, useSelectedPet } from "@/lib/pets/use-selected-pet";
 
 type Entry = {
   id: string;
@@ -123,7 +124,15 @@ function buildWeeklyActivityFromEntries(entries: Entry[]) {
   return out;
 }
 
-export function HealthActivityMinutesPanel() {
+export function HealthActivityMinutesPanel({
+  initialPetId,
+  initialPetName,
+}: {
+  initialPetId?: string;
+  initialPetName?: string;
+} = {}) {
+  const { petId, petName } = useSelectedPet({ petId: initialPetId, petName: initialPetName });
+  const displayPetName = petName || initialPetName || "";
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -157,13 +166,18 @@ export function HealthActivityMinutesPanel() {
   }, []);
 
   useEffect(() => {
+    if (!petId) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
 
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/pets/activity-minutes");
+        const res = await fetch(`/api/pets/activity-minutes${petMetricsQuery(petId)}`);
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(payload?.error ?? "Falha ao carregar minutos ativos.");
@@ -181,7 +195,7 @@ export function HealthActivityMinutesPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [petId]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -241,7 +255,7 @@ export function HealthActivityMinutesPanel() {
       const res = await fetch("/api/pets/activity-minutes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, minutes: minutesParsed }),
+        body: JSON.stringify({ date, minutes: minutesParsed, petId }),
       });
       const payload = (await res.json().catch(() => null)) as
         | { error?: string; entry?: Entry }
@@ -270,7 +284,9 @@ export function HealthActivityMinutesPanel() {
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">Atividade Semanal</h3>
+          <h3 className="text-[14px] font-semibold leading-snug text-zinc-900">
+            Atividade Semanal{displayPetName ? ` · ${displayPetName}` : ""}
+          </h3>
           <p className="mt-0.5 text-[12px] text-zinc-500">Media (7 dias): {avgWeeklyMinutes} min/dia</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">

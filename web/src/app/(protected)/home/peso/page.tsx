@@ -1,12 +1,31 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { AppShell } from "@/components/shell";
 import TopBar from "@/components/top-bar";
 import { HealthWeightPanel } from "@/components/health-weight-panel";
 import { IconChevronLeft } from "@/components/icons";
+import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
+import { parseAuthUserUidCookie } from "@/lib/auth/session";
+import { listOwnedPets } from "@/lib/pets/current";
 
 export const dynamic = "force-dynamic";
 
-export default function HomePesoPage() {
+export default async function HomePesoPage() {
+  const jar = await cookies();
+  const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
+  let currentPetId = "";
+  let currentPetName = "";
+  if (uid) {
+    try {
+      const owned = await listOwnedPets(uid, { readOnly: true });
+      currentPetId = owned.currentPetId || owned.pets[0]?.id || "";
+      const selected = owned.pets.find((item) => item.id === currentPetId) ?? owned.pets[0] ?? null;
+      if (selected?.name?.trim()) currentPetName = selected.name.trim();
+    } catch {
+      currentPetId = "";
+    }
+  }
+
   const back = (
     <Link
       href="/home"
@@ -21,7 +40,7 @@ export default function HomePesoPage() {
   return (
     <AppShell tab="home">
       <TopBar title="Peso" subtitle="Registros e evolucao" leadingAction={back} />
-      <HealthWeightPanel />
+      <HealthWeightPanel initialPetId={currentPetId} initialPetName={currentPetName} />
     </AppShell>
   );
 }

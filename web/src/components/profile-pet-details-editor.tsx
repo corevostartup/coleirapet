@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { PetAvatarImage } from "@/components/pet-avatar-image";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 import { PET_PROFILE_PHOTO_INPUT_ID } from "@/lib/pets/profile-photo-input-id";
+import { dispatchWeightEntriesUpdated, hasPetWeightChanged } from "@/lib/pets/weight-entries";
 
 /** SVG local: evita named import de `@/components/icons` virar `undefined` no bundle Webpack/RSC. */
 function ShareProfileIcon(props: ComponentProps<"svg">) {
@@ -254,6 +255,7 @@ export function ProfilePetDetailsEditor({
   const identityCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [shareCopiedHint, setShareCopiedHint] = useState(false);
   const shareHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const weightAtEditStartRef = useRef<number | null>(initialWeightKg);
 
   const canCopyPetIdentity =
     Boolean(petIdentity?.trim()) && petIdentity.trim() !== "Nao disponivel";
@@ -261,6 +263,11 @@ export function ProfilePetDetailsEditor({
   useEffect(() => {
     setPhotoUrl(getPetImageOrDefault(petImage));
   }, [petImage]);
+
+  useEffect(() => {
+    weightAtEditStartRef.current = initialWeightKg;
+    setWeightKg(initialWeightKg);
+  }, [initialWeightKg]);
 
   useEffect(() => {
     return () => {
@@ -381,6 +388,12 @@ export function ProfilePetDetailsEditor({
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(body?.error ?? "Falha ao salvar dados do pet.");
       }
+
+      if (weightKg != null && hasPetWeightChanged(weightAtEditStartRef.current, weightKg)) {
+        dispatchWeightEntriesUpdated();
+      }
+      weightAtEditStartRef.current = weightKg;
+      window.dispatchEvent(new CustomEvent("lyka-pet-data-updated"));
 
       setSaveState("success");
       setTimeout(() => {
@@ -591,7 +604,10 @@ export function ProfilePetDetailsEditor({
             <button
               type="button"
               onClick={() => {
-                setIsEditing((value) => !value);
+                setIsEditing((value) => {
+                  if (!value) weightAtEditStartRef.current = weightKg;
+                  return !value;
+                });
                 setSaveState("idle");
                 setErrorMessage(null);
               }}

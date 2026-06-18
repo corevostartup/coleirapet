@@ -10,7 +10,7 @@ import { IconFile, IconPin, IconShield } from "@/components/icons";
 import { pet, records } from "@/lib/mock";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 import { loadTopBarQuickPetSeed } from "@/lib/pets/load-top-bar-quick-pet-seed";
 
@@ -18,12 +18,22 @@ export default async function DadosPage() {
   const jar = await cookies();
   const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
   let currentPet = null;
+  let currentPetId = "";
+  let currentPetName = pet.name;
   if (uid) {
     try {
-      currentPet = (await getOrCreateCurrentPet(uid)).pet;
+      const owned = await listOwnedPets(uid, { readOnly: true });
+      currentPetId = owned.currentPetId || owned.pets[0]?.id || "";
+      currentPet = owned.pets.find((item) => item.id === currentPetId) ?? owned.pets[0] ?? null;
+      if (currentPet?.name?.trim()) currentPetName = currentPet.name.trim();
     } catch {
-      // Fallback para mock quando backend (Admin/Firestore) estiver indisponível.
-      currentPet = null;
+      try {
+        currentPet = (await getOrCreateCurrentPet(uid)).pet;
+        currentPetId = currentPet.id;
+        if (currentPet.name?.trim()) currentPetName = currentPet.name.trim();
+      } catch {
+        currentPet = null;
+      }
     }
   }
   const publicFields = currentPet?.publicFields ?? {
@@ -62,7 +72,7 @@ export default async function DadosPage() {
   return (
     <AppShell tab="dados">
       <div className="dados-page-topbar">
-        <TopBar title="Registros medicos" subtitle="Historico clinico" quickPetSeed={quickPetSeed} />
+        <TopBar title="Registros Médicos" subtitle="Historico clinico" quickPetSeed={quickPetSeed} />
       </div>
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
@@ -120,7 +130,7 @@ export default async function DadosPage() {
         </details>
       </section>
 
-      <VaccinesPanel animationDelay="120ms" />
+      <VaccinesPanel animationDelay="120ms" initialPetId={currentPetId} initialPetName={currentPetName} />
 
       <section
         data-lyka-shell-span="full"
@@ -129,7 +139,7 @@ export default async function DadosPage() {
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="text-[14px] font-semibold text-zinc-900">Clínicas veterinárias</h3>
+            <h3 className="text-[14px] font-semibold text-zinc-900">Clínicas e Serviços</h3>
             <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">
               Clínicas, hotéis e creches para cachorros na região.
             </p>
@@ -154,7 +164,7 @@ export default async function DadosPage() {
         </div>
       </section>
 
-      <MedicationRemindersPanel animationDelay="240ms" />
+      <MedicationRemindersPanel animationDelay="240ms" initialPetId={currentPetId} initialPetName={currentPetName} />
     </AppShell>
   );
 }

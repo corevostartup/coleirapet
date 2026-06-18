@@ -3,11 +3,12 @@ import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { SUBCOLLECTION_ACTIVITY_MINUTES } from "@/lib/firebase/collections";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { readPetIdFromRequestUrl, resolvePetContextForUser } from "@/lib/pets/resolve-pet-context";
 
 type CreatePayload = {
   date?: string;
   minutes?: number;
+  petId?: string;
 };
 
 async function requireAuthContext() {
@@ -24,26 +25,33 @@ function formatPtBrDate(isoDate: string) {
   return `${day}/${month}/${year}`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireAuthContext();
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
 
-  const { petRef } = await getOrCreateCurrentPet(auth.uid);
-  const snapshot = await petRef.collection(SUBCOLLECTION_ACTIVITY_MINUTES).orderBy("date", "desc").limit(30).get();
+  try {
+    const { petRef } = await resolvePetContextForUser(auth.uid, readPetIdFromRequestUrl(request));
+    const snapshot = await petRef.collection(SUBCOLLECTION_ACTIVITY_MINUTES).orderBy("date", "desc").limit(30).get();
 
-  const entries = snapshot.docs.map((doc) => {
-    const data = doc.data() as { date?: string; minutes?: number };
-    const date = typeof data.date === "string" ? data.date : "";
-    const minutes = typeof data.minutes === "number" ? data.minutes : 0;
-    return {
-      id: doc.id,
-      date,
-      dateLabel: formatPtBrDate(date),
-      minutes,
-    };
-  });
+    const entries = snapshot.docs.map((doc) => {
+      const data = doc.data() as { date?: string; minutes?: number };
+      const date = typeof data.date === "string" ? data.date : "";
+      const minutes = typeof data.minutes === "number" ? data.minutes : 0;
+      return {
+        id: doc.id,
+        date,
+        dateLabel: formatPtBrDate(date),
+        minutes,
+      };
+    });
 
-  return NextResponse.json({ entries });
+    return NextResponse.json({ entries });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Falha ao carregar atividade." },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -66,29 +74,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Minutos invalidos" }, { status: 400 });
   }
 
-  const { petRef } = await getOrCreateCurrentPet(auth.uid);
-  const nowIso = new Date().toISOString();
-  const docId = date;
-  await petRef.collection(SUBCOLLECTION_ACTIVITY_MINUTES).doc(docId).set(
-    {
-      date,
-      minutes: Math.round(minutes),
-      updatedAt: nowIso,
-      createdAt: nowIso,
-    },
-    { merge: true },
-  );
-
-  return NextResponse.json(
-    {
-      ok: true,
-      entry: {
-        id: docId,
+  try {
+    const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
+    const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
+    const nowIso = new Date().toISOString();
+    const docId = date;
+    await petRef.collection(SUBCOLLECTION_ACTIVITY_MINUTES).doc(docId).set(
+      {
         date,
-        dateLabel: formatPtBrDate(date),
         minutes: Math.round(minutes),
+        updatedAt: nowIso,
+        createdAt: nowIso,
       },
-    },
-    { status: 201 },
-  );
+      { merge: true },
+    );
+
+    return NextResponse.json(
+      {
+        ok: true,
+        entry: {
+          id: docId,
+          date,
+          dateLabel: formatPtBrDate(date),
+          minutes: Math.round(minutes),
+        },
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Falha ao salvar atividade." },
+      { status: 500 },
+    );
+  }
 }

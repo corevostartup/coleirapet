@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { VaccineDetailsModal } from "@/components/vaccine-details-modal";
 import { IconPill, IconShare } from "@/components/icons";
 import { getPetImageOrDefault } from "@/lib/pets/image";
+import { petMetricsQuery } from "@/lib/pets/use-selected-pet";
 import type { VaccineItem } from "@/lib/vaccines/vaccine-item";
 
 type Props = {
@@ -52,12 +53,17 @@ export function VaccinationWalletContent({
   }, [currentPetId, initialPets]);
 
   useEffect(() => {
+    if (!selectedPetId) {
+      setVaccines([]);
+      setLoading(false);
+      return;
+    }
     let active = true;
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/vaccines", { method: "GET" });
+        const res = await fetch(`/api/vaccines${petMetricsQuery(selectedPetId)}`, { method: "GET" });
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(payload?.error ?? "Falha ao carregar vacinas.");
@@ -76,7 +82,7 @@ export function VaccinationWalletContent({
     return () => {
       active = false;
     };
-  }, []);
+  }, [selectedPetId]);
 
   const applied = vaccines
     .filter((v) => v.status === "applied")
@@ -284,7 +290,7 @@ export function VaccinationWalletContent({
               <p className="rounded-2xl border border-rose-100 bg-rose-50/80 px-3 py-3 text-[12px] text-rose-700">{error}</p>
             ) : applied.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-3 py-4 text-center text-[12px] leading-relaxed text-zinc-500">
-                Nenhuma vacina com status <strong className="text-zinc-700">Aplicada</strong> ainda. Cadastre em Registros medicos e marque como
+                Nenhuma vacina com status <strong className="text-zinc-700">Aplicada</strong> ainda. Cadastre em Registros Médicos e marque como
                 aplicada para aparecer aqui.
               </p>
             ) : (
@@ -328,6 +334,7 @@ export function VaccinationWalletContent({
 
       <VaccineDetailsModal
         vaccine={detailVaccine}
+        petId={selectedPetId}
         open={detailVaccine !== null}
         onClose={() => setDetailVaccine(null)}
         onUpdated={(v) => {

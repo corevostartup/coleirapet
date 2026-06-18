@@ -9,7 +9,7 @@ import {
   SUBCOLLECTION_VACCINES_LEGACY,
 } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { getOrCreateCurrentPet } from "@/lib/pets/current";
+import { readPetIdFromRequestUrl, resolvePetContextForUser } from "@/lib/pets/resolve-pet-context";
 import { canOwnerEditVaccineStatus } from "@/lib/vaccines/vaccine-access";
 import type { VaccineStatus } from "@/lib/vaccines/vaccine-item";
 import { vaccineFromDoc } from "@/lib/vaccines/vaccine-item";
@@ -21,6 +21,7 @@ type CreateVaccinePayload = {
   veterinarian?: string;
   clinic?: string;
   notes?: string;
+  petId?: string;
 };
 
 type UpdateVaccinePayload = {
@@ -29,6 +30,7 @@ type UpdateVaccinePayload = {
   veterinarian?: string;
   clinic?: string;
   notes?: string;
+  petId?: string;
 };
 
 function sliceText(value: unknown, max: number) {
@@ -99,7 +101,7 @@ async function migrateLegacyVaccinesToPet(
   await batch.commit();
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireAuthContext();
   if (!auth) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
@@ -107,7 +109,7 @@ export async function GET() {
 
   try {
     const db = getFirebaseAdminDb();
-    const { petRef } = await getOrCreateCurrentPet(auth.uid);
+    const { petRef } = await resolvePetContextForUser(auth.uid, readPetIdFromRequestUrl(request));
     let docs = await readAndSortVaccineDocs(petRef);
 
     if (!docs.length) {
@@ -161,7 +163,8 @@ export async function POST(request: Request) {
 
   try {
     const nowIso = new Date().toISOString();
-    const { petRef } = await getOrCreateCurrentPet(auth.uid);
+    const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
+    const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
     const payload: Record<string, unknown> = {
       name: name.slice(0, 80),
       status,
@@ -229,7 +232,8 @@ export async function PATCH(request: Request) {
 
   try {
     const nowIso = new Date().toISOString();
-    const { petRef } = await getOrCreateCurrentPet(auth.uid);
+    const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
+    const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
     const canonicalRef = petRef.collection(SUBCOLLECTION_VACCINES).doc(id);
     const legacyRef = petRef.collection(SUBCOLLECTION_VACCINES_LEGACY).doc(id);
 
