@@ -7,6 +7,7 @@ import { COLLECTION_PETS, COLLECTION_USER, SUBCOLLECTION_PET_MEMBERS, SUBCOLLECT
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { getPetAccessById, countPrimaryOwnedPetsForUser } from "@/lib/pets/access";
 import { invalidateCurrentPetCache } from "@/lib/pets/current";
+import { getPetImageOrDefault } from "@/lib/pets/image";
 import { resolveUserOwnerIdAliases } from "@/lib/pets/user-owner-aliases";
 
 type NotificationDoc = {
@@ -20,6 +21,7 @@ type NotificationDoc = {
   respondedAt?: string;
   petId?: string;
   petName?: string;
+  petImage?: string;
   inviterUid?: string;
   inviterName?: string;
   targetUid?: string;
@@ -57,10 +59,39 @@ function mapNotification(id: string, data: NotificationDoc) {
     when: createdAt ? new Date(createdAt).toLocaleString("pt-BR") : "Agora",
     petId: parseText(data.petId),
     petName: parseText(data.petName),
+    petImage: parseText(data.petImage),
     inviterUid: parseText(data.inviterUid),
     inviterName: parseText(data.inviterName),
     targetUid: parseText(data.targetUid),
   };
+}
+
+type MappedNotification = ReturnType<typeof mapNotification>;
+
+async function enrichInviteNotifications(notifications: MappedNotification[]) {
+  const db = getFirebaseAdminDb();
+  return Promise.all(
+    notifications.map(async (item) => {
+      if (item.type !== "secondary_tutor_invite") return item;
+
+      let petName = item.petName;
+      let petImage = item.petImage;
+      if (item.petId && (!petName || !petImage)) {
+        const petSnap = await db.collection(COLLECTION_PETS).doc(item.petId).get();
+        if (petSnap.exists) {
+          const petData = petSnap.data() ?? {};
+          if (!petName) petName = parseText(petData.name, "Pet");
+          if (!petImage) petImage = getPetImageOrDefault(typeof petData.image === "string" ? petData.image : "");
+        }
+      }
+
+      return {
+        ...item,
+        petName: petName || "Pet",
+        petImage: getPetImageOrDefault(petImage),
+      };
+    }),
+  );
 }
 
 export async function GET() {
@@ -76,7 +107,9 @@ export async function GET() {
     .limit(120)
     .get();
 
-  const notifications = snapshot.docs.map((doc) => mapNotification(doc.id, (doc.data() ?? {}) as NotificationDoc));
+  const notifications = await enrichInviteNotifications(
+    snapshot.docs.map((doc) => mapNotification(doc.id, (doc.data() ?? {}) as NotificationDoc)),
+  );
   const unreadCount = notifications.filter((item) => item.unread).length;
   return NextResponse.json({ notifications, unreadCount });
 }

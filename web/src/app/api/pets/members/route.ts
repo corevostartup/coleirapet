@@ -2,9 +2,10 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
-import { COLLECTION_USER, SUBCOLLECTION_PET_MEMBERS, SUBCOLLECTION_USER_NOTIFICATIONS } from "@/lib/firebase/collections";
+import { COLLECTION_PETS, COLLECTION_USER, SUBCOLLECTION_PET_MEMBERS, SUBCOLLECTION_USER_NOTIFICATIONS } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
 import { getPetAccessById } from "@/lib/pets/access";
+import { getPetImageOrDefault } from "@/lib/pets/image";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 type UserDoc = {
@@ -36,6 +37,7 @@ type MemberDoc = {
 type PetDoc = {
   ownerId?: string;
   name?: string;
+  image?: string;
 };
 
 type CreateMemberPayload = {
@@ -213,6 +215,7 @@ export async function POST(request: Request) {
   const petData = access.petData as PetDoc;
   const ownerId = parseText(petData.ownerId);
   const petName = parseText(petData.name, "pet");
+  const petImage = getPetImageOrDefault(typeof petData.image === "string" ? petData.image : "");
   const targetDoc =
     (parseText(body.targetUserId) ? await resolveUserDocByIdOrAlias(parseText(body.targetUserId)) : null) ??
     (parseTutorCode(body.targetTutorCode) ? await resolveUserDocByTutorCode(parseTutorCode(body.targetTutorCode)) : null);
@@ -267,6 +270,7 @@ export async function POST(request: Request) {
     createdAt: nowIso,
     petId,
     petName,
+    petImage,
     inviterUid: auth.uid,
     inviterName: actorName,
     targetUid,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/shell";
 import TopBar from "@/components/top-bar";
+import { PetAvatarImage } from "@/components/pet-avatar-image";
 import { IconBell } from "@/components/icons";
 type NotificationItem = {
   id: string;
@@ -13,6 +14,9 @@ type NotificationItem = {
   status: string;
   unread: boolean;
   when: string;
+  petId?: string;
+  petName?: string;
+  petImage?: string;
 };
 
 function kindDotClass(kind: string) {
@@ -122,7 +126,9 @@ export default function NotificationsPage() {
           <ul className="space-y-2">
             {items.map((item, index) => {
               const isUnread = item.unread;
-              const isPendingInvite = item.type === "secondary_tutor_invite" && item.status === "pending";
+              const isInvite = item.type === "secondary_tutor_invite";
+              const isPendingInvite = isInvite && item.status === "pending";
+              const invitePetName = item.petName?.trim() || "Pet";
               return (
                 <li key={item.id}>
                   <article
@@ -134,12 +140,29 @@ export default function NotificationsPage() {
                     style={{ animationDelay: `${120 + index * 40}ms` }}
                   >
                     <div className="flex items-start gap-2.5">
-                      <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${kindDotClass(item.status)}`} aria-hidden />
+                      {isInvite ? (
+                        <div className="relative mt-0.5 h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+                          <PetAvatarImage
+                            src={item.petImage}
+                            alt={`Foto de ${invitePetName}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${kindDotClass(item.status)}`} aria-hidden />
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                          <p className="text-[13px] font-semibold text-zinc-900">{item.title}</p>
+                          {isInvite ? (
+                            <p className="text-[14px] font-semibold text-zinc-900">{invitePetName}</p>
+                          ) : (
+                            <p className="text-[13px] font-semibold text-zinc-900">{item.title}</p>
+                          )}
                           <time className="shrink-0 text-[11px] text-zinc-500">{item.when}</time>
                         </div>
+                        {isInvite ? (
+                          <p className="mt-0.5 text-[11px] font-medium text-emerald-800">{item.title}</p>
+                        ) : null}
                         <p className="mt-1 text-[12px] leading-snug text-zinc-600">{item.body}</p>
                         {isUnread ? (
                           <span className="mt-2 inline-flex rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
