@@ -5,14 +5,14 @@
 
 [build.environment]
   NODE_VERSION = "22"
-
-[functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["firebase-admin", "@google-cloud/firestore", "farmhash-modern"]
   # O SDK Web do Firebase incorpora NEXT_PUBLIC_FIREBASE_API_KEY no bundle do cliente.
   # Essa chave é pública por design (restrições ficam no console Firebase); o scan
   # heurístico da Netlify acusa "AIza..." como segredo no output do build.
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["firebase-admin", "@google-cloud/firestore", "farmhash-modern"]
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
