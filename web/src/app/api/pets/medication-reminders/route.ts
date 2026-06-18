@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
-import { FieldValue } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { SUBCOLLECTION_MEDICATION_REMINDERS } from "@/lib/firebase/collections";
+import { getFirebaseAdminDb, getFirestoreFieldValue } from "@/lib/firebase/admin";
 import { getOrCreateCurrentPet } from "@/lib/pets/current";
 
 /** Persistência: `Pets/{petId}/medicationReminders/{docId}` (Firebase Admin SDK; não depende do cliente). */
@@ -111,8 +111,8 @@ export async function POST(request: Request) {
       name: name.slice(0, 80),
       dose: dose.slice(0, 80),
       time,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: getFirestoreFieldValue().serverTimestamp(),
+      updatedAt: getFirestoreFieldValue().serverTimestamp(),
     });
 
     const written = await ref.get();
@@ -180,7 +180,7 @@ export async function PATCH(request: Request) {
       name: name.slice(0, 80),
       dose: dose.slice(0, 80),
       time,
-      updatedAt: FieldValue.serverTimestamp(),
+      updatedAt: getFirestoreFieldValue().serverTimestamp(),
     });
 
     const after = await docRef.get();

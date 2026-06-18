@@ -1,10 +1,9 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_PETS, COLLECTION_USER, SUBCOLLECTION_PET_MEMBERS, SUBCOLLECTION_USER_NOTIFICATIONS } from "@/lib/firebase/collections";
-import { getFirebaseAdminDb } from "@/lib/firebase/admin";
+import { getFirebaseAdminDb, getFirestoreFieldValue } from "@/lib/firebase/admin";
 import { getPetAccessById, countPrimaryOwnedPetsForUser } from "@/lib/pets/access";
 import { invalidateCurrentPetCache } from "@/lib/pets/current";
 import { getPetImageOrDefault } from "@/lib/pets/image";
@@ -211,7 +210,7 @@ export async function PATCH(request: Request) {
 
   const petAccess = await getPetAccessById(auth.uid, petId);
   if (petAccess) {
-    await db.collection(COLLECTION_USER).doc(auth.uid).set({ secondaryPetIds: FieldValue.arrayUnion(petId) }, { merge: true });
+    await db.collection(COLLECTION_USER).doc(auth.uid).set({ secondaryPetIds: getFirestoreFieldValue().arrayUnion(petId) }, { merge: true });
     invalidateCurrentPetCache(auth.uid);
     await notificationRef.set({ status: "accepted", unread: false, respondedAt: nowIso, readAt: nowIso }, { merge: true });
     return NextResponse.json({ ok: true, status: "accepted" });
@@ -219,7 +218,7 @@ export async function PATCH(request: Request) {
 
   const memberStatus = parseText(memberSnap.data()?.status).toLowerCase();
   if (memberStatus !== "pending") {
-    await db.collection(COLLECTION_USER).doc(auth.uid).set({ secondaryPetIds: FieldValue.arrayUnion(petId) }, { merge: true });
+    await db.collection(COLLECTION_USER).doc(auth.uid).set({ secondaryPetIds: getFirestoreFieldValue().arrayUnion(petId) }, { merge: true });
     invalidateCurrentPetCache(auth.uid);
     await notificationRef.set({ status: "accepted", unread: false, respondedAt: nowIso, readAt: nowIso }, { merge: true });
     return NextResponse.json({ ok: true, status: "accepted" });
@@ -238,7 +237,7 @@ export async function PATCH(request: Request) {
   const userSnap = await userRef.get();
   const defaultPetId = parseText(userSnap.data()?.defaultPetId);
   const primaryOwnedCount = await countPrimaryOwnedPetsForUser(auth.uid);
-  await userRef.set({ secondaryPetIds: FieldValue.arrayUnion(petId) }, { merge: true });
+  await userRef.set({ secondaryPetIds: getFirestoreFieldValue().arrayUnion(petId) }, { merge: true });
   if (!defaultPetId || primaryOwnedCount === 0) {
     await userRef.set({ defaultPetId: petId }, { merge: true });
   }

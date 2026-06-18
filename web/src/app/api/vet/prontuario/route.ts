@@ -1,10 +1,9 @@
 import { cookies } from "next/headers";
-import { FieldValue } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_VETERINARIANS, SUBCOLLECTION_VET_MEDICAL_RECORDS } from "@/lib/firebase/collections";
-import { getFirebaseAdminDb } from "@/lib/firebase/admin";
+import { getFirebaseAdminDb, getFirestoreFieldValue } from "@/lib/firebase/admin";
 import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
 
 type CreateMedicalRecordPayload = {
@@ -132,8 +131,8 @@ export async function POST(request: Request) {
         petName: petName.slice(0, 80),
         diagnosis: diagnosis.slice(0, 120),
         note: note.slice(0, 1200),
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: getFirestoreFieldValue().serverTimestamp(),
+        updatedAt: getFirestoreFieldValue().serverTimestamp(),
       });
 
     const written = await ref.get();

@@ -1,6 +1,6 @@
-import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import type { App } from "firebase-admin/app";
+import type { Auth } from "firebase-admin/auth";
+import type { Firestore } from "firebase-admin/firestore";
 
 function readRequired(name: string) {
   const value = process.env[name];
@@ -77,23 +77,44 @@ function readFirebaseAdminCredentials() {
   return { projectId, clientEmail, privateKey };
 }
 
-function getFirebaseAdminApp() {
-  if (getApps().length) return getApp();
+let cachedApp: App | null = null;
+
+/** require() adiado — evita crash na carga do modulo serverless (Netlify) antes do try/catch das rotas. */
+function getOrInitFirebaseAdminApp(): App {
+  if (cachedApp) return cachedApp;
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { cert, getApp, getApps, initializeApp } = require("firebase-admin/app") as typeof import("firebase-admin/app");
   const { projectId, clientEmail, privateKey } = readFirebaseAdminCredentials();
 
-  return initializeApp({
-    credential: cert({
-      projectId,
-      clientEmail,
-      privateKey,
-    }),
-  });
+  cachedApp =
+    getApps().length > 0
+      ? getApp()
+      : initializeApp({
+          credential: cert({
+            projectId,
+            clientEmail,
+            privateKey,
+          }),
+        });
+
+  return cachedApp;
 }
 
-export function getFirebaseAdminAuth() {
-  return getAuth(getFirebaseAdminApp());
+export function getFirebaseAdminAuth(): Auth {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getAuth } = require("firebase-admin/auth") as typeof import("firebase-admin/auth");
+  return getAuth(getOrInitFirebaseAdminApp());
 }
 
-export function getFirebaseAdminDb() {
-  return getFirestore(getFirebaseAdminApp());
+export function getFirebaseAdminDb(): Firestore {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getFirestore } = require("firebase-admin/firestore") as typeof import("firebase-admin/firestore");
+  return getFirestore(getOrInitFirebaseAdminApp());
+}
+
+export function getFirestoreFieldValue() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { FieldValue } = require("firebase-admin/firestore") as typeof import("firebase-admin/firestore");
+  return FieldValue;
 }

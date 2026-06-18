@@ -1,13 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { DocumentReference, Firestore } from "firebase-admin/firestore";
-import { FieldValue } from "firebase-admin/firestore";
 import {
   COLLECTION_PETS,
   COLLECTION_USER,
   SUBCOLLECTION_VACCINES,
   SUBCOLLECTION_VACCINES_LEGACY,
 } from "@/lib/firebase/collections";
-import { getFirebaseAdminDb } from "@/lib/firebase/admin";
+import { getFirebaseAdminDb, getFirestoreFieldValue } from "@/lib/firebase/admin";
 import { ensurePrimaryMemberRecord, getPetAccessById, listAccessiblePetIdsForUser, type PetAccessRole } from "@/lib/pets/access";
 import { listSecondaryPetIdsForUserWithFallbacks } from "@/lib/pets/secondary-member-pets";
 import { getPetImageOrDefault } from "@/lib/pets/image";
@@ -607,7 +606,7 @@ export async function listOwnedPets(uid: string, options?: { readOnly?: boolean 
     const secondaryIds = pets.filter((item) => item.accessRole === "secondary").map((item) => item.id);
     if (secondaryIds.length > 0) {
       try {
-        await userRef.set({ secondaryPetIds: FieldValue.arrayUnion(...secondaryIds) }, { merge: true });
+        await userRef.set({ secondaryPetIds: getFirestoreFieldValue().arrayUnion(...secondaryIds) }, { merge: true });
       } catch {
         // Nao bloqueia listagem se o campo legado tiver tipo invalido ou Firestore estiver indisponivel.
       }
