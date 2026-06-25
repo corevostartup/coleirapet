@@ -55,6 +55,7 @@ type VaccineDoc = {
   veterinarian?: string;
   clinic?: string;
   notes?: string;
+  observation?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -69,9 +70,18 @@ export function vaccineFromDoc(id: string, data: VaccineDoc): VaccineItem {
         : "pending";
   const date = typeof data.date === "string" ? data.date : "";
   const name = typeof data.name === "string" && data.name.trim() ? data.name.trim() : "Vacina";
-  const veterinarian = typeof data.veterinarian === "string" ? data.veterinarian.trim() : "";
+  const prescribedByName = typeof data.prescribedByName === "string" ? data.prescribedByName.trim() : "";
+  const prescribedByCrmv = typeof data.prescribedByCrmv === "string" ? data.prescribedByCrmv.trim() : "";
+  const legacyVeterinarian = typeof data.veterinarian === "string" ? data.veterinarian.trim() : "";
+  const veterinarian =
+    legacyVeterinarian ||
+    (prescribedByName && prescribedByCrmv && prescribedByCrmv !== "Nao informado"
+      ? `${prescribedByName} · CRMV ${prescribedByCrmv}`
+      : prescribedByName);
   const clinic = typeof data.clinic === "string" ? data.clinic.trim() : "";
-  const notes = typeof data.notes === "string" ? data.notes.trim() : "";
+  const notes =
+    (typeof data.notes === "string" ? data.notes.trim() : "") ||
+    (typeof data.observation === "string" ? data.observation.trim() : "");
   const createdAt = typeof data.createdAt === "string" ? data.createdAt : "";
   const updatedAt = typeof data.updatedAt === "string" ? data.updatedAt : "";
 

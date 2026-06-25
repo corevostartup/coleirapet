@@ -32,8 +32,14 @@ export const SUBCOLLECTION_VACCINES = "vacinas";
 /** Nome legado em inglês mantido para migração retrocompatível. */
 export const SUBCOLLECTION_VACCINES_LEGACY = "vaccines";
 
+/** Subcoleção em `Pets/{petId}`: registros clínicos do pet (prontuário, visível ao tutor). */
+export const SUBCOLLECTION_PET_CLINICAL_RECORDS = "clinicalRecords";
+
 /** Subcoleção em `Veterinarians/{uid}`: registros de prontuário por pet. */
 export const SUBCOLLECTION_VET_MEDICAL_RECORDS = "medicalRecords";
+
+/** Subcoleção em `Veterinarians/{uid}`: fila de atendimentos (triagem). */
+export const SUBCOLLECTION_VET_APPOINTMENTS = "appointments";
 
 /** Subcoleção em `User/{uid}`: notificações do usuário autenticado. */
 export const SUBCOLLECTION_USER_NOTIFICATIONS = "notifications";

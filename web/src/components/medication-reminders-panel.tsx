@@ -36,6 +36,7 @@ export function MedicationRemindersPanel({
   const [time, setTime] = useState("");
   const [mounted, setMounted] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -118,6 +119,35 @@ export function MedicationRemindersPanel({
     setTime("");
   }
 
+  async function handleDelete(item: ReminderItem) {
+    if (!petId) {
+      setError("Selecione um pet para excluir lembretes.");
+      return;
+    }
+    const confirmed = window.confirm(`Excluir o lembrete "${item.name}" (${item.timeLabel})?`);
+    if (!confirmed) return;
+
+    setDeletingId(item.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/pets/medication-reminders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, petId }),
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Falha ao excluir lembrete.");
+      }
+      setReminders((prev) => prev.filter((r) => r.id !== item.id));
+      if (editingId === item.id) closeModal();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao excluir lembrete.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!petId) {
@@ -147,6 +177,7 @@ export function MedicationRemindersPanel({
       } else {
         setReminders((prev) => [payload.reminder, ...prev]);
       }
+      window.dispatchEvent(new CustomEvent("lyka-pet-data-updated"));
       closeModal();
     } catch (err) {
       setModalError(err instanceof Error ? err.message : "Falha ao salvar lembrete.");
@@ -198,13 +229,24 @@ export function MedicationRemindersPanel({
                 </div>
                 <p className="mt-1 text-[11px] text-zinc-600">Dose: {item.dose}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => openModalEdit(item)}
-                className="shrink-0 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition hover:bg-zinc-100"
-              >
-                Editar
-              </button>
+              <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={() => openModalEdit(item)}
+                  disabled={Boolean(deletingId)}
+                  className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(item)}
+                  disabled={deletingId === item.id}
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deletingId === item.id ? "Excluindo..." : "Excluir"}
+                </button>
+              </div>
             </article>
           ))}
         </div>
@@ -299,15 +341,28 @@ export function MedicationRemindersPanel({
 
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || Boolean(deletingId)}
                 className="mt-1 w-full rounded-2xl bg-emerald-600 px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
               >
                 {saving ? "Salvando..." : editingId ? "Salvar alteracoes" : "Salvar lembrete"}
               </button>
+              {editingId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = reminders.find((r) => r.id === editingId);
+                    if (item) void handleDelete(item);
+                  }}
+                  disabled={saving || deletingId === editingId}
+                  className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[13px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deletingId === editingId ? "Excluindo..." : "Excluir lembrete"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={closeModal}
-                disabled={saving}
+                disabled={saving || Boolean(deletingId)}
                 className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[13px] font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Cancelar

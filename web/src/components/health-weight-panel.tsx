@@ -6,6 +6,7 @@ import { HealthWeightSevenDayChart } from "@/components/health-weight-seven-day-
 import { LykaDateCalendarPicker } from "@/components/lyka-date-calendar-picker";
 import { petMetricsQuery, useSelectedPet } from "@/lib/pets/use-selected-pet";
 import { WEIGHT_ENTRIES_UPDATED_EVENT } from "@/lib/pets/weight-entries";
+import { LYKA_Z_INDEX } from "@/lib/ui/z-index";
 
 type Entry = {
   id: string;
@@ -253,7 +254,8 @@ export function HealthWeightPanel({
       {mounted && modalOpen
         ? createPortal(
             <div
-              className="fixed inset-0 z-[3000] flex min-h-[100dvh] items-center justify-center bg-black/40 px-3 py-6 pb-28 sm:px-6"
+              className="fixed inset-0 flex min-h-[100dvh] items-start justify-center overflow-y-auto bg-black/40 px-3 pb-[max(7rem,42dvh)] pt-4 sm:items-center sm:py-6 sm:pb-28"
+              style={{ zIndex: LYKA_Z_INDEX.modal }}
               role="dialog"
               aria-modal="true"
               aria-labelledby="weight-modal-title"
@@ -308,9 +310,11 @@ export function HealthWeightPanel({
                         id="weight-value"
                         type="text"
                         inputMode="decimal"
+                        data-lyka-keyboard-layout="decimal"
                         value={weightKg}
                         onChange={(e) => setWeightKg(e.target.value)}
                         placeholder="Ex: 12,5"
+                        autoComplete="off"
                         className="mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:px-3"
                         required
                       />

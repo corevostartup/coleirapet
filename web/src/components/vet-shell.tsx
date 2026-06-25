@@ -17,9 +17,9 @@ export function VetShell({
 }) {
   const pathname = usePathname() ?? "";
   const desktopMenu = [
-    { label: "Pets", href: "/vet/pets", Icon: IconCollar },
-    { label: "Prontuario", href: "/vet/prontuario", Icon: IconFile },
+    { label: "Triagem", href: "/vet/pets", Icon: IconCollar },
     { label: "Atendimentos", href: "/vet/atendidos", Icon: IconUser },
+    { label: "Prontuario", href: "/vet/prontuario", Icon: IconFile },
     { label: "Clinicas", href: "/vet/clinicas", Icon: IconPin },
   ] as const;
 

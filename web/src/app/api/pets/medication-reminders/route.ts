@@ -35,6 +35,11 @@ type UpdateMedicationReminderPayload = CreateMedicationReminderPayload & {
   id?: string;
 };
 
+type DeleteMedicationReminderPayload = {
+  id?: string;
+  petId?: string;
+};
+
 function formatTimeLabel(value: string) {
   if (!/^\d{2}:\d{2}$/.test(value)) return value;
   return `${value}h`;
@@ -209,6 +214,43 @@ export async function PATCH(request: Request) {
       {
         error: "Falha ao atualizar lembrete",
         detail: error instanceof Error ? error.message : "Erro desconhecido ao atualizar lembrete.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  const auth = await requireAuthContext();
+  if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+
+  let body: DeleteMedicationReminderPayload;
+  try {
+    body = (await request.json()) as DeleteMedicationReminderPayload;
+  } catch {
+    return NextResponse.json({ error: "Body invalido" }, { status: 400 });
+  }
+
+  const id = typeof body.id === "string" ? body.id.trim() : "";
+  if (!id) return NextResponse.json({ error: "Id do lembrete invalido" }, { status: 400 });
+
+  try {
+    const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
+    const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
+    const docRef = petRef.collection(SUBCOLLECTION_MEDICATION_REMINDERS).doc(id);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      return NextResponse.json({ error: "Lembrete nao encontrado" }, { status: 404 });
+    }
+
+    await docRef.delete();
+
+    return NextResponse.json({ ok: true, id });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Falha ao excluir lembrete",
+        detail: error instanceof Error ? error.message : "Erro desconhecido ao excluir lembrete.",
       },
       { status: 500 },
     );

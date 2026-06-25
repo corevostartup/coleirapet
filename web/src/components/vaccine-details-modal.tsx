@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { IconStethoscope } from "@/components/icons";
+import { petMetricsQuery } from "@/lib/pets/use-selected-pet";
 import type { VaccineItem, VaccineStatus } from "@/lib/vaccines/vaccine-item";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -86,7 +87,7 @@ export function VaccineDetailsModal({
         payload.status = status;
       }
 
-      const res = await fetch("/api/vaccines", {
+      const res = await fetch(`/api/vaccines${petMetricsQuery(petId ?? "")}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

@@ -56,15 +56,19 @@ export function VaccinesPanel({
     if (!petId) {
       setVaccines([]);
       setLoading(false);
+      setDetailVaccine(null);
+      setModalOpen(false);
       return;
     }
     let active = true;
 
     async function loadVaccines() {
+      setVaccines([]);
       setLoading(true);
       setError(null);
+      setDetailVaccine(null);
       try {
-        const res = await fetch(`/api/vaccines${petMetricsQuery(petId)}`, { method: "GET" });
+        const res = await fetch(`/api/vaccines${petMetricsQuery(petId)}`, { method: "GET", cache: "no-store" });
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(payload?.error ?? "Falha ao carregar vacinas.");
@@ -131,7 +135,7 @@ export function VaccinesPanel({
     setModalError(null);
 
     try {
-      const res = await fetch("/api/vaccines", {
+      const res = await fetch(`/api/vaccines${petMetricsQuery(petId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -153,6 +157,7 @@ export function VaccinesPanel({
       const payload = (await res.json()) as CreateVaccineResponse;
       const created = payload.vaccine;
       setVaccines((current) => [created, ...current]);
+      window.dispatchEvent(new CustomEvent("lyka-pet-data-updated"));
       closeModal();
     } catch (err) {
       setModalError(err instanceof Error ? err.message : "Falha ao cadastrar vacina.");
@@ -177,7 +182,7 @@ export function VaccinesPanel({
     setTogglingId(vaccine.id);
     try {
       const nextStatus: VaccineStatus = vaccine.status === "applied" ? "pending" : "applied";
-      const res = await fetch("/api/vaccines", {
+      const res = await fetch(`/api/vaccines${petMetricsQuery(petId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: vaccine.id, status: nextStatus, petId }),
@@ -222,8 +227,9 @@ export function VaccinesPanel({
           <button
             type="button"
             onClick={openModal}
+            disabled={!petId}
             aria-label="Adicionar vacina"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200/90 bg-zinc-50/80 text-zinc-500 transition hover:border-zinc-300 hover:bg-white hover:text-zinc-800 active:scale-[0.97]"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200/90 bg-zinc-50/80 text-zinc-500 transition hover:border-zinc-300 hover:bg-white hover:text-zinc-800 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
               <path d="M12 5v14M5 12h14" />

@@ -3,11 +3,12 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { AppShell } from "@/components/shell";
 import TopBar from "@/components/top-bar";
+import { PetClinicalHistoryPanel } from "@/components/pet-clinical-history-panel";
 import { MedicationRemindersPanel } from "@/components/medication-reminders-panel";
 import { DadosVeterinaryClinicsMap } from "@/components/dados-veterinary-clinics-map";
 import { VaccinesPanel } from "@/components/vaccines-panel";
-import { IconFile, IconPin, IconShield } from "@/components/icons";
-import { pet, records } from "@/lib/mock";
+import { IconPin, IconShield } from "@/components/icons";
+import { pet } from "@/lib/mock";
 import { AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthUserUidCookie } from "@/lib/auth/session";
 import { getOrCreateCurrentPet, listOwnedPets } from "@/lib/pets/current";
@@ -132,10 +133,12 @@ export default async function DadosPage() {
 
       <VaccinesPanel animationDelay="120ms" initialPetId={currentPetId} initialPetName={currentPetName} />
 
+      <PetClinicalHistoryPanel animationDelay="150ms" initialPetId={currentPetId} initialPetName={currentPetName} />
+
       <section
         data-lyka-shell-span="full"
         className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
-        style={{ animationDelay: "140ms" }}
+        style={{ animationDelay: "170ms" }}
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="min-w-0">
@@ -149,22 +152,7 @@ export default async function DadosPage() {
         <DadosVeterinaryClinicsMap />
       </section>
 
-      <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "180ms" }}>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-[14px] font-semibold text-zinc-900">Prontuario simplificado</h3>
-          <IconFile className="h-5 w-5 text-zinc-600" />
-        </div>
-        <div className="space-y-2">
-          {records.map((item) => (
-            <article key={item.type} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-wide text-zinc-500">{item.type}</p>
-              <p className="mt-0.5 text-[12px] font-medium text-zinc-800">{item.detail}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <MedicationRemindersPanel animationDelay="240ms" initialPetId={currentPetId} initialPetName={currentPetName} />
+      <MedicationRemindersPanel animationDelay="210ms" initialPetId={currentPetId} initialPetName={currentPetName} />
     </AppShell>
   );
 }

@@ -23,7 +23,13 @@ function normalizePetItem(item: TopBarQuickPetItem): TopBarQuickPetItem {
   };
 }
 
-function TopBarUserQuickActions({ seed }: { seed?: TopBarQuickPetSeed }) {
+function TopBarUserQuickActions({
+  seed,
+  showNotificationsLink = true,
+}: {
+  seed?: TopBarQuickPetSeed;
+  showNotificationsLink?: boolean;
+}) {
   const pathname = usePathname();
   const [pets, setPets] = useState<TopBarQuickPetItem[]>(() => (seed?.pets ?? []).map(normalizePetItem));
   const [currentPetId, setCurrentPetId] = useState(() => seed?.currentPetId ?? "");
@@ -117,7 +123,7 @@ function TopBarUserQuickActions({ seed }: { seed?: TopBarQuickPetSeed }) {
 
   return (
     <div className="flex shrink-0 items-center gap-2">
-      <TopBarNotificationsLink />
+      {showNotificationsLink ? <TopBarNotificationsLink /> : null}
       {loading && !currentPet ? (
         <div className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-zinc-200" aria-hidden />
       ) : currentPet ? (
@@ -142,6 +148,7 @@ export default function TopBar({
   action,
   leadingAction,
   showNotifications = true,
+  showNotificationsLink = true,
   quickPetSeed,
 }: {
   title: string;
@@ -150,6 +157,7 @@ export default function TopBar({
   action?: ReactNode | null;
   leadingAction?: ReactNode;
   showNotifications?: boolean;
+  showNotificationsLink?: boolean;
   quickPetSeed?: TopBarQuickPetSeed;
 }) {
   return (
@@ -165,7 +173,7 @@ export default function TopBar({
         {action !== undefined ? (
           action
         ) : showNotifications ? (
-          <TopBarUserQuickActions seed={quickPetSeed} />
+          <TopBarUserQuickActions seed={quickPetSeed} showNotificationsLink={showNotificationsLink} />
         ) : null}
       </div>
       {children ? <div className="mt-3">{children}</div> : null}

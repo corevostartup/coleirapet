@@ -1,12 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { HealthActivitySevenDayChart } from "@/components/health-activity-seven-day-chart";
+import { HealthWeightSevenDayChart } from "@/components/health-weight-seven-day-chart";
+import { LykaConfirmDialog } from "@/components/lyka-confirm-dialog";
 import { VetShell } from "@/components/vet-shell";
 import { getPetImageOrDefault } from "@/lib/pets/image";
 
 type PetOption = { id: string; petIdentity: string; name: string; image: string };
-type ClinicalRecord = { id: string; petId: string; petName: string; note: string; diagnosis: string; when: string };
+type ClinicalRecord = {
+  id: string;
+  petId: string;
+  petName: string;
+  note: string;
+  diagnosis: string;
+  when: string;
+  prescribedByName: string;
+  prescribedByCrmv: string;
+};
+type VetProfileSummary = { name: string; crmv: string; specialty: string };
+type PetHistoryItem = {
+  id: string;
+  kind: "clinical" | "vaccine" | "medication";
+  kindLabel: string;
+  title: string;
+  detail: string;
+  prescribedByName: string;
+  prescribedByCrmv: string;
+  veterinarianLabel: string;
+  when: string;
+};
 type VaccineRecord = {
   id: string;
   petId: string;
@@ -30,10 +55,158 @@ type MedicationRecord = {
   prescribedByCrmv: string;
 };
 
+type VeterinarianApiPayload = { name?: string; crmv?: string; specialty?: string };
+
+function VetResponsibleCard({ profile, label }: { profile: VetProfileSummary | null; label: string }) {
+  if (!profile) return null;
+  return (
+    <div className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800">{label}</p>
+      <p className="mt-0.5 text-[12px] font-semibold text-zinc-800">{profile.name}</p>
+      <p className="text-[11px] text-zinc-600">
+        CRMV {profile.crmv}
+        {profile.specialty ? ` · ${profile.specialty}` : ""}
+      </p>
+    </div>
+  );
+}
+
+function toVetProfileSummary(veterinarian: VeterinarianApiPayload): VetProfileSummary {
+  return {
+    name: veterinarian.name?.trim() || "Veterinario",
+    crmv: veterinarian.crmv?.trim() || "Nao informado",
+    specialty: veterinarian.specialty?.trim() || "",
+  };
+}
+
+type PetHealthSummary = {
+  id: string;
+  name: string;
+  petIdentity: string;
+  breed: string;
+  age: number | null;
+  tutorName: string;
+  weightKg: number | null;
+  weightDateLabel: string | null;
+  activity: {
+    todayMinutes: number;
+    last7DaysMinutes: number;
+    last7DaysAverage: number;
+    latestDateLabel: string | null;
+    latestMinutes: number;
+  };
+  charts: {
+    weight: Array<{ date: string; weightKg: number }>;
+    activity: Array<{ date: string; minutes: number }>;
+  };
+};
+
+function formatAge(age: number | null) {
+  if (age == null) return "Nao informado";
+  return `${age} ${age === 1 ? "ano" : "anos"}`;
+}
+
+function formatWeight(weightKg: number | null) {
+  if (weightKg == null) return "Nao informado";
+  return `${weightKg.toFixed(1).replace(/\.0$/, "")} kg`;
+}
+
+function formatActivityMinutes(minutes: number) {
+  if (minutes <= 0) return "0 min";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest > 0 ? `${hours}h ${rest}min` : `${hours}h`;
+}
+
+function PetHealthCard({
+  health,
+  loading,
+  error,
+}: {
+  health: PetHealthSummary | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  if (!health && !loading && !error) {
+    return <p className="mt-3 text-[12px] text-zinc-500">Selecione um pet para ver os dados de saude.</p>;
+  }
+
+  return (
+    <div className="mt-3">
+      <h4 className="text-[12px] font-semibold text-zinc-900">Dados de saude do pet</h4>
+      {loading ? <p className="mt-2 text-[11px] text-zinc-500">Carregando dados de saude...</p> : null}
+      {error ? <p className="mt-2 text-[11px] text-rose-700">{error}</p> : null}
+      {health && !loading ? (
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Nome</p>
+            <p className="mt-1 text-[12px] font-semibold text-zinc-800">{health.name}</p>
+          </article>
+          <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Idade</p>
+            <p className="mt-1 text-[12px] font-semibold text-zinc-800">{formatAge(health.age)}</p>
+          </article>
+          <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Peso</p>
+            <p className="mt-1 text-[12px] font-semibold text-zinc-800">{formatWeight(health.weightKg)}</p>
+            {health.weightDateLabel ? (
+              <p className="mt-0.5 text-[10px] text-zinc-500">Atualizado em {health.weightDateLabel}</p>
+            ) : null}
+          </article>
+          <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Atividade hoje</p>
+            <p className="mt-1 text-[12px] font-semibold text-zinc-800">{formatActivityMinutes(health.activity.todayMinutes)}</p>
+            <p className="mt-0.5 text-[10px] text-zinc-500">
+              Media 7 dias: {formatActivityMinutes(health.activity.last7DaysAverage)}
+            </p>
+          </article>
+          <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Raca</p>
+            <p className="mt-1 text-[12px] font-semibold text-zinc-800">{health.breed}</p>
+          </article>
+          <article className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Tutor</p>
+            <p className="mt-1 text-[12px] font-semibold text-zinc-800">{health.tutorName}</p>
+          </article>
+          {health.activity.latestDateLabel ? (
+            <article className="col-span-2 rounded-2xl border border-emerald-100 bg-emerald-50/50 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-wide text-emerald-800">Ultima atividade registrada</p>
+              <p className="mt-1 text-[12px] font-semibold text-zinc-800">
+                {formatActivityMinutes(health.activity.latestMinutes)} · {health.activity.latestDateLabel}
+              </p>
+            </article>
+          ) : null}
+
+          <div className="col-span-2 mt-1 grid gap-2 sm:grid-cols-2">
+            <div className="min-w-0">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Peso · 7 dias</p>
+              <HealthWeightSevenDayChart entries={health.charts.weight} variant="dense" />
+            </div>
+            <div className="min-w-0">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                Atividade · 7 dias
+              </p>
+              <HealthActivitySevenDayChart entries={health.charts.activity} variant="dense" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function VetProntuarioPage() {
+  const router = useRouter();
+  const pathname = usePathname() ?? "";
   const [mounted, setMounted] = useState(false);
   const [petOptions, setPetOptions] = useState<PetOption[]>([]);
   const [selectedPetId, setSelectedPetId] = useState("");
+  const [activePetId, setActivePetId] = useState<string | null>(null);
+  const [inProgressAppointmentId, setInProgressAppointmentId] = useState<string | null>(null);
+  const [finalizingConsultation, setFinalizingConsultation] = useState(false);
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
   const [petsLoading, setPetsLoading] = useState(false);
   const [petsError, setPetsError] = useState<string | null>(null);
   const [records, setRecords] = useState<ClinicalRecord[]>([]);
@@ -50,6 +223,14 @@ export default function VetProntuarioPage() {
   const [submittingMedication, setSubmittingMedication] = useState(false);
   const [vaccineSuccessMessage, setVaccineSuccessMessage] = useState<string | null>(null);
   const [medicationSuccessMessage, setMedicationSuccessMessage] = useState<string | null>(null);
+  const [vetProfile, setVetProfile] = useState<VetProfileSummary | null>(null);
+  const [petHistory, setPetHistory] = useState<PetHistoryItem[]>([]);
+  const [petHistoryLoading, setPetHistoryLoading] = useState(false);
+  const [petHistoryError, setPetHistoryError] = useState<string | null>(null);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [petHealth, setPetHealth] = useState<PetHealthSummary | null>(null);
+  const [petHealthLoading, setPetHealthLoading] = useState(false);
+  const [petHealthError, setPetHealthError] = useState<string | null>(null);
 
   const [note, setNote] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
@@ -63,13 +244,108 @@ export default function VetProntuarioPage() {
   const [medicationObservation, setMedicationObservation] = useState("");
 
   const selectedPet = useMemo(() => petOptions.find((pet) => pet.id === selectedPetId) ?? null, [petOptions, selectedPetId]);
+  const canFinalizeConsultation = Boolean(
+    selectedPetId && (selectedPetId === activePetId || inProgressAppointmentId),
+  );
+
+  const loadAttendanceState = useCallback(async (petId: string) => {
+    try {
+      const [activeResponse, appointmentsResponse] = await Promise.all([
+        fetch("/api/vet/pets?active=1", { method: "GET", credentials: "include", cache: "no-store" }),
+        fetch("/api/vet/appointments", { method: "GET", credentials: "include", cache: "no-store" }),
+      ]);
+      const activeData = (await activeResponse.json()) as { pet?: { id: string } | null };
+      const appointmentsData = (await appointmentsResponse.json()) as {
+        appointments?: Array<{ id: string; petId: string; status: string }>;
+      };
+
+      setActivePetId(activeData.pet?.id ?? null);
+
+      const inProgress =
+        (appointmentsData.appointments ?? []).find(
+          (item) => item.petId === petId && item.status === "Em atendimento",
+        )?.id ?? null;
+      setInProgressAppointmentId(inProgress);
+    } catch {
+      setActivePetId(null);
+      setInProgressAppointmentId(null);
+    }
+  }, []);
 
   const petRecords = useMemo(() => records.filter((item) => item.petId === selectedPetId), [records, selectedPetId]);
   const petVaccines = useMemo(() => vaccines.filter((item) => item.petId === selectedPetId), [vaccines, selectedPetId]);
   const petMedications = useMemo(() => medications.filter((item) => item.petId === selectedPetId), [medications, selectedPetId]);
 
+  function bumpPetHistory() {
+    setHistoryRefreshKey((value) => value + 1);
+  }
+
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPetId) {
+      setPetHealth(null);
+      setPetHealthLoading(false);
+      setPetHealthError(null);
+      return;
+    }
+
+    let active = true;
+
+    async function loadPetHealth() {
+      setPetHealthLoading(true);
+      setPetHealthError(null);
+      try {
+        const response = await fetch(`/api/vet/pets/health?petId=${encodeURIComponent(selectedPetId)}`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = (await response.json()) as { error?: string; health?: PetHealthSummary };
+        if (!response.ok) throw new Error(data.error ?? "Falha ao carregar dados de saude.");
+        if (active) setPetHealth(data.health ?? null);
+      } catch (error) {
+        if (active) {
+          setPetHealth(null);
+          setPetHealthError(error instanceof Error ? error.message : "Falha ao carregar dados de saude.");
+        }
+      } finally {
+        if (active) setPetHealthLoading(false);
+      }
+    }
+
+    void loadPetHealth();
+    return () => {
+      active = false;
+    };
+  }, [selectedPetId]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadVetProfile() {
+      try {
+        const response = await fetch("/api/vet/prontuario?veterinarian=1", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = (await response.json()) as {
+          veterinarian?: { name?: string; crmv?: string; specialty?: string };
+        };
+        if (!response.ok || !active || !data.veterinarian) return;
+        setVetProfile(toVetProfileSummary(data.veterinarian));
+      } catch {
+        if (active) setVetProfile(null);
+      }
+    }
+
+    void loadVetProfile();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -79,12 +355,18 @@ export default function VetProntuarioPage() {
       setPetsLoading(true);
       setPetsError(null);
       try {
-        const response = await fetch("/api/vet/pets", { method: "GET", credentials: "include", cache: "no-store" });
-        const data = (await response.json()) as {
+        const [recentResponse, activeResponse] = await Promise.all([
+          fetch("/api/vet/pets?recent=1", { method: "GET", credentials: "include", cache: "no-store" }),
+          fetch("/api/vet/pets?active=1", { method: "GET", credentials: "include", cache: "no-store" }),
+        ]);
+        const data = (await recentResponse.json()) as {
           error?: string;
           pets?: Array<{ id: string; petIdentity: string; name: string; image: string }>;
         };
-        if (!response.ok) throw new Error(data.error ?? "Falha ao carregar pets.");
+        const activeData = (await activeResponse.json()) as {
+          pet?: { id: string; petIdentity: string; name: string; image: string } | null;
+        };
+        if (!recentResponse.ok) throw new Error(data.error ?? "Falha ao carregar pets.");
         const mapped: PetOption[] = (data.pets ?? []).map((pet) => ({
           id: pet.id,
           petIdentity: typeof pet.petIdentity === "string" && pet.petIdentity.trim() ? pet.petIdentity.trim() : pet.id,
@@ -92,9 +374,28 @@ export default function VetProntuarioPage() {
           image: getPetImageOrDefault(pet.image),
         }));
 
+        const activePet = activeData.pet;
+        if (activePet && !mapped.some((pet) => pet.id === activePet.id)) {
+          mapped.unshift({
+            id: activePet.id,
+            petIdentity:
+              typeof activePet.petIdentity === "string" && activePet.petIdentity.trim()
+                ? activePet.petIdentity.trim()
+                : activePet.id,
+            name: activePet.name,
+            image: getPetImageOrDefault(activePet.image),
+          });
+        }
+
         if (!active) return;
         setPetOptions(mapped);
-        setSelectedPetId((prev) => (prev && mapped.some((pet) => pet.id === prev) ? prev : (mapped[0]?.id ?? "")));
+        setActivePetId(activePet?.id ?? null);
+        const preferredId = activePet?.id && mapped.some((pet) => pet.id === activePet.id) ? activePet.id : "";
+        setSelectedPetId((prev) => {
+          if (prev && mapped.some((pet) => pet.id === prev)) return prev;
+          if (preferredId) return preferredId;
+          return mapped[0]?.id ?? "";
+        });
       } catch (error) {
         if (!active) return;
         setPetOptions([]);
@@ -109,6 +410,14 @@ export default function VetProntuarioPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!mounted || !selectedPetId) {
+      setInProgressAppointmentId(null);
+      return;
+    }
+    void loadAttendanceState(selectedPetId);
+  }, [mounted, pathname, selectedPetId, loadAttendanceState]);
 
   useEffect(() => {
     if (!selectedPetId) {
@@ -129,6 +438,7 @@ export default function VetProntuarioPage() {
         });
         const data = (await response.json()) as {
           error?: string;
+          veterinarian?: VeterinarianApiPayload;
           vaccines?: Array<{
             id: string;
             petId: string;
@@ -142,6 +452,7 @@ export default function VetProntuarioPage() {
         };
         if (!response.ok) throw new Error(data.error ?? "Falha ao carregar vacinas.");
         if (!active) return;
+        if (data.veterinarian) setVetProfile(toVetProfileSummary(data.veterinarian));
         const normalized = (data.vaccines ?? []).map((item) => ({
           id: item.id,
           petId: item.petId,
@@ -188,6 +499,7 @@ export default function VetProntuarioPage() {
         });
         const data = (await response.json()) as {
           error?: string;
+          veterinarian?: VeterinarianApiPayload;
           medications?: Array<{
             id: string;
             petId: string;
@@ -201,6 +513,7 @@ export default function VetProntuarioPage() {
         };
         if (!response.ok) throw new Error(data.error ?? "Falha ao carregar medicacoes.");
         if (!active) return;
+        if (data.veterinarian) setVetProfile(toVetProfileSummary(data.veterinarian));
         const normalized = (data.medications ?? []).map((item) => ({
           id: item.id,
           petId: item.petId,
@@ -259,12 +572,30 @@ export default function VetProntuarioPage() {
         });
         const data = (await response.json()) as {
           error?: string;
-          records?: ClinicalRecord[];
+          veterinarian?: { name?: string; crmv?: string; specialty?: string };
+          records?: Array<{
+            id: string;
+            petId: string;
+            petName: string;
+            note: string;
+            diagnosis: string;
+            when: string;
+            prescribedByName?: string;
+            prescribedByCrmv?: string;
+          }>;
         };
         if (!response.ok) {
           throw new Error(data.error ?? "Falha ao carregar prontuario.");
         }
-        if (active) setRecords(Array.isArray(data.records) ? data.records : []);
+        if (active) {
+          if (data.veterinarian) setVetProfile(toVetProfileSummary(data.veterinarian));
+          const normalized = (data.records ?? []).map((item) => ({
+            ...item,
+            prescribedByName: item.prescribedByName || "Veterinario",
+            prescribedByCrmv: item.prescribedByCrmv || "Nao informado",
+          }));
+          setRecords(normalized);
+        }
       } catch (error) {
         if (active) {
           setRecords([]);
@@ -280,6 +611,42 @@ export default function VetProntuarioPage() {
       active = false;
     };
   }, [selectedPetId]);
+
+  useEffect(() => {
+    if (!selectedPetId) {
+      setPetHistory([]);
+      setPetHistoryLoading(false);
+      return;
+    }
+    let active = true;
+
+    async function loadPetHistory() {
+      setPetHistoryLoading(true);
+      setPetHistoryError(null);
+      try {
+        const response = await fetch(`/api/vet/clinical-history?petId=${encodeURIComponent(selectedPetId)}`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = (await response.json()) as { error?: string; history?: PetHistoryItem[] };
+        if (!response.ok) throw new Error(data.error ?? "Falha ao carregar historico do pet.");
+        if (active) setPetHistory(Array.isArray(data.history) ? data.history : []);
+      } catch (error) {
+        if (active) {
+          setPetHistory([]);
+          setPetHistoryError(error instanceof Error ? error.message : "Falha ao carregar historico do pet.");
+        }
+      } finally {
+        if (active) setPetHistoryLoading(false);
+      }
+    }
+
+    void loadPetHistory();
+    return () => {
+      active = false;
+    };
+  }, [selectedPetId, historyRefreshKey]);
 
   async function addClinicalRecord() {
     if (!selectedPet) return;
@@ -308,6 +675,7 @@ export default function VetProntuarioPage() {
       setRecords((prev) => [data.record as ClinicalRecord, ...prev]);
       setNote("");
       setDiagnosis("");
+      bumpPetHistory();
     } catch (error) {
       setRecordsError(error instanceof Error ? error.message : "Falha ao adicionar prontuario.");
     } finally {
@@ -374,6 +742,7 @@ export default function VetProntuarioPage() {
         setNextDose("");
         setVaccineObservation("");
         setVaccineSuccessMessage("Vacina adicionada com sucesso.");
+        bumpPetHistory();
       } catch (error) {
         setVaccinesError(error instanceof Error ? error.message : "Falha ao adicionar vacina.");
       } finally {
@@ -437,6 +806,7 @@ export default function VetProntuarioPage() {
         setDuration("");
         setMedicationObservation("");
         setMedicationSuccessMessage("Medicacao adicionada com sucesso.");
+        bumpPetHistory();
       } catch (error) {
         setMedicationsError(error instanceof Error ? error.message : "Falha ao adicionar medicacao.");
       } finally {
@@ -445,18 +815,73 @@ export default function VetProntuarioPage() {
     })();
   }
 
+  async function confirmFinalizeConsultation() {
+    if (!selectedPet || !canFinalizeConsultation) return;
+
+    setShowFinalizeConfirm(false);
+    setFinalizingConsultation(true);
+    setFinalizeError(null);
+    try {
+      const useActiveSession = selectedPet.id === activePetId;
+      const response = await fetch(useActiveSession ? "/api/vet/pets" : "/api/vet/appointments", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(useActiveSession ? { petId: selectedPet.id } : { id: inProgressAppointmentId }),
+      });
+      const data = (await response.json()) as { error?: string; detail?: string };
+      if (!response.ok) {
+        throw new Error(data.detail ?? data.error ?? "Falha ao finalizar atendimento.");
+      }
+      router.push("/vet/atendidos");
+    } catch (error) {
+      setFinalizeError(error instanceof Error ? error.message : "Falha ao finalizar atendimento.");
+    } finally {
+      setFinalizingConsultation(false);
+    }
+  }
+
   return (
     <VetShell title="Prontuario" subtitle="Area medica">
+      <LykaConfirmDialog
+        open={showFinalizeConfirm}
+        title="Finalizar atendimento?"
+        description={
+          selectedPet
+            ? `Encerrar o atendimento de ${selectedPet.name} e liberar a fila.`
+            : "Encerrar o atendimento e liberar a fila."
+        }
+        confirmLabel="Finalizar atendimento"
+        confirmTone="default"
+        busy={finalizingConsultation}
+        dialogId="vet-finalize-prontuario-dialog-title"
+        onCancel={() => setShowFinalizeConfirm(false)}
+        onConfirm={() => void confirmFinalizeConsultation()}
+      />
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "80ms" }}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-[14px] font-semibold text-zinc-900">Gestao de prontuario do pet</h3>
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700">Persistido</span>
+          <div className="flex items-center gap-1.5">
+            {canFinalizeConsultation ? (
+              <button
+                type="button"
+                onClick={() => setShowFinalizeConfirm(true)}
+                disabled={finalizingConsultation}
+                className="rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {finalizingConsultation ? "Finalizando..." : "Finalizar atendimento"}
+              </button>
+            ) : null}
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700">
+              Persistido
+            </span>
+          </div>
         </div>
         <p className="text-[12px] text-zinc-500">Selecione um pet, consulte historicos e adicione prontuario, vacinas e medicacao.</p>
 
         {selectedPet ? (
           <div className="mt-3 flex items-center gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 py-2">
-            <div className="relative h-11 w-11 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
               <Image
                 src={getPetImageOrDefault(selectedPet.image)}
                 alt={`Foto de ${selectedPet.name}`}
@@ -465,13 +890,27 @@ export default function VetProntuarioPage() {
                 sizes="44px"
               />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-[12px] font-semibold text-zinc-800">
                 {selectedPet.name} <span className="text-[10px] font-medium text-zinc-500">({selectedPet.petIdentity})</span>
               </p>
+              {canFinalizeConsultation ? (
+                <p className="text-[10px] text-emerald-700">Atendimento em andamento</p>
+              ) : null}
             </div>
+            {canFinalizeConsultation ? (
+              <button
+                type="button"
+                onClick={() => setShowFinalizeConfirm(true)}
+                disabled={finalizingConsultation}
+                className="shrink-0 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {finalizingConsultation ? "Finalizando..." : "Finalizar"}
+              </button>
+            ) : null}
           </div>
         ) : null}
+        {finalizeError ? <p className="mt-2 text-[11px] text-rose-700">{finalizeError}</p> : null}
 
         <select
           value={selectedPetId}
@@ -488,10 +927,13 @@ export default function VetProntuarioPage() {
           ))}
         </select>
         {petsError ? <p className="mt-2 text-[11px] text-rose-700">{petsError}</p> : null}
+
+        <PetHealthCard health={petHealth} loading={petHealthLoading} error={petHealthError} />
       </section>
 
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "110ms" }}>
         <h3 className="text-[13px] font-semibold text-zinc-900">Novo registro clinico</h3>
+        <VetResponsibleCard profile={vetProfile} label="Responsavel pelo registro" />
         <div className="mt-2 grid gap-2">
           <input
             type="text"
@@ -522,6 +964,7 @@ export default function VetProntuarioPage() {
       <div className="mt-3 grid gap-3 xl:grid-cols-2">
       <section className="appear-up rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "130ms" }}>
         <h3 className="text-[13px] font-semibold text-zinc-900">Vacinas</h3>
+        <VetResponsibleCard profile={vetProfile} label="Responsavel pela prescricao" />
         <div className="mt-2 grid gap-2">
           <input
             type="text"
@@ -566,6 +1009,7 @@ export default function VetProntuarioPage() {
 
       <section className="appear-up rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "150ms" }}>
         <h3 className="text-[13px] font-semibold text-zinc-900">Medicacao</h3>
+        <VetResponsibleCard profile={vetProfile} label="Responsavel pela prescricao" />
         <div className="mt-2 grid gap-2">
           <input
             type="text"
@@ -609,58 +1053,54 @@ export default function VetProntuarioPage() {
       </section>
       </div>
 
+      {canFinalizeConsultation && selectedPet ? (
+        <section
+          className="appear-up mt-3 rounded-[26px] border border-emerald-200 bg-emerald-50/50 p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]"
+          style={{ animationDelay: "160ms" }}
+        >
+          <h3 className="text-[13px] font-semibold text-emerald-950">Encerrar atendimento</h3>
+          <p className="mt-1 text-[12px] text-emerald-900/80">
+            Ao finalizar, {selectedPet.name} sai da fila em atendimento e o prontuario fica disponivel apenas para consulta.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowFinalizeConfirm(true)}
+            disabled={finalizingConsultation}
+            className="mt-3 h-11 w-full rounded-xl border border-zinc-800 bg-zinc-900 text-[12px] font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-60"
+          >
+            {finalizingConsultation ? "Finalizando atendimento..." : "Finalizar atendimento"}
+          </button>
+        </section>
+      ) : null}
+
       <section className="appear-up mt-3 rounded-[26px] bg-white p-4 shadow-[0_16px_28px_-22px_rgba(10,16,13,0.35)]" style={{ animationDelay: "170ms" }}>
-        <h3 className="text-[13px] font-semibold text-zinc-900">Historico de {selectedPet?.name ?? "pet selecionado"}</h3>
+        <h3 className="text-[13px] font-semibold text-zinc-900">Historico do pet · {selectedPet?.name ?? "pet selecionado"}</h3>
+        <p className="mt-1 text-[11px] text-zinc-500">Timeline unificada visivel ao tutor em Registros Medicos.</p>
 
-        <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Prontuario</p>
-        <div className="mt-1 space-y-2">
-          {recordsLoading ? <p className="text-[11px] text-zinc-500">Carregando prontuario...</p> : null}
-          {petRecords.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
-              <div className="flex items-center justify-between">
-                <p className="text-[12px] font-semibold text-zinc-800">{item.diagnosis}</p>
-                <p className="text-[10px] text-zinc-500">{item.when}</p>
-              </div>
-              <p className="mt-1 text-[11px] text-zinc-700">{item.note}</p>
-            </article>
-          ))}
-          {!recordsLoading && petRecords.length === 0 ? <p className="text-[11px] text-zinc-500">Sem prontuarios para este pet.</p> : null}
-        </div>
-
-        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Vacinas</p>
-        <div className="mt-1 space-y-2">
-          {vaccinesLoading ? <p className="text-[11px] text-zinc-500">Carregando vacinas...</p> : null}
-          {petVaccines.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-              <p className="text-[12px] font-semibold text-zinc-800">{item.vaccine}</p>
-              <p className="mt-0.5 text-[11px] text-zinc-600">
-                Aplicada em {item.date} · Proxima dose: {item.nextDose}
-              </p>
-              {item.observation ? <p className="mt-0.5 text-[10px] text-zinc-600">Observacao: {item.observation}</p> : null}
-              <p className="mt-0.5 text-[10px] text-zinc-500">
-                Prescrita por {item.prescribedByName} · CRMV {item.prescribedByCrmv}
-              </p>
-            </article>
-          ))}
-          {!vaccinesLoading && petVaccines.length === 0 ? <p className="text-[11px] text-zinc-500">Sem vacinas registradas para este pet.</p> : null}
-        </div>
-
-        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Medicacao</p>
-        <div className="mt-1 space-y-2">
-          {medicationsLoading ? <p className="text-[11px] text-zinc-500">Carregando medicacoes...</p> : null}
-          {petMedications.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-              <p className="text-[12px] font-semibold text-zinc-800">{item.medication}</p>
-              <p className="mt-0.5 text-[11px] text-zinc-600">
-                {item.dosage} · Duracao: {item.duration}
-              </p>
-              {item.observation ? <p className="mt-0.5 text-[10px] text-zinc-600">Observacao: {item.observation}</p> : null}
-              <p className="mt-0.5 text-[10px] text-zinc-500">
-                Prescrita por {item.prescribedByName} · CRMV {item.prescribedByCrmv}
-              </p>
-            </article>
-          ))}
-          {!medicationsLoading && petMedications.length === 0 ? <p className="text-[11px] text-zinc-500">Sem medicacoes registradas para este pet.</p> : null}
+        <div className="mt-2 space-y-2">
+          {petHistoryLoading ? <p className="text-[11px] text-zinc-500">Carregando historico...</p> : null}
+          {petHistoryError ? <p className="text-[11px] text-rose-700">{petHistoryError}</p> : null}
+          {!petHistoryLoading && !petHistoryError
+            ? petHistory.map((item) => (
+                <article key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">{item.kindLabel}</p>
+                      <p className="mt-0.5 text-[12px] font-semibold text-zinc-800">{item.title}</p>
+                    </div>
+                    <p className="shrink-0 text-[10px] text-zinc-500">{item.when}</p>
+                  </div>
+                  {item.detail ? <p className="mt-1 text-[11px] text-zinc-700">{item.detail}</p> : null}
+                  <p className="mt-1 text-[10px] text-zinc-500">
+                    {item.kind === "clinical" ? "Registrado por" : "Prescrito por"}{" "}
+                    {item.veterinarianLabel || `${item.prescribedByName} · CRMV ${item.prescribedByCrmv}`}
+                  </p>
+                </article>
+              ))
+            : null}
+          {!petHistoryLoading && !petHistoryError && petHistory.length === 0 ? (
+            <p className="text-[11px] text-zinc-500">Sem registros no historico deste pet.</p>
+          ) : null}
         </div>
       </section>
     </VetShell>

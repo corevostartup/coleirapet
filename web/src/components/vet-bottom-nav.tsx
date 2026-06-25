@@ -22,9 +22,9 @@ function VetBottomNavInner() {
 
   const tab = resolveVetTab(pathname);
   const items = [
-    { key: "pets", label: "Pets", href: "/vet/pets", Icon: IconCollar },
-    { key: "prontuario", label: "Prontuario", href: "/vet/prontuario", Icon: IconFile },
+    { key: "pets", label: "Triagem", href: "/vet/pets", Icon: IconCollar },
     { key: "atendidos", label: "Atendimentos", href: "/vet/atendidos", Icon: IconUser },
+    { key: "prontuario", label: "Prontuario", href: "/vet/prontuario", Icon: IconFile },
     { key: "clinicas", label: "Clinicas", href: "/vet/clinicas", Icon: IconPin },
   ] as const;
 

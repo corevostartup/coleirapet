@@ -1,17 +1,9 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
+import { VeterinaryClinicsLeafletMap } from "@/components/veterinary-clinics-leaflet-map";
 import { location } from "@/lib/mock";
-
-const VeterinaryClinicsLeafletMap = dynamic(
-  () => import("@/components/veterinary-clinics-leaflet-map").then((m) => m.VeterinaryClinicsLeafletMap),
-  {
-    ssr: false,
-    loading: () => <div className="h-full w-full animate-pulse bg-zinc-100" aria-hidden />,
-  },
-);
 
 const DESKTOP_LAYOUT_MQ = "(min-width: 768px)";
 

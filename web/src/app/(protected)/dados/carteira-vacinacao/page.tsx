@@ -66,6 +66,7 @@ export default async function CarteiraVacinacaoPage() {
       <TopBar
         title="Carteira de vacinacao"
         subtitle="Registros Médicos"
+        showNotificationsLink={false}
         leadingAction={
           <Link
             href="/dados"

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { toBlob } from "html-to-image";
 import { useEffect, useRef, useState } from "react";
 import { VaccineDetailsModal } from "@/components/vaccine-details-modal";
@@ -41,14 +42,9 @@ export function VaccinationWalletContent({
   const [error, setError] = useState<string | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareHint, setShareHint] = useState<string | null>(null);
-  const [pets, setPets] = useState(initialPets);
   const [selectedPetId, setSelectedPetId] = useState(currentPetId || initialPets[0]?.id || "");
-  const [switchOpen, setSwitchOpen] = useState(false);
-  const [switchBusy, setSwitchBusy] = useState<string | null>(null);
-  const [switchError, setSwitchError] = useState<string | null>(null);
 
   useEffect(() => {
-    setPets(initialPets);
     setSelectedPetId(currentPetId || initialPets[0]?.id || "");
   }, [currentPetId, initialPets]);
 
@@ -63,7 +59,7 @@ export function VaccinationWalletContent({
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/vaccines${petMetricsQuery(selectedPetId)}`, { method: "GET" });
+        const res = await fetch(`/api/vaccines${petMetricsQuery(selectedPetId)}`, { method: "GET", cache: "no-store" });
         if (!res.ok) {
           const payload = (await res.json().catch(() => null)) as { error?: string } | null;
           throw new Error(payload?.error ?? "Falha ao carregar vacinas.");
@@ -84,50 +80,35 @@ export function VaccinationWalletContent({
     };
   }, [selectedPetId]);
 
+  useEffect(() => {
+    function onRefresh() {
+      if (!selectedPetId) return;
+      void (async () => {
+        try {
+          const res = await fetch(`/api/vaccines${petMetricsQuery(selectedPetId)}`, { method: "GET", cache: "no-store" });
+          if (!res.ok) return;
+          const data = (await res.json()) as { vaccines?: VaccineItem[] };
+          setVaccines(data.vaccines ?? []);
+        } catch {
+          // ignora falha silenciosa no refresh
+        }
+      })();
+    }
+    window.addEventListener("lyka-pet-data-updated", onRefresh);
+    return () => window.removeEventListener("lyka-pet-data-updated", onRefresh);
+  }, [selectedPetId]);
+
   const applied = vaccines
     .filter((v) => v.status === "applied")
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
+  const pending = vaccines
+    .filter((v) => v.status === "pending")
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
   const ageLabel = petAge === null ? "Idade nao informada" : `${petAge} ${petAge === 1 ? "ano" : "anos"}`;
   const weightLabel =
     petWeightKg === null ? "Peso nao informado" : `${petWeightKg.toFixed(1).replace(/\.0$/, "")} kg`;
-  const selectedPet = pets.find((item) => item.id === selectedPetId) ?? pets[0] ?? null;
-
-  async function switchPet(petId: string) {
-    if (!petId || petId === selectedPetId || switchBusy) {
-      setSwitchOpen(false);
-      return;
-    }
-    setSwitchError(null);
-    setSwitchBusy(petId);
-    try {
-      const response = await fetch("/api/pets/list", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ petId }),
-      });
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string; currentPetId?: string; pets?: Array<{ id: string; name: string; breed: string; image: string }> }
-        | null;
-      if (!response.ok) throw new Error(payload?.error ?? "Nao foi possivel trocar pet.");
-
-      const nextPets = Array.isArray(payload?.pets) ? payload.pets : pets;
-      const nextPetId = payload?.currentPetId ?? petId;
-      setPets(nextPets);
-      setSelectedPetId(nextPetId);
-      setSwitchOpen(false);
-
-      if (typeof window !== "undefined") {
-        const url = new URL(window.location.href);
-        url.searchParams.set("_r", String(Date.now()));
-        window.location.assign(url.toString());
-      }
-    } catch (err) {
-      setSwitchError(err instanceof Error ? err.message : "Falha ao trocar pet.");
-    } finally {
-      setSwitchBusy(null);
-    }
-  }
 
   async function shareWalletImage() {
     if (!walletRef.current || shareBusy) return;
@@ -183,62 +164,40 @@ export function VaccinationWalletContent({
           <div className="mb-2 flex items-center justify-end gap-2">
             <button
               type="button"
-              onClick={() => setSwitchOpen((value) => !value)}
-              className="flex items-center gap-1 rounded-xl border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
-            >
-              {selectedPet ? (
-                <span className="relative h-5 w-5 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
-                  <Image src={selectedPet.image ? getPetImageOrDefault(selectedPet.image) : getPetImageOrDefault("")} alt={`Foto de ${selectedPet.name}`} fill className="object-cover" sizes="20px" unoptimized />
-                </span>
-              ) : null}
-              Trocar pet
-              <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-                <path d="m5 7 5 5 5-5" />
-              </svg>
-            </button>
-            <button
-              type="button"
               onClick={() => void shareWalletImage()}
               disabled={shareBusy}
-              className="flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label={shareBusy ? "Gerando imagem para compartilhar" : "Compartilhar carteira de vacinacao"}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <IconShare className="h-3.5 w-3.5" />
-              {shareBusy ? "Gerando..." : "Compartilhar"}
+              <IconShare className="h-4 w-4" aria-hidden />
             </button>
           </div>
 
-          {switchOpen ? (
-            <div className="mb-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.2)]">
-              <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Trocar pet</p>
-              <ul className="space-y-1.5">
-                {pets.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      disabled={Boolean(switchBusy)}
-                      onClick={() => void switchPet(item.id)}
-                      className={`flex w-full items-center gap-2 rounded-xl border px-2 py-1.5 text-left text-[11px] transition ${
-                        item.id === selectedPetId ? "border-emerald-200 bg-emerald-50/70" : "border-zinc-200 bg-zinc-50 hover:bg-zinc-100"
-                      }`}
-                    >
-                      <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-                        <Image src={item.image ? getPetImageOrDefault(item.image) : getPetImageOrDefault("")} alt={`Foto de ${item.name}`} fill className="object-cover" sizes="28px" unoptimized />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate font-semibold text-zinc-800">{item.name}</span>
-                        <span className="block truncate text-[10px] text-zinc-500">{item.breed || "Sem raca"}</span>
-                      </span>
-                      <span className="ml-auto text-[10px] font-semibold text-emerald-700">
-                        {switchBusy === item.id ? "..." : item.id === selectedPetId ? "Atual" : ""}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+          {shareHint ? <p className="mb-2 rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-[11px] text-zinc-600">{shareHint}</p> : null}
+
+          {!loading && !error && pending.length > 0 ? (
+            <div className="mb-3 flex flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold text-amber-950">Possui vacinas pendentes</p>
+                <p className="mt-0.5 text-[11px] leading-snug text-amber-900/90">
+                  {pending.length === 1
+                    ? "1 vacina aguardando aplicacao ou confirmacao."
+                    : `${pending.length} vacinas aguardando aplicacao ou confirmacao.`}
+                  {pending.length <= 3 ? (
+                    <span className="mt-1 block truncate text-[10px] text-amber-800/80">
+                      {pending.map((v) => v.name).join(" · ")}
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+              <Link
+                href="/dados"
+                className="inline-flex shrink-0 items-center justify-center rounded-xl border border-amber-300 bg-white px-3 py-2 text-[11px] font-semibold text-amber-950 transition hover:bg-amber-100/80"
+              >
+                Ver vacinas
+              </Link>
             </div>
           ) : null}
-          {switchError ? <p className="mb-2 rounded-xl border border-rose-100 bg-rose-50 px-2.5 py-1.5 text-[11px] text-rose-700">{switchError}</p> : null}
-          {shareHint ? <p className="mb-2 rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-[11px] text-zinc-600">{shareHint}</p> : null}
 
           <div className="flex items-start gap-3">
             <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl border border-emerald-200/80 bg-zinc-100 shadow-sm ring-2 ring-white">

@@ -1,17 +1,20 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
-import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import { COLLECTION_PETS, SUBCOLLECTION_VACCINES, SUBCOLLECTION_VACCINES_LEGACY } from "@/lib/firebase/collections";
 import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
-import { getCurrentVeterinarianProfile } from "@/lib/veterinarians/current";
+import {
+  createPrescribedByCache,
+  enrichPrescribedBy,
+  prescribedByForWrite,
+  requireVetAuthContext,
+  veterinarianFromAuth,
+} from "@/lib/veterinarians/auth";
 import { canVetEditVaccineStatus } from "@/lib/vaccines/vaccine-access";
 import type { VaccineStatus } from "@/lib/vaccines/vaccine-item";
 import { vaccineFromDoc } from "@/lib/vaccines/vaccine-item";
 
 type GetVaccinesParams = {
   petId?: string;
+  veterinarian?: string;
 };
 
 type CreateVaccinePayload = {
@@ -42,23 +45,19 @@ type VaccineSourceDoc = {
   updatedAt?: string;
 };
 
-async function requireVetAuthContext() {
-  const jar = await cookies();
-  const session = parseAuthSessionCookie(jar.get(AUTH_SESSION_COOKIE)?.value);
-  const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
-  if (!session || !uid) return null;
-
-  const user = await getOrCreateCurrentUserProfile(uid);
-  if (user.userType !== "vet") return null;
-  return { uid, vetName: user.name || "Veterinario" };
-}
-
 export async function GET(request: Request) {
   const auth = await requireVetAuthContext();
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
 
   const params = Object.fromEntries(new URL(request.url).searchParams.entries()) as GetVaccinesParams;
+  const veterinarianOnly = params.veterinarian === "1";
   const petId = typeof params.petId === "string" ? params.petId.trim() : "";
+  const veterinarian = veterinarianFromAuth(auth);
+
+  if (veterinarianOnly) {
+    return NextResponse.json({ veterinarian });
+  }
+
   if (!petId) return NextResponse.json({ error: "PetId invalido" }, { status: 400 });
 
   try {
@@ -79,17 +78,11 @@ export async function GET(request: Request) {
       }
     }
 
-    const vaccines = Array.from(deduped.values())
-      .map((doc) => {
-        const data = doc.data() as {
-          name?: string;
-          date?: string;
-          nextDose?: string;
-          observation?: string;
-          prescribedByName?: string;
-          prescribedByCrmv?: string;
-          createdAt?: string;
-        };
+    const authorCache = createPrescribedByCache(auth);
+    const vaccines = await Promise.all(
+      Array.from(deduped.values()).map(async (doc) => {
+        const data = doc.data() as VaccineSourceDoc & { observation?: string; createdAt?: string };
+        const author = await enrichPrescribedBy(data, auth, authorCache);
         return {
           id: doc.id,
           petId,
@@ -97,14 +90,16 @@ export async function GET(request: Request) {
           date: typeof data.date === "string" ? data.date : "",
           nextDose: typeof data.nextDose === "string" ? data.nextDose : "Nao informado",
           observation: typeof data.observation === "string" ? data.observation : "",
-          prescribedByName: typeof data.prescribedByName === "string" ? data.prescribedByName : "Veterinario",
-          prescribedByCrmv: typeof data.prescribedByCrmv === "string" ? data.prescribedByCrmv : "Nao informado",
+          prescribedByName: author.prescribedByName,
+          prescribedByCrmv: author.prescribedByCrmv,
           createdAt: typeof data.createdAt === "string" ? data.createdAt : "",
         };
-      })
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      }),
+    );
 
-    return NextResponse.json({ vaccines });
+    vaccines.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    return NextResponse.json({ vaccines, veterinarian });
   } catch (error) {
     return NextResponse.json(
       {
@@ -143,8 +138,11 @@ export async function POST(request: Request) {
     const petSnap = await petRef.get();
     if (!petSnap.exists) return NextResponse.json({ error: "Pet nao encontrado" }, { status: 404 });
 
-    const vetProfile = await getCurrentVeterinarianProfile(auth.uid);
-    const prescribedByCrmv = vetProfile?.crmv?.trim() || "Nao informado";
+    const prescribedBy = prescribedByForWrite(auth);
+    const veterinarianLabel =
+      prescribedBy.prescribedByCrmv !== "Nao informado"
+        ? `${prescribedBy.prescribedByName} · CRMV ${prescribedBy.prescribedByCrmv}`
+        : prescribedBy.prescribedByName;
     const nowIso = new Date().toISOString();
 
     const ref = await petRef.collection(SUBCOLLECTION_VACCINES).add({
@@ -153,8 +151,9 @@ export async function POST(request: Request) {
       date: date.slice(0, 20),
       nextDose: (nextDose || "Nao informado").slice(0, 40),
       observation: observation.slice(0, 400),
-      prescribedByName: auth.vetName.slice(0, 80),
-      prescribedByCrmv: prescribedByCrmv.slice(0, 40),
+      notes: observation.slice(0, 400),
+      veterinarian: veterinarianLabel.slice(0, 120),
+      ...prescribedBy,
       createdBy: "vet",
       createdByUid: auth.uid,
       createdAt: nowIso,
@@ -171,8 +170,8 @@ export async function POST(request: Request) {
           date: date.slice(0, 20),
           nextDose: (nextDose || "Nao informado").slice(0, 40),
           observation: observation.slice(0, 400),
-          prescribedByName: auth.vetName.slice(0, 80),
-          prescribedByCrmv: prescribedByCrmv.slice(0, 40),
+          prescribedByName: prescribedBy.prescribedByName,
+          prescribedByCrmv: prescribedBy.prescribedByCrmv,
           createdAt: nowIso,
         },
       },

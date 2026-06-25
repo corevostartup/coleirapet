@@ -16,6 +16,7 @@ No Next.js 16 com Webpack, **não** usar cadeias Server → Client → Client ne
 | `AppShell` | `web/src/components/shell.tsx` | Server | named `AppShell` |
 | `UserAppShellLayout` | `web/src/components/user-app-shell-layout.tsx` | Client | named |
 | `TopBar` | `web/src/components/top-bar.tsx` | Client | **default** |
+| `LykaKeyboardProvider` | `web/src/components/lyka-keyboard-provider.tsx` | Client | **default** (teclado inline no mesmo arquivo) |
 | `LoginPage` | `web/src/app/login/page.tsx` | Client | reexport default de `login-screen` |
 | `LoginScreen` | `web/src/components/login/login-screen.tsx` | Client | **default** |
 | `ProfilePetSwitcher` | `web/src/components/profile-pet-switcher.tsx` | Client | named |

@@ -3,7 +3,9 @@
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IconWave } from "@/components/icons";
+import { LykaDateCalendarPicker } from "@/components/lyka-date-calendar-picker";
 import { petMetricsQuery, useSelectedPet } from "@/lib/pets/use-selected-pet";
+import { LYKA_Z_INDEX } from "@/lib/ui/z-index";
 
 type Entry = {
   id: string;
@@ -14,6 +16,15 @@ type Entry = {
 
 function todayIso() {
   const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function minActivityDateIso() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 1);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
@@ -133,6 +144,8 @@ export function HealthActivityMinutesPanel({
 } = {}) {
   const { petId, petName } = useSelectedPet({ petId: initialPetId, petName: initialPetName });
   const displayPetName = petName || initialPetName || "";
+  const maxDateIso = todayIso();
+  const minDateIso = useMemo(() => minActivityDateIso(), []);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -354,7 +367,8 @@ export function HealthActivityMinutesPanel({
       {mounted && modalOpen
         ? createPortal(
             <div
-              className="fixed inset-0 z-[3000] flex min-h-[100dvh] items-center justify-center overflow-x-hidden bg-black/40 px-2 py-6 pb-28 sm:px-6"
+              className="fixed inset-0 flex min-h-[100dvh] items-start justify-center overflow-y-auto bg-black/40 px-2 pb-[max(7rem,42dvh)] pt-4 sm:items-center sm:px-6 sm:py-6 sm:pb-28"
+              style={{ zIndex: LYKA_Z_INDEX.modal }}
               role="dialog"
               aria-modal="true"
               aria-labelledby="activity-minutes-modal-title"
@@ -390,22 +404,19 @@ export function HealthActivityMinutesPanel({
                 </div>
 
                 <form onSubmit={handleSubmit} className="grid min-w-0 gap-3">
-                  <div className="flex flex-wrap items-end gap-3">
-                    <div className="shrink-0">
-                      <label htmlFor="act-minutes-date" className="text-[12px] font-semibold text-zinc-700">
-                        Data
-                      </label>
-                      <input
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-2">
+                    <div className="min-w-0">
+                      <LykaDateCalendarPicker
                         id="act-minutes-date"
-                        type="date"
+                        label="Data"
                         value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        readOnly={Boolean(editingId)}
-                        required
-                        className="mt-2 box-border h-11 min-h-11 w-[min(100%,11.5rem)] min-w-[10.5rem] max-w-[12rem] rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] text-zinc-900 outline-none transition read-only:opacity-90 focus:border-emerald-400 focus:bg-white sm:px-3"
+                        onChange={setDate}
+                        disabled={Boolean(editingId)}
+                        minDate={minDateIso}
+                        maxDate={maxDateIso}
                       />
                     </div>
-                    <div className="min-w-[6.25rem] shrink-0 sm:w-28">
+                    <div className="min-w-0">
                       <label htmlFor="act-minutes-value" className="text-[12px] font-semibold text-zinc-700">
                         Tempo <span className="font-normal text-zinc-500">(h:mm)</span>
                       </label>
@@ -413,6 +424,7 @@ export function HealthActivityMinutesPanel({
                         id="act-minutes-value"
                         type="text"
                         inputMode="numeric"
+                        data-lyka-keyboard-layout="numeric"
                         autoComplete="off"
                         spellCheck={false}
                         value={formatDurationDigitBuffer(durationDigits)}
@@ -421,7 +433,7 @@ export function HealthActivityMinutesPanel({
                           setDurationDigits(digits);
                         }}
                         placeholder="0:30"
-                        className="no-number-spinner mt-2 box-border h-11 min-h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] tabular-nums text-zinc-900 outline-none transition placeholder:text-zinc-400 placeholder:font-normal focus:border-emerald-400 focus:bg-white focus:text-zinc-900 sm:px-3"
+                        className="no-number-spinner mt-2 box-border h-11 min-h-11 w-full min-w-0 max-w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 text-[13px] tabular-nums text-zinc-900 outline-none transition placeholder:text-zinc-400 placeholder:font-normal focus:border-emerald-400 focus:bg-white focus:text-zinc-900 sm:px-3"
                       />
                     </div>
                   </div>

@@ -52,21 +52,22 @@ function buildLastSevenDaysSlots(entries: WeightChartEntry[]): Slot[] {
   return slots;
 }
 
-/** Grafico peso 7 dias; `variant="compact"` para card quadrado na Home (sem blocos de titulo extra). */
+/** Grafico peso 7 dias; `variant="compact"` para card quadrado na Home; `dense` para vet prontuario. */
 export function HealthWeightSevenDayChart({
   entries,
   variant = "default",
 }: {
   entries: WeightChartEntry[];
-  variant?: "default" | "compact";
+  variant?: "default" | "compact" | "dense";
 }) {
   const strokeGradId = useId().replace(/:/g, "");
   const compact = variant === "compact";
+  const dense = variant === "dense";
   const slots = useMemo(() => buildLastSevenDaysSlots(entries), [entries]);
 
   const chartGeom = useMemo(() => {
     const vbW = 280;
-    const vbH = compact ? 50 : 72;
+    const vbH = dense ? 32 : compact ? 50 : 72;
     const values = slots.map((s) => s.weightKg).filter((w): w is number => w != null);
     if (values.length === 0) {
       return {
@@ -120,7 +121,7 @@ export function HealthWeightSevenDayChart({
     });
 
     return { pathD, circles, gridYs, vbW, vbH };
-  }, [slots, compact]);
+  }, [slots, compact, dense]);
 
   const avgWeek = useMemo(() => {
     const nums = slots.map((s) => s.weightKg).filter((w): w is number => w != null);
@@ -134,16 +135,20 @@ export function HealthWeightSevenDayChart({
   const inner = (
     <div
       className={
-        compact
-          ? "flex min-h-0 flex-1 flex-col rounded-xl border border-zinc-100 bg-zinc-50 p-2"
-          : "rounded-2xl border border-zinc-100 bg-zinc-50 p-3"
+        dense
+          ? "rounded-lg border border-zinc-100 bg-zinc-50 p-1"
+          : compact
+            ? "flex min-h-0 flex-1 flex-col rounded-xl border border-zinc-100 bg-zinc-50 p-2"
+            : "rounded-2xl border border-zinc-100 bg-zinc-50 p-3"
       }
     >
-      <div className={`grid grid-cols-7 ${compact ? "shrink-0 gap-0.5" : "gap-2"}`}>
+      <div className={`grid grid-cols-7 ${dense ? "gap-0" : compact ? "shrink-0 gap-0.5" : "gap-2"}`}>
         {slots.map((s) => (
           <div key={s.dateIso} className="flex flex-col items-center justify-end">
             <span
-              className={`font-semibold tabular-nums text-zinc-500 ${compact ? "text-[8px]" : "text-[10px]"}`}
+              className={`font-semibold tabular-nums text-zinc-500 ${
+                dense ? "text-[7px] leading-none" : compact ? "text-[8px]" : "text-[10px]"
+              }`}
             >
               {s.weightKg != null ? formatKgShort(s.weightKg) : "—"}
             </span>
@@ -153,21 +158,67 @@ export function HealthWeightSevenDayChart({
 
       <div
         className={
-          compact
-            ? "relative mt-0.5 flex min-h-0 min-w-0 flex-1 flex-col"
-            : "relative mt-1 h-[72px] w-full min-w-0"
+          dense
+            ? "relative mt-0 h-[34px] w-full min-w-0"
+            : compact
+              ? "relative mt-0.5 flex min-h-0 min-w-0 flex-1 flex-col"
+              : "relative mt-1 h-[72px] w-full min-w-0"
         }
       >
         {!hasAnyPoint ? (
           <div
             className={`flex w-full items-center justify-center rounded-xl border border-dashed border-zinc-200/90 bg-white/40 text-center text-zinc-500 ${
-              compact
-                ? "min-h-0 flex-1 px-1.5 py-2 text-[9px] leading-snug"
-                : "h-full px-2 text-[11px]"
+              dense
+                ? "h-full px-1 text-[8px] leading-none"
+                : compact
+                  ? "min-h-0 flex-1 px-1.5 py-2 text-[9px] leading-snug"
+                  : "h-full px-2 text-[11px]"
             }`}
           >
-            {compact ? "Sem dados na semana" : "Registre o peso em pelo menos um dia para ver a linha."}
+            {dense || compact ? "Sem dados na semana" : "Registre o peso em pelo menos um dia para ver a linha."}
           </div>
+        ) : dense ? (
+          <svg
+            viewBox={`0 0 ${chartGeom.vbW} ${chartGeom.vbH}`}
+            className="h-full w-full overflow-visible"
+            preserveAspectRatio="xMidYMid meet"
+            aria-hidden
+          >
+            <defs>
+              <linearGradient id={`${strokeGradId}-ln`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="100%" stopColor="#10b981" />
+              </linearGradient>
+            </defs>
+            {chartGeom.gridYs.map((gy, idx) => (
+              <line
+                key={idx}
+                x1={8}
+                y1={gy}
+                x2={chartGeom.vbW - 8}
+                y2={gy}
+                stroke="#e4e4e7"
+                strokeWidth={0.5}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+            {chartGeom.pathD ? (
+              <path
+                d={chartGeom.pathD}
+                fill="none"
+                stroke={`url(#${strokeGradId}-ln)`}
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : null}
+            {chartGeom.circles.map((c) => (
+              <g key={c.key}>
+                <circle cx={c.cx} cy={c.cy} r={3.2} fill="#ffffff" stroke="#10b981" strokeWidth={1.2} />
+                <circle cx={c.cx} cy={c.cy} r={1.4} fill="#10b981" />
+              </g>
+            ))}
+          </svg>
         ) : compact ? (
           <div className="relative min-h-0 w-full flex-1">
             <svg
@@ -263,18 +314,24 @@ export function HealthWeightSevenDayChart({
         )}
       </div>
 
-      <div className={`grid grid-cols-7 ${compact ? "mt-1 shrink-0 gap-0.5" : "mt-2 gap-2"}`}>
+      <div className={`grid grid-cols-7 ${dense ? "mt-0.5 gap-0" : compact ? "mt-1 shrink-0 gap-0.5" : "mt-2 gap-2"}`}>
         {slots.map((s) => (
           <div key={`${s.dateIso}-lab`} className="flex flex-col items-center">
-            <span className={`font-medium text-zinc-500 ${compact ? "text-[8px]" : "text-[10px]"}`}>{s.day}</span>
+            <span
+              className={`font-medium text-zinc-500 ${
+                dense ? "text-[7px] leading-none" : compact ? "text-[8px]" : "text-[10px]"
+              }`}
+            >
+              {s.day}
+            </span>
           </div>
         ))}
       </div>
     </div>
   );
 
-  if (compact) {
-    return <div className="flex min-h-0 min-w-0 flex-1 flex-col">{inner}</div>;
+  if (compact || dense) {
+    return dense ? inner : <div className="flex min-h-0 min-w-0 flex-1 flex-col">{inner}</div>;
   }
 
   return (

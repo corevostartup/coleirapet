@@ -1,18 +1,16 @@
 import { cookies } from "next/headers";
-import type { DocumentReference, Firestore, QueryDocumentSnapshot } from "firebase-admin/firestore";
+import type { DocumentReference, QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
 import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
 import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
 import {
-  COLLECTION_USER,
   SUBCOLLECTION_VACCINES,
   SUBCOLLECTION_VACCINES_LEGACY,
 } from "@/lib/firebase/collections";
-import { getFirebaseAdminDb } from "@/lib/firebase/admin";
-import { readPetIdFromRequestUrl, resolvePetContextForUser } from "@/lib/pets/resolve-pet-context";
 import { canOwnerEditVaccineStatus } from "@/lib/vaccines/vaccine-access";
 import type { VaccineStatus } from "@/lib/vaccines/vaccine-item";
 import { vaccineFromDoc } from "@/lib/vaccines/vaccine-item";
+import { readPetIdFromRequestUrl, resolvePetContextForUser } from "@/lib/pets/resolve-pet-context";
 
 type CreateVaccinePayload = {
   name?: string;
@@ -82,25 +80,6 @@ async function readAndSortVaccineDocs(petRef: DocumentReference) {
   });
 }
 
-async function migrateLegacyVaccinesToPet(
-  db: Firestore,
-  uid: string,
-  petRef: DocumentReference,
-) {
-  const legacySnapshots = await Promise.all([
-    db.collection(COLLECTION_USER).doc(uid).collection(SUBCOLLECTION_VACCINES).get(),
-    db.collection(COLLECTION_USER).doc(uid).collection(SUBCOLLECTION_VACCINES_LEGACY).get(),
-  ]);
-  const legacyDocs = legacySnapshots.flatMap((snapshot) => snapshot.docs);
-  if (!legacyDocs.length) return;
-
-  const batch = db.batch();
-  for (const legacyDoc of legacyDocs) {
-    batch.set(petRef.collection(SUBCOLLECTION_VACCINES).doc(legacyDoc.id), legacyDoc.data(), { merge: true });
-  }
-  await batch.commit();
-}
-
 export async function GET(request: Request) {
   const auth = await requireAuthContext();
   if (!auth) {
@@ -108,18 +87,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const db = getFirebaseAdminDb();
-    const { petRef } = await resolvePetContextForUser(auth.uid, readPetIdFromRequestUrl(request));
-    let docs = await readAndSortVaccineDocs(petRef);
-
-    if (!docs.length) {
-      await migrateLegacyVaccinesToPet(db, auth.uid, petRef);
-      docs = await readAndSortVaccineDocs(petRef);
+    const requestedPetId = readPetIdFromRequestUrl(request);
+    if (!requestedPetId) {
+      return NextResponse.json({ error: "Pet nao informado" }, { status: 400 });
     }
 
+    const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
+    const docs = await readAndSortVaccineDocs(petRef);
     const vaccines = docs.map((doc) => vaccineFromDoc(doc.id, doc.data() as VaccineSourceDoc));
 
-    return NextResponse.json({ vaccines });
+    return NextResponse.json({ vaccines, petId: requestedPetId });
   } catch (error) {
     return NextResponse.json(
       {
@@ -161,14 +138,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Data invalida" }, { status: 400 });
   }
 
+  const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
+  if (!requestedPetId) {
+    return NextResponse.json({ error: "Pet nao informado" }, { status: 400 });
+  }
+
   try {
     const nowIso = new Date().toISOString();
-    const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
-    const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
+    const { petRef, petId } = await resolvePetContextForUser(auth.uid, requestedPetId);
     const payload: Record<string, unknown> = {
       name: name.slice(0, 80),
       status,
       date,
+      petId,
       createdBy: "owner",
       createdByUid: auth.uid,
       createdAt: nowIso,
@@ -230,9 +212,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Status invalido" }, { status: 400 });
   }
 
+  const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
+  if (!requestedPetId) {
+    return NextResponse.json({ error: "Pet nao informado" }, { status: 400 });
+  }
+
   try {
     const nowIso = new Date().toISOString();
-    const requestedPetId = readPetIdFromRequestUrl(request) ?? body.petId ?? null;
     const { petRef } = await resolvePetContextForUser(auth.uid, requestedPetId);
     const canonicalRef = petRef.collection(SUBCOLLECTION_VACCINES).doc(id);
     const legacyRef = petRef.collection(SUBCOLLECTION_VACCINES_LEGACY).doc(id);

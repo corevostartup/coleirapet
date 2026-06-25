@@ -1,10 +1,19 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { AUTH_SESSION_COOKIE, AUTH_USER_UID_COOKIE } from "@/lib/auth/constants";
-import { parseAuthSessionCookie, parseAuthUserUidCookie } from "@/lib/auth/session";
-import { COLLECTION_VETERINARIANS, SUBCOLLECTION_VET_MEDICAL_RECORDS } from "@/lib/firebase/collections";
+import {
+  COLLECTION_PETS,
+  COLLECTION_VETERINARIANS,
+  SUBCOLLECTION_PET_CLINICAL_RECORDS,
+  SUBCOLLECTION_VET_MEDICAL_RECORDS,
+} from "@/lib/firebase/collections";
 import { getFirebaseAdminDb, getFirestoreFieldValue } from "@/lib/firebase/admin";
-import { getOrCreateCurrentUserProfile } from "@/lib/users/current";
+import { loadPetClinicalHistory } from "@/lib/pets/clinical-history";
+import {
+  createPrescribedByCache,
+  enrichPrescribedBy,
+  prescribedByForWrite,
+  requireVetAuthContext,
+  veterinarianFromAuth,
+} from "@/lib/veterinarians/auth";
 
 type CreateMedicalRecordPayload = {
   petId?: string;
@@ -37,27 +46,73 @@ function formatDateTime(value: string) {
   }).format(date);
 }
 
-async function requireVetAuthContext() {
-  const jar = await cookies();
-  const session = parseAuthSessionCookie(jar.get(AUTH_SESSION_COOKIE)?.value);
-  const uid = parseAuthUserUidCookie(jar.get(AUTH_USER_UID_COOKIE)?.value);
-  if (!session || !uid) return null;
-
-  const user = await getOrCreateCurrentUserProfile(uid);
-  if (user.userType !== "vet") return null;
-  return { uid };
+function recordFromDoc(
+  id: string,
+  data: {
+    petId?: string;
+    petName?: string;
+    diagnosis?: string;
+    note?: string;
+    prescribedByName?: string;
+    prescribedByCrmv?: string;
+    createdAt?: unknown;
+  },
+) {
+  const createdAtIso = isoFromFirestoreTime(data.createdAt);
+  return {
+    id,
+    petId: typeof data.petId === "string" ? data.petId : "",
+    petName: typeof data.petName === "string" ? data.petName : "Pet",
+    diagnosis: typeof data.diagnosis === "string" ? data.diagnosis : "Registro clinico",
+    note: typeof data.note === "string" ? data.note : "",
+    prescribedByName: typeof data.prescribedByName === "string" ? data.prescribedByName : "Veterinario",
+    prescribedByCrmv: typeof data.prescribedByCrmv === "string" ? data.prescribedByCrmv : "Nao informado",
+    createdAtIso,
+    when: formatDateTime(createdAtIso),
+  };
 }
 
 export async function GET(request: Request) {
   const auth = await requireVetAuthContext();
   if (!auth) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
 
-  const petId = new URL(request.url).searchParams.get("petId")?.trim() ?? "";
+  const url = new URL(request.url);
+  const veterinarianOnly = url.searchParams.get("veterinarian") === "1";
+  const petId = url.searchParams.get("petId")?.trim() ?? "";
+
+  const veterinarian = veterinarianFromAuth(auth);
+
+  if (veterinarianOnly) {
+    return NextResponse.json({ veterinarian });
+  }
+
   if (!petId) return NextResponse.json({ error: "PetId invalido" }, { status: 400 });
 
   try {
     const db = getFirebaseAdminDb();
-    const snapshot = await db
+    const petRef = db.collection(COLLECTION_PETS).doc(petId);
+    const petSnap = await petRef.get();
+    if (!petSnap.exists) return NextResponse.json({ error: "Pet nao encontrado" }, { status: 404 });
+
+    const history = await loadPetClinicalHistory(petRef, petId);
+    const petData = petSnap.data() as { name?: string } | undefined;
+    const resolvedPetName =
+      typeof petData?.name === "string" && petData.name.trim() ? petData.name.trim() : "Pet";
+    const fromPet = history
+      .filter((item) => item.kind === "clinical")
+      .map((item) => ({
+        id: item.id.replace(/^clinical-/, ""),
+        petId,
+        petName: resolvedPetName,
+        diagnosis: item.title,
+        note: item.detail,
+        prescribedByName: item.prescribedByName,
+        prescribedByCrmv: item.prescribedByCrmv,
+        createdAtIso: item.createdAtIso,
+        when: item.when,
+      }));
+
+    const legacySnapshot = await db
       .collection(COLLECTION_VETERINARIANS)
       .doc(auth.uid)
       .collection(SUBCOLLECTION_VET_MEDICAL_RECORDS)
@@ -65,29 +120,21 @@ export async function GET(request: Request) {
       .limit(200)
       .get();
 
-    const records = snapshot.docs
-      .map((doc) => {
-        const data = doc.data() as {
-          petId?: string;
-          petName?: string;
-          diagnosis?: string;
-          note?: string;
-          createdAt?: unknown;
-        };
-        const createdAtIso = isoFromFirestoreTime(data.createdAt);
-        return {
-          id: doc.id,
-          petId: typeof data.petId === "string" ? data.petId : "",
-          petName: typeof data.petName === "string" ? data.petName : "Pet",
-          diagnosis: typeof data.diagnosis === "string" ? data.diagnosis : "Registro clinico",
-          note: typeof data.note === "string" ? data.note : "",
-          createdAtIso,
-          when: formatDateTime(createdAtIso),
-        };
-      })
-      .sort((a, b) => b.createdAtIso.localeCompare(a.createdAtIso));
+    const authorCache = createPrescribedByCache(auth);
+    const legacyIds = new Set(fromPet.map((item) => item.id));
+    const legacyRecords = await Promise.all(
+      legacySnapshot.docs
+        .filter((doc) => !legacyIds.has(doc.id))
+        .map(async (doc) => {
+          const raw = doc.data() as Parameters<typeof recordFromDoc>[1] & { recordedByUid?: string };
+          const author = await enrichPrescribedBy(raw, auth, authorCache);
+          return recordFromDoc(doc.id, { ...raw, ...author });
+        }),
+    );
 
-    return NextResponse.json({ records });
+    const records = [...fromPet, ...legacyRecords].sort((a, b) => b.createdAtIso.localeCompare(a.createdAtIso));
+
+    return NextResponse.json({ records, veterinarian });
   } catch (error) {
     return NextResponse.json(
       {
@@ -122,35 +169,50 @@ export async function POST(request: Request) {
 
   try {
     const db = getFirebaseAdminDb();
-    const ref = await db
+    const petRef = db.collection(COLLECTION_PETS).doc(petId);
+    const petSnap = await petRef.get();
+    if (!petSnap.exists) return NextResponse.json({ error: "Pet nao encontrado" }, { status: 404 });
+
+    const prescribedBy = prescribedByForWrite(auth);
+    const recordPayload = {
+      kind: "clinical",
+      petId: petId.slice(0, 64),
+      petName: petName.slice(0, 80),
+      diagnosis: diagnosis.slice(0, 120),
+      note: note.slice(0, 1200),
+      ...prescribedBy,
+      recordedByUid: auth.uid,
+      createdBy: "vet",
+      createdAt: getFirestoreFieldValue().serverTimestamp(),
+      updatedAt: getFirestoreFieldValue().serverTimestamp(),
+    };
+
+    const petRecordRef = await petRef.collection(SUBCOLLECTION_PET_CLINICAL_RECORDS).add(recordPayload);
+
+    await db
       .collection(COLLECTION_VETERINARIANS)
       .doc(auth.uid)
       .collection(SUBCOLLECTION_VET_MEDICAL_RECORDS)
-      .add({
+      .doc(petRecordRef.id)
+      .set({
         petId: petId.slice(0, 64),
         petName: petName.slice(0, 80),
         diagnosis: diagnosis.slice(0, 120),
         note: note.slice(0, 1200),
+        ...prescribedBy,
+        recordedByUid: auth.uid,
+        petClinicalRecordId: petRecordRef.id,
         createdAt: getFirestoreFieldValue().serverTimestamp(),
         updatedAt: getFirestoreFieldValue().serverTimestamp(),
       });
 
-    const written = await ref.get();
-    const data = written.data() as { createdAt?: unknown } | undefined;
-    const createdAtIso = isoFromFirestoreTime(data?.createdAt);
+    const written = await petRecordRef.get();
+    const data = written.data() as Parameters<typeof recordFromDoc>[1] | undefined;
 
     return NextResponse.json(
       {
         ok: true,
-        record: {
-          id: ref.id,
-          petId: petId.slice(0, 64),
-          petName: petName.slice(0, 80),
-          diagnosis: diagnosis.slice(0, 120),
-          note: note.slice(0, 1200),
-          createdAtIso,
-          when: formatDateTime(createdAtIso),
-        },
+        record: recordFromDoc(petRecordRef.id, data ?? {}),
       },
       { status: 201 },
     );
